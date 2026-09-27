@@ -1,9 +1,9 @@
 from fastapi import APIRouter, File, Request, UploadFile
 
 from app.errors import ApiError
-from app.media import decode_jpeg
+from app.media import decode_jpeg, decode_wav
 from app.registry import ModelRegistry
-from app.schemas import Analysis, AnalyzeRequest, DetectResponse
+from app.schemas import Analysis, AnalyzeRequest, DetectResponse, TranscribeResponse
 
 router = APIRouter(prefix="/internal/v1")
 
@@ -20,6 +20,12 @@ def detect(request: Request, image: UploadFile = File(...)):
     # Sync handler: FastAPI runs it in a worker thread, so GPU inference doesn't block the event loop.
     model = require(request.app.state.registry, "vision")
     return DetectResponse(detections=model.detect(decode_jpeg(image.file.read())))
+
+
+@router.post("/speech/transcribe", response_model=TranscribeResponse)
+def transcribe(request: Request, audio: UploadFile = File(...)):
+    model = require(request.app.state.registry, "stt")
+    return TranscribeResponse(transcript=model.transcribe(decode_wav(audio.file.read())))
 
 
 @router.post("/language/analyze", response_model=Analysis)
