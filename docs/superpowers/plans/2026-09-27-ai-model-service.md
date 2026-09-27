@@ -6,24 +6,39 @@
 
 **Architecture:** 단일 FastAPI 프로세스가 기동 시 세 모델을 로딩한다(`ModelRegistry`). 라우트는 모델 구현체가 아니라 Protocol(`VisionModel`/`SpeechModel`/`LanguageModel`)에만 의존하므로, 단위 테스트는 가짜 모델로 CPU에서 돌고 실제 모델 테스트는 `@pytest.mark.gpu`로 분리한다. 음성은 메모리에서만 처리한다(Zero-Storage).
 
-**Tech Stack:** Python 3.11, FastAPI, pydantic-settings, Ultralytics(YOLO11-pose + YOLOE), faster-whisper, transformers(+bitsandbytes), PyTorch CUDA, pytest, Docker.
+**Tech Stack:** WSL2 Ubuntu, Python 3.11, FastAPI, pydantic-settings, Ultralytics(YOLO11s + YOLOE), faster-whisper, transformers(+bitsandbytes), PyTorch CUDA, pytest, Docker.
 
-**Spec:** `API_v1_3.md` 4장, 7장, 12장, 16장 (모델 서비스 부분). 모델 선정 근거는 팀 대화 정리본을 따른다.
+**Spec:** `API_v1_3.md` 4장, 7장, 12장, 16장 (모델 서비스 부분). 모델 선정 근거와 아래 결정 사항은 2026-09-27 팀 대화·검토(grilling) 결과를 따른다.
 
 ## Global Constraints
 
-- 모든 코드는 `model-service/` 아래에 둔다. `main` 브랜치는 수정하지 않는다. 작업 브랜치는 `feature/ai-model`.
+**저장소 · 협업**
+- 모노레포. 모델 서비스 코드는 모두 `model-service/` 아래에 둔다. 루트 `docker-compose.yml`은 인태님 관리이며, 모델 서비스 블록은 PR로 제안만 한다.
+- 작업 브랜치는 `feature/ai-model`. `main`은 직접 수정하지 않는다.
+- main 병합: **Phase가 끝날 때마다** `feature/ai-model` → main PR (Phase 1 끝, Phase 2 끝). 다른 팀원 코드는 병합된 main에서 받아 연동 테스트한다.
+- API 명세 수정은 코드보다 먼저 **명세만 담은 작은 PR**로 올린다. 모든 PR은 올리기 전에 민중님 확인을 받는다.
+
+**API 계약**
 - Base path: `/internal/v1`. 엔드포인트: `POST /vision/detect`, `POST /speech/transcribe`, `POST /language/analyze`, `POST /audio/process`, 추가로 `GET /health`.
 - 이미지 입력: `multipart/form-data` 필드 `image`, `image/jpeg`.
 - 음성 입력: `multipart/form-data` 필드 `audio`, `audio/wav`, **PCM 16-bit, 16kHz, Mono**. 이외 형식은 400.
 - 오류 응답: `{"code": "...", "message": "..."}`. 400 잘못된 요청, 500 내부 오류, 503 모델 사용 불가.
-- Vision `label` 허용 값: `person`, `package` (명세의 `box`는 쓰지 않는다 — 인태님께 확정 공유).
+- Vision 응답은 Phase 1에서 `label`, `confidence`만. `label` 허용 값: `person`, `package` (`box`는 쓰지 않음). `bbox`/`facingCamera`는 인태님·덕민님 동의 전까지 넣지 않는다.
+- `package` 범위: 택배 박스, 비닐 택배봉투, 배달 음식 봉지·용기, 보냉백(프레시백)을 모두 `package` 하나로. 사람이 들고 있는 물건도 구분하지 않는다.
 - `purpose` 허용 값: `DELIVERY`, `INSPECTION`, `VISIT`, `ETC` (덕민님 승인 전 초안). 목록 밖 값은 `ETC`.
-- `summary`: 공백 포함 최대 20자. 초과 시 `s[:19] + "…"` (Spring과 동일 규칙).
-- Zero-Storage: 음성 바이트를 디스크(임시 파일 포함)에 쓰지 않는다. 로그에도 전사문 외 음성 데이터를 남기지 않는다.
-- 프로필: 환경변수 `MODEL_PROFILE` = `full` | `lite` (기본 `lite`). lite는 8GB VRAM에서 전체 적재가 가능해야 한다.
+- `summary`: 명사형, 공백 포함 최대 20자. 초과 시 `s[:19] + "…"` (Spring과 동일 규칙).
+- 빈 전사(발화 없음): `transcript=""`, `summary=""`, `purpose="ETC"`. 표시 문구는 Spring·앱이 정한다.
+- Zero-Storage: 음성 바이트를 디스크(임시 파일 포함)에 쓰지 않는다. 로그에도 음성 데이터를 남기지 않는다.
+
+**실행 · 성능**
+- 프로필: 환경변수 `MODEL_PROFILE` = `full` | `lite` (기본 `lite`).
 - uvicorn worker는 1개. 각 모델 래퍼는 추론을 `threading.Lock`으로 직렬화한다(GPU 동시 접근 방지).
-- 지연 목표: `/internal/v1/audio/process` p95 ≤ 2.0초(lite, 5초 발화 기준). Pi 타임아웃 3~5초에서 네트워크·Spring 몫을 남기기 위함.
+- 지연 목표 — **full(시연 PC, 3090)**: `/audio/process` p95 ≤ 2.0초(5초 발화), `/vision/detect` p95 ≤ 0.3초. **lite(8GB)**: 세 모델 전체 로딩 성공 + `/audio/process` p95 ≤ 4.0초.
+- 정확도 목표(full 기준, 잠정 — 첫 측정 후 조정): 사람 재현율 ≥ 95%, 택배 재현율 ≥ 85%, STT CER ≤ 15%, 용건 정확도 ≥ 90%, 요약 20자 초과 0%.
+
+**데이터**
+- 초기 테스트·평가 데이터는 공개 이미지와 TTS로 생성한 음성으로 만든다. 팀원 얼굴·목소리 등 실데이터는 커밋하지 않는다(`.gitignore`된 `data/` 또는 공유 드라이브).
+- GPU 테스트와 평가 스크립트는 데이터 파일이 없으면 실패가 아니라 skip한다.
 
 ## Review Focus
 
@@ -31,7 +46,7 @@
 2. **Pi 설정 실수로 온 스테레오/44.1kHz/32-bit WAV** — 크래시가 아니라 400 `INVALID_AUDIO`와 무엇이 틀렸는지 알려주는 메시지. → Task 2.
 3. **LLM이 JSON이 아닌 출력, 목록 밖 purpose, 20자 초과 요약을 낼 때** — 규칙 기반 폴백 또는 정규화로 항상 계약에 맞는 응답. → Task 6, Task 7.
 4. **모델 로딩 중에 들어온 요청** — 503 `MODEL_NOT_READY`, 서버는 죽지 않음. → Task 1.
-5. **등을 돌린 사람 / 화면 끝에 잘린 사람(떠나는 택배 기사)** — `person`은 감지하되 `facingCamera: false`. → Task 3.
+5. **박스가 아닌 택배(비닐봉투·배달 음식 봉지·보냉백)** — 박스만 잡고 이것들을 놓치면 "물건 도착"이 누락된다. → Task 4 GPU 테스트, Task 10 비전 평가셋에 유형별 폴더.
 
 ---
 
@@ -40,8 +55,9 @@
 ```text
 model-service/
 ├─ pyproject.toml            # 의존성, pytest 설정(gpu 마커)
-├─ README.md                 # 실행법, 프로필, API 차이점(bbox/facingCamera 제안)
+├─ README.md                 # 실행법, 프로필, 명세 대비 변경점
 ├─ Dockerfile
+├─ .gitignore                # data/, bench 임시 파일, 가중치
 ├─ app/
 │  ├─ main.py                # create_app(), lifespan, 라우터 등록
 │  ├─ config.py              # Settings, 프로필별 모델 설정
@@ -52,7 +68,6 @@ model-service/
 │  ├─ media.py               # decode_jpeg, decode_wav (메모리 전용)
 │  ├─ pipeline.py            # analyze_transcript, process_audio
 │  ├─ routes.py              # 5개 엔드포인트
-│  ├─ vision/pose.py         # is_facing_camera
 │  ├─ vision/yolo.py         # YoloVision
 │  ├─ speech/filters.py      # clean_segments
 │  ├─ speech/whisper.py      # WhisperSpeech
@@ -60,35 +75,37 @@ model-service/
 │  ├─ language/rules.py      # rule_analyze
 │  └─ language/qwen.py       # QwenLanguage, build_messages
 ├─ tests/                    # 단위(가짜 모델) + gpu 마커 통합 테스트
-│  └─ fixtures/              # 샘플 jpg/wav (Task 2에서 생성 스크립트로 만듦)
+│  └─ fixtures/              # make_fixtures.py (합성 wav/jpg 생성)
 ├─ bench/benchmark.py        # VRAM·지연 측정
-└─ eval/                     # 정확도 평가 스크립트 + 라벨 데이터
+├─ eval/                     # 정확도 평가 스크립트, 라벨(jsonl), 데이터 준비 스크립트
+└─ data/                     # (gitignore) 공개·생성·실제 이미지/음성
 ```
 
 ---
 
-### Task 0: 개발 환경 준비 (이 PC: RTX 3060 Ti 8GB, Python·Docker 미설치)
+### Task 0: 개발 환경 준비 (민중님이 직접 실행, 이 PC: RTX 3060 Ti 8GB)
 
 **Files:** 없음 (로컬 환경)
 
-- [ ] **Step 1:** Python 3.11 설치 — `winget install Python.Python.3.11`. 확인: `py -3.11 --version` → `Python 3.11.x`
-- [ ] **Step 2:** `model-service/.venv` 생성 후 CUDA PyTorch 설치 — `pip install torch --index-url https://download.pytorch.org/whl/cu124`. 확인: `python -c "import torch;print(torch.cuda.is_available())"` → `True`
-- [ ] **Step 3:** Docker Desktop(WSL2 백엔드) 설치 — Task 11 전까지만 끝내면 된다. 확인: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` 에 3060 Ti 표시.
+- [ ] **Step 1:** PowerShell(관리자)에서 `wsl --install -d Ubuntu-22.04` → 재부팅 → Ubuntu 사용자 생성. 확인: WSL 안에서 `nvidia-smi`에 3060 Ti 표시(Windows 드라이버가 GPU를 WSL에 전달하므로 WSL 안에 드라이버를 설치하지 않는다).
+- [ ] **Step 2:** WSL에서 `sudo apt update && sudo apt install -y python3.11 python3.11-venv git`, 그리고 `git clone https://github.com/centreject/DataCat.git ~/DataCat && cd ~/DataCat && git checkout feature/ai-model`. 이 세션의 작업 폴더를 `\\wsl$\Ubuntu-22.04\home\<user>\DataCat`로 옮긴다(이전 임시 clone은 폐기).
+- [ ] **Step 3:** `python3.11 -m venv model-service/.venv`, `pip install torch --index-url https://download.pytorch.org/whl/cu124`. 확인: `python -c "import torch;print(torch.cuda.is_available())"` → `True`.
+- [ ] **Step 4:** Docker Desktop 설치(WSL2 백엔드, Ubuntu 통합 켬). Task 11 전까지만 끝내면 된다. 확인: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`.
 
 ---
 
 ### Task 1: 서비스 뼈대 — 설정, 오류 형식, 레지스트리, `/health`
 
 **Files:**
-- Create: `model-service/pyproject.toml`, `app/main.py`, `app/config.py`, `app/errors.py`, `app/protocols.py`, `app/registry.py`, `app/schemas.py`, `app/routes.py`
+- Create: `model-service/pyproject.toml`, `.gitignore`, `app/main.py`, `app/config.py`, `app/errors.py`, `app/protocols.py`, `app/registry.py`, `app/schemas.py`, `app/routes.py`
 - Test: `tests/test_app.py`, `tests/conftest.py`
 
 **Interfaces:**
 - Produces:
-  - `Settings(BaseSettings)`: `model_profile: Literal["full","lite"]="lite"`, `person_conf: float=0.4`, `package_conf: float=0.3`, `keypoint_conf: float=0.5`, `stt_model: str="large-v3-turbo"`, `llm_model: str="Qwen/Qwen3-4B-Instruct-2507"`, `llm_max_new_tokens: int=64`. 프로필 파생값은 프로퍼티: `stt_compute_type` (`full`→`"float16"`, `lite`→`"int8_float16"`), `llm_quantize_4bit` (`lite`→`True`).
+  - `Settings(BaseSettings)`: `model_profile: Literal["full","lite"]="lite"`, `person_conf: float=0.4`, `package_conf: float=0.3`, `package_prompts: list[str]` (Task 4에서 값 확정), `stt_model: str="large-v3-turbo"`, `llm_model: str="Qwen/Qwen3-4B-Instruct-2507"`, `llm_max_new_tokens: int=64`. 프로필 파생값은 프로퍼티: `stt_compute_type` (`full`→`"float16"`, `lite`→`"int8_float16"`), `llm_quantize_4bit` (`lite`→`True`).
   - `ApiError(status: int, code: str, message: str)`; `install_error_handlers(app)`. 코드: `INVALID_IMAGE`(400), `INVALID_AUDIO`(400), `INVALID_REQUEST`(400), `MODEL_NOT_READY`(503), `INFERENCE_FAILED`(500). FastAPI 검증 오류도 `INVALID_REQUEST` 형식으로 변환.
   - `protocols.py`: `VisionModel.detect(image: PIL.Image.Image) -> list[Detection]`, `SpeechModel.transcribe(audio: np.ndarray) -> str` (float32, 16kHz), `LanguageModel.analyze(transcript: str) -> Analysis`.
-  - `schemas.py`: `Detection(label: Literal["person","package"], confidence: float, bbox: list[float] | None = None, facingCamera: bool | None = None)` — bbox는 `[x1,y1,x2,y2]` 0~1 정규화, `DetectResponse(detections: list[Detection])`, `TranscribeResponse(transcript: str)`, `AnalyzeRequest(transcript: str)`, `Analysis(summary: str, purpose: Literal["DELIVERY","INSPECTION","VISIT","ETC"])`, `AudioProcessResponse(transcript: str, purpose: str, summary: str)`.
+  - `schemas.py`: `Detection(label: Literal["person","package"], confidence: float)`, `DetectResponse(detections: list[Detection])`, `TranscribeResponse(transcript: str)`, `AnalyzeRequest(transcript: str)`, `Analysis(summary: str, purpose: Literal["DELIVERY","INSPECTION","VISIT","ETC"])`, `AudioProcessResponse(transcript: str, purpose: str, summary: str)`.
   - `ModelRegistry` dataclass: `vision`, `stt`, `language` (각각 Optional), `ready: bool`. `load_registry(settings) -> ModelRegistry` (실제 모델은 Task 4·5·7에서 채움; 이 태스크에선 빈 레지스트리).
   - `create_app(registry_factory: Callable[[Settings], ModelRegistry] = load_registry) -> FastAPI` — lifespan에서 팩토리를 **백그라운드 스레드**로 실행해 로딩 중에도 `/health`가 응답하게 한다. `app.state.registry`에 저장.
   - `routes.py`: `require(registry, name) -> model` — 준비 안 됐으면 `ApiError(503,"MODEL_NOT_READY",...)`.
@@ -99,7 +116,7 @@ model-service/
   - `test_validation_error_uses_error_format`: `POST /internal/v1/language/analyze` 본문 `{}` → 400, `code == "INVALID_REQUEST"`.
   - `test_profile_derived_settings`: `Settings(model_profile="full").stt_compute_type == "float16"`, `Settings().llm_quantize_4bit is True`.
 - [ ] **Step 2:** `pytest tests/test_app.py -v` → FAIL (모듈 없음)
-- [ ] **Step 3:** 위 Interfaces대로 구현. `pyproject.toml`에 `[tool.pytest.ini_options] markers = ["gpu: needs CUDA and real weights"]`, 기본 `addopts = "-m 'not gpu'"`.
+- [ ] **Step 3:** 위 Interfaces대로 구현. `pyproject.toml`에 `[tool.pytest.ini_options] markers = ["gpu: needs CUDA and real weights"]`, 기본 `addopts = "-m 'not gpu'"`. `.gitignore`에 `data/`, `.venv/`, `*.pt`, `bench/results/*.tmp`.
 - [ ] **Step 4:** `pytest -v` → PASS
 - [ ] **Step 5:** Commit — `feat(model-service): app skeleton, error format, health, profiles`
 
@@ -128,55 +145,52 @@ model-service/
 
 ---
 
-### Task 3: `/vision/detect` 라우트 + 정면 판정 (가짜 모델로)
+### Task 3: `/vision/detect` 라우트 (가짜 모델로)
 
 **Files:**
-- Create: `app/vision/pose.py`
 - Modify: `app/routes.py`
 - Test: `tests/test_vision.py`
 
 **Interfaces:**
 - Consumes: `decode_jpeg`, `require`, `DetectResponse`.
-- Produces: `is_facing_camera(keypoints: np.ndarray, min_conf: float) -> bool` — `keypoints` shape `(17,3)` COCO 순서 `(x,y,conf)`. 코(0)의 conf ≥ min_conf **그리고** 왼눈(1) 또는 오른눈(2)의 conf ≥ min_conf 이면 `True`.
 
 - [ ] **Step 1: 실패하는 테스트 작성**
-  - `test_facing_when_nose_and_eye_visible` → True.
-  - `test_not_facing_when_back_turned`: 코·눈 conf 0.1, 어깨만 0.9 → False.
-  - `test_not_facing_when_only_nose`: 코 0.9, 두 눈 0.2 → False.
-  - `test_detect_route_returns_contract`: 가짜 VisionModel이 `[Detection(label="person", confidence=0.94, bbox=[0.1,0.2,0.5,0.9], facingCamera=False)]` 반환 → 응답 JSON `detections[0]` 이 그대로, `label`/`confidence` 키 존재.
+  - `test_detect_route_returns_contract`: 가짜 VisionModel이 `[Detection(label="person", confidence=0.94)]` 반환 → 응답 `{"detections":[{"label":"person","confidence":0.94}]}` (키가 정확히 이 둘).
   - `test_detect_route_empty`: 가짜가 `[]` → `{"detections": []}`.
   - `test_detect_route_rejects_non_jpeg` → 400 `INVALID_IMAGE`.
+  - `test_detect_route_missing_field`: `image` 필드 없이 요청 → 400 `INVALID_REQUEST`.
 - [ ] **Step 2:** `pytest tests/test_vision.py -v` → FAIL
-- [ ] **Step 3:** 구현. 라우트는 `response_model_exclude_none=True`로 선택 필드가 없으면 생략.
+- [ ] **Step 3:** 구현.
 - [ ] **Step 4:** `pytest -v` → PASS
-- [ ] **Step 5:** Commit — `feat(model-service): vision detect endpoint and facing-camera rule`
+- [ ] **Step 5:** Commit — `feat(model-service): vision detect endpoint`
 
 ---
 
 ### Task 4: 실제 비전 모델 `YoloVision` (Phase 1 마감 대상)
 
 **Files:**
-- Create: `app/vision/yolo.py`
-- Modify: `app/registry.py` (`load_registry`가 vision 로딩)
+- Create: `app/vision/yolo.py`, `eval/prepare_images.py`
+- Modify: `app/registry.py` (`load_registry`가 vision 로딩), `app/config.py` (`package_prompts` 기본값)
 - Test: `tests/test_vision_gpu.py` (`@pytest.mark.gpu`)
 
 **Interfaces:**
-- Consumes: `VisionModel`, `Detection`, `is_facing_camera`, `Settings`.
+- Consumes: `VisionModel`, `Detection`, `Settings`.
 - Produces: `YoloVision(settings: Settings)` implements `VisionModel`.
-  - 사람: `yolo11s-pose.pt` — 박스(`person`) + 키포인트 → `facingCamera`. `conf >= settings.person_conf`.
-  - 택배: `yoloe-11s-seg.pt`(open-vocabulary)에 `set_classes(["cardboard box", "parcel", "package"])` → 모두 `package`로 매핑. `conf >= settings.package_conf`. 파인튜닝 가중치가 생기면 설정값 `package_weights`로 교체(후속 계획).
-  - bbox는 이미지 크기로 나눠 0~1 정규화, 소수 4자리 반올림. 추론 fp16, `threading.Lock`으로 직렬화.
+  - 사람: `yolo11s.pt` (COCO) 클래스 0(person)만, `conf >= settings.person_conf`.
+  - 택배: `yoloe-11s-seg.pt`에 `set_classes(settings.package_prompts)`; 기본값 `["cardboard box", "parcel", "plastic mailer bag", "shopping bag", "food delivery bag", "takeout container", "insulated cooler bag"]` → 모두 `package`로 매핑, `conf >= settings.package_conf`. 파인튜닝 가중치가 생기면 설정값 `package_weights`로 교체(후속 계획).
+  - 같은 label이 여러 개면 모두 반환(Spring은 존재 여부만 본다). 추론 fp16, `threading.Lock`으로 직렬화.
+- `eval/prepare_images.py`: Open Images / COCO에서 person, box, plastic bag, 음식 용기 이미지와 사람 없는 실내 복도 이미지를 `data/images/<person|package_box|package_bag|package_food|package_cooler|empty>/`로 받는 스크립트.
 
-- [ ] **Step 1: 실패하는 GPU 테스트 작성** — 테스트 이미지는 `tests/fixtures/images/`에 팀이 직접 찍은 사진(초상권 문제 없는 팀원 사진)으로 추가.
-  - `test_person_facing.jpg` → `person` 1개 이상, `facingCamera is True`.
-  - `test_person_back.jpg` → `person`, `facingCamera is False`.
-  - `test_package_only.jpg` → `package` 있음, `person` 없음.
-  - `test_empty_hallway.jpg` → `detections == []`.
-- [ ] **Step 2:** `pytest -m gpu tests/test_vision_gpu.py -v` → FAIL
-- [ ] **Step 3:** 구현.
-- [ ] **Step 4:** `pytest -m gpu tests/test_vision_gpu.py -v` → PASS. 실패하는 사진이 있으면 임계값을 조정하고 조정값을 `Settings` 기본값에 반영.
-- [ ] **Step 5:** Commit — `feat(model-service): YOLO11-pose + YOLOE package detector`
-- [ ] **Step 6:** 인태님께 공유 — 엔드포인트 동작 확인용 `curl -F image=@x.jpg http://localhost:8000/internal/v1/vision/detect` 예시, `label`은 `package`, 선택 필드 `bbox`/`facingCamera` 추가 제안(명세 7.1 수정 요청).
+- [ ] **Step 1:** `prepare_images.py` 구현 후 실행 → 폴더별 최소 30장.
+- [ ] **Step 2: 실패하는 GPU 테스트 작성** — 폴더별로 대표 이미지 1장씩 읽음, 파일 없으면 `pytest.skip`.
+  - `person/` → `person` 포함.
+  - `package_box/`, `package_bag/`, `package_food/`, `package_cooler/` → 각각 `package` 포함.
+  - `empty/` → `detections == []`.
+- [ ] **Step 3:** `pytest -m gpu tests/test_vision_gpu.py -v` → FAIL
+- [ ] **Step 4:** 구현.
+- [ ] **Step 5:** `pytest -m gpu tests/test_vision_gpu.py -v` → PASS. 실패 유형이 있으면 `package_prompts`·임계값을 조정하고 기본값에 반영.
+- [ ] **Step 6:** Commit — `feat(model-service): YOLO11 person + YOLOE package detector`
+- [ ] **비상안(기록만):** YOLOE가 Phase 1 안에 목표에 못 미치면, Spring 규칙 "사람 없음 + ToF 감지 = 물건 도착"으로 대체 가능하다고 인태님께 알린다.
 
 ---
 
@@ -198,7 +212,7 @@ model-service/
   - `test_clean_drops_high_no_speech`: `[("음", 0.9)]` → `""`.
   - `test_transcribe_route`: 가짜 SpeechModel이 `"택배 왔습니다."` → `{"transcript": "택배 왔습니다."}`.
   - `test_transcribe_route_rejects_stereo` → 400 `INVALID_AUDIO`.
-  - GPU: `test_silence_gives_empty` — 3초 무음 → `""`. `test_korean_sample` — `tests/fixtures/audio/delivery_01.wav`(팀원 녹음, INMP441로 녹음한 것이 이상적) → `"택배"` 포함.
+  - GPU: `test_silence_gives_empty` — `silence_wav(3)` → `""`. `test_korean_tts_sample` — Task 10에서 생성한 `data/audio/tts/delivery_01.wav`(없으면 skip) → `"택배"` 포함.
 - [ ] **Step 2:** `pytest tests/test_speech.py -v` → FAIL
 - [ ] **Step 3:** 구현.
 - [ ] **Step 4:** `pytest -v` 그리고 `pytest -m gpu tests/test_speech_gpu.py -v` → PASS
@@ -218,14 +232,14 @@ model-service/
 - Produces:
   - `truncate_summary(s: str, limit: int = 20) -> str` — `strip()` 후 `len > limit`이면 `s[:limit-1] + "…"`.
   - `parse_llm_output(raw: str) -> Analysis | None` — 첫 `{`~마지막 `}` 구간을 JSON 파싱. 실패하거나 `summary`가 비었으면 `None`. `purpose`는 대문자화, 목록 밖이면 `ETC`. `summary`는 `truncate_summary`.
-  - `rule_analyze(transcript: str) -> Analysis` — 키워드 우선순위 DELIVERY > INSPECTION > VISIT, 없으면 ETC. 키워드: DELIVERY `택배, 배달, 배송, 소포, 음식, 물건`; INSPECTION `검침, 점검, 관리사무소, 관리실, 가스, 소독, 수리, 설치, 공사`; VISIT `친구, 나야, 엄마, 아빠, 언니, 오빠, 형, 누나, 놀러`. summary는 `truncate_summary(transcript)`.
-  - `analyze_transcript(model: LanguageModel, transcript: str) -> Analysis` — 빈 전사(공백만 포함) → `Analysis(summary="용건 인식 실패", purpose="ETC")`, 모델을 부르지 않음. 모델 예외 → `rule_analyze`.
+  - `rule_analyze(transcript: str) -> Analysis` — **LLM 실패 시에만 쓰는 폴백.** 키워드 우선순위 DELIVERY > INSPECTION > VISIT, 없으면 ETC. 키워드: DELIVERY `택배, 배달, 배송, 소포, 음식, 물건`; INSPECTION `검침, 점검, 관리사무소, 관리실, 가스, 소독, 수리, 설치, 공사`; VISIT `친구, 나야, 엄마, 아빠, 언니, 오빠, 형, 누나, 놀러`. summary는 `truncate_summary(transcript)`.
+  - `analyze_transcript(model: LanguageModel, transcript: str) -> Analysis` — 빈 전사(공백만 포함) → `Analysis(summary="", purpose="ETC")`, 모델을 부르지 않음. 모델 예외 → `rule_analyze`.
 
 - [ ] **Step 1: 실패하는 테스트 작성**
   - `test_truncate_exact_20_kept`, `test_truncate_21_becomes_19_plus_ellipsis` (결과 길이 20, 끝 `"…"`).
   - `test_parse_valid`, `test_parse_with_surrounding_text` (`"결과: {...} 입니다"`), `test_parse_garbage_none`, `test_parse_unknown_purpose_is_etc` (`"purpose":"FOOD"` → `ETC`), `test_parse_lowercase_purpose` (`"delivery"` → `DELIVERY`).
   - `test_rules_delivery`: `"택배 문 앞에 두고 갑니다"` → `DELIVERY`. `test_rules_inspection`: `"가스 검침 왔습니다"` → `INSPECTION`. `test_rules_etc`: `"안녕하세요"` → `ETC`.
-  - `test_empty_transcript_skips_model`: 호출되면 실패하는 가짜 모델 + `"  "` → `summary == "용건 인식 실패"`.
+  - `test_empty_transcript_skips_model`: 호출되면 실패하는 가짜 모델 + `"  "` → `Analysis(summary="", purpose="ETC")`.
   - `test_model_exception_falls_back_to_rules`.
   - `test_analyze_route_contract`: 응답 키가 정확히 `{"summary","purpose"}`.
 - [ ] **Step 2:** `pytest tests/test_language.py -v` → FAIL
@@ -245,7 +259,7 @@ model-service/
 **Interfaces:**
 - Consumes: `parse_llm_output`, `rule_analyze`, `Settings`.
 - Produces:
-  - `build_messages(transcript: str) -> list[dict]` — system 프롬프트(역할, purpose 정의 4개, "summary는 공백 포함 20자 이내 명사형", "JSON 한 줄만 출력"), few-shot 4개(용건별 1개), user = transcript.
+  - `build_messages(transcript: str) -> list[dict]` — system 프롬프트(역할, purpose 정의 4개, "summary는 공백 포함 20자 이내 **명사형**(예: `택배 문 앞 보관`, `가스 검침 방문`)", "JSON 한 줄만 출력"), few-shot 4개(용건별 1개, summary 모두 명사형), user = transcript.
   - `QwenLanguage(settings)` implements `LanguageModel` — `AutoModelForCausalLM`, `settings.llm_quantize_4bit`이면 `BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16)`, 아니면 `torch_dtype=torch.bfloat16`. greedy(`do_sample=False`), `max_new_tokens=settings.llm_max_new_tokens`. `parse_llm_output` 결과가 `None`이면 `rule_analyze`.
 
 - [ ] **Step 1: 실패하는 테스트 작성**
@@ -270,7 +284,7 @@ model-service/
 
 - [ ] **Step 1: 실패하는 테스트 작성**
   - `test_process_audio_contract`: 가짜 STT `"택배 문 앞에 두고 갑니다."`, 가짜 LM `Analysis("택배 문 앞 보관","DELIVERY")` → 응답이 정확히 `{"transcript","purpose","summary"}`.
-  - `test_process_audio_silence`: 가짜 STT `""` → `summary == "용건 인식 실패"`, `purpose == "ETC"`.
+  - `test_process_audio_silence`: 가짜 STT `""` → `{"transcript":"","purpose":"ETC","summary":""}`.
   - `test_process_audio_writes_no_files`: `tempfile.mkstemp`, `tempfile.NamedTemporaryFile`, `tempfile.SpooledTemporaryFile`을 호출 시 예외를 던지게 monkeypatch + `tmp_path`를 cwd로 둔 상태에서 요청 → 200, 요청 전후 `tempfile.gettempdir()`와 cwd 파일 목록 동일. (Starlette 업로드가 1MB 이하 WAV를 메모리에 유지함을 이 테스트로 함께 고정; 5초 16k 16-bit ≈ 160KB.)
   - `test_process_audio_stt_not_ready` → 503.
 - [ ] **Step 2:** `pytest tests/test_audio_process.py -v` → FAIL
@@ -280,36 +294,38 @@ model-service/
 
 ---
 
-### Task 9: 벤치마크 — VRAM·지연 (8GB 가능 여부 판정)
+### Task 9: 벤치마크 — VRAM·지연
 
 **Files:**
 - Create: `bench/benchmark.py`, `bench/results/.gitkeep`
 
 **Interfaces:**
 - Consumes: `load_registry`, `Settings`, `process_audio`, fixture 생성 함수.
-- Produces: CLI `python bench/benchmark.py --profile lite --runs 20` → stdout 마크다운 표 + `bench/results/<GPU이름>_<profile>.json`. 항목: GPU 이름, 총 VRAM, 모델별 로딩 후 `torch.cuda.max_memory_allocated`와 `nvidia-smi` 사용량, 로딩 시간, vision/stt/language/audio-process 각 p50·p95(ms). 첫 1회는 워밍업으로 제외.
+- Produces: CLI `python bench/benchmark.py --profile lite --runs 20` → stdout 마크다운 표 + `bench/results/<GPU이름>_<profile>.json`. 항목: GPU 이름, 총 VRAM, 모델별 로딩 후 `torch.cuda.max_memory_allocated`와 `nvidia-smi` 사용량, 로딩 시간, vision/stt/language/audio-process 각 p50·p95(ms). 첫 1회는 워밍업으로 제외. 표 하단에 해당 프로필의 목표(Global Constraints) 대비 PASS/FAIL 표시.
 
 - [ ] **Step 1:** 구현 후 `python bench/benchmark.py --profile lite --runs 3` 스모크 실행 → 표 출력, JSON 생성.
-- [ ] **Step 2:** 이 PC(3060 Ti 8GB)에서 `--profile lite --runs 20` 실행. 판정: 로딩 성공 + audio-process p95 ≤ 2000ms. 실패 시 `llm_model`을 `Qwen/Qwen3-1.7B`로 바꿔 재측정하고 lite 기본값을 결과에 맞게 수정.
-- [ ] **Step 3:** `--profile full`은 시연 PC(3090)에서 실행하도록 README에 명시. 결과 JSON을 커밋.
-- [ ] **Step 4:** Commit — `perf(model-service): VRAM/latency benchmark and 3060Ti lite results`
+- [ ] **Step 2:** 이 PC(3060 Ti 8GB)에서 `--profile lite --runs 20`. 판정: 전체 로딩 성공 + audio-process p95 ≤ 4000ms. 실패 시 `llm_model`을 `Qwen/Qwen3-1.7B`로 바꿔 재측정하고 lite 기본값을 결과에 맞게 수정.
+- [ ] **Step 3:** 결과 JSON 커밋. Commit — `perf(model-service): VRAM/latency benchmark and 3060Ti lite results`
+- [ ] **Step 4:** 시연 PC(3090) 관리자에게 `--profile full --runs 20` 실행 요청 → 결과 JSON을 받아 커밋. 판정: audio-process p95 ≤ 2000ms, vision p95 ≤ 300ms.
 
 ---
 
-### Task 10: 정확도 평가 스크립트 + 초기 평가셋
+### Task 10: 평가 데이터 생성 + 정확도 평가
 
 **Files:**
-- Create: `eval/purpose_cases.jsonl`, `eval/eval_language.py`, `eval/eval_stt.py`, `eval/eval_vision.py`, `eval/README.md`
+- Create: `eval/purpose_cases.jsonl`, `eval/make_tts_audio.py`, `eval/eval_language.py`, `eval/eval_stt.py`, `eval/eval_vision.py`, `eval/README.md`
 
 **Interfaces:**
-- `purpose_cases.jsonl`: 한 줄에 `{"transcript": str, "purpose": str}`. 초기 40건(용건별 10건, 구어체·말줄임·잡음 섞인 표현 포함). 덕민님 분류 기획이 확정되면 100건으로 확장.
-- `eval_language.py` → 전체 정확도, 용건별 precision/recall, 혼동 행렬, 20자 초과 비율(0이어야 함), 폴백 발생 비율.
-- `eval_stt.py` → `eval/audio/*.wav` + 같은 이름 `.txt` 정답으로 CER(공백 제거 후 문자 편집거리 / 정답 길이).
-- `eval_vision.py` → `eval/images/<label폴더>/`별 person·package 감지 정밀도/재현율, facingCamera 정확도.
+- `purpose_cases.jsonl`: 한 줄에 `{"transcript": str, "purpose": str}`. 초기 40건(용건별 10건, 구어체·말줄임·"택배 아니고 관리실에서 왔어요" 같은 반례 포함). 덕민님 분류 기획이 확정되면 100건으로 확장.
+- `make_tts_audio.py`: `purpose_cases.jsonl`의 문장을 `edge-tts`(한국어 남·여 음성 각 1개 이상)로 합성 → 16kHz mono 16-bit WAV로 변환 → 복도 잡음(백색 잡음, SNR 10·20dB) 섞은 버전 추가 → `data/audio/tts/<id>.wav` + 정답 `<id>.txt`. 실제 INMP441 녹음이 생기면 `data/audio/real/`에 같은 형식으로 추가.
+- `eval_language.py` → 전체 정확도, 용건별 precision/recall, 혼동 행렬, 20자 초과 비율, 폴백 발생 비율. `--rules-only` 옵션.
+- `eval_stt.py` → `data/audio/<tts|real>/`별 CER(공백 제거 후 문자 편집거리 / 정답 길이).
+- `eval_vision.py` → Task 4의 `data/images/` 폴더별 person·package 재현율, `empty/` 오탐률.
+- 모든 스크립트는 결과 끝에 Global Constraints 정확도 목표 대비 PASS/FAIL을 출력한다.
 
-- [ ] **Step 1:** 스크립트 구현, `eval_language.py`를 규칙 전용(`--rules-only`)으로 실행해 동작 확인.
-- [ ] **Step 2:** lite 프로필로 Qwen 평가 실행, 결과를 `eval/README.md`에 기록(날짜, 모델, 정확도).
-- [ ] **Step 3:** Commit — `test(model-service): accuracy evaluation harness and seed dataset`
+- [ ] **Step 1:** 스크립트 구현, `make_tts_audio.py` 실행, `eval_language.py --rules-only`로 동작 확인.
+- [ ] **Step 2:** lite 프로필로 세 평가 실행, 결과를 `eval/README.md`에 기록(날짜, 프로필, 모델, 수치). full 수치는 Task 9 Step 4와 함께 시연 PC에서 받는다.
+- [ ] **Step 3:** Commit — `test(model-service): evaluation data generation and accuracy harness`
 
 ---
 
@@ -320,23 +336,34 @@ model-service/
 
 **Interfaces:**
 - Dockerfile: `nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04` 기반, Python 3.11, 가중치는 이미지에 굽지 않고 볼륨 `/models`(`HF_HOME`, Ultralytics 가중치 경로)에 캐시. `CMD uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 --workers 1`. `HEALTHCHECK`는 `/health`가 `ok`일 때 성공.
-- README: 실행법(venv / Docker), `MODEL_PROFILE`, 엔드포인트 curl 예시, **API v1.3 대비 제안 사항**(label `package` 확정, `bbox`/`facingCamera` 선택 필드, `/health`), 인태님 compose에 넣을 서비스 블록 예시(`gpus: all`, 포트 8000, 볼륨).
+- README: 실행법(venv / Docker), `MODEL_PROFILE`, 엔드포인트 curl 예시, **API v1.3 대비 변경점**(label `package`, 빈 전사 규칙, `/health`), 인태님 compose에 넣을 서비스 블록 예시(`gpus: all`, 포트 8000, 볼륨).
 
 - [ ] **Step 1:** `docker build -t datacat-model model-service` → 성공.
-- [ ] **Step 2:** `docker run --rm --gpus all -e MODEL_PROFILE=lite -p 8000:8000 -v datacat-models:/models datacat-model` 후 `/health`가 `ok`가 될 때까지 대기 → 네 엔드포인트 curl 스모크 통과.
+- [ ] **Step 2:** `docker run --rm --gpus all -e MODEL_PROFILE=lite -p 8000:8000 -v datacat-models:/models datacat-model` 후 `/health`가 `ok`가 될 때까지 대기 → 구현된 엔드포인트 curl 스모크 통과.
 - [ ] **Step 3:** Commit — `build(model-service): CUDA Dockerfile and integration README`
 
 ---
 
-## 이 계획 밖의 후속 작업 (별도 계획으로)
+## 팀 협의 체크리스트 (코드 외 할 일)
 
-- 택배 전용 YOLO11 파인튜닝: 실제 마운트 각도로 촬영한 데이터와 공개 택배 데이터셋 수집 → 학습 → Task 10 비전 평가로 YOLOE 대비 개선 확인 → `package_weights` 교체.
-- `purpose` 최종 목록 확정(덕민님) 시 `Analysis.purpose`, 프롬프트, 규칙, 평가셋을 함께 갱신.
-- STT·LLM 모델 교체 비교(예: Whisper large-v3, EXAONE, Qwen3-8B 4bit)는 Task 9·10 도구로 같은 조건에서 측정.
+각 항목은 보내기 전에 민중님 확인을 받는다.
+
+- [ ] **인태님 — 저장소·병합 방식 제안 (즉시):** 모노레포 폴더 구조(`spring-server/`, `model-service/`, `pi/`, `app/`), 각자 브랜치 + Phase 종료마다 main 병합, 루트 compose는 인태님 관리.
+- [ ] **명세 PR (Task 4 전):** `API_v1_3.md` 수정만 담은 작은 PR — 7.1 `label`을 `person`/`package`로 확정 및 package 범위 명시, 7.3·7.4 빈 전사 응답 규칙, 모델 서비스 `GET /health` 추가.
+- [ ] **덕민님 — 요약 문체 확인 (Task 7 전):** 명사형 예시 5개(`택배 문 앞 보관`, `가스 검침 방문`, `관리실 소방 점검`, `친구 방문`, `음식 배달 도착`)로 앱 표시에 맞는지 확인. `purpose` 4개 값 최종 승인 요청.
+- [ ] **인태님·덕민님 — 비전 선택 필드 제안 (Phase 2 초반):** 떠나는 택배 기사 대응용 `facingCamera`(YOLO11-pose)와 `bbox`. 동의 시 별도 계획으로 추가.
+- [ ] **시연 PC 관리자 — full 벤치마크·평가 실행 요청 (Task 9·10 후).**
 
 ## 팀 일정과의 연결
 
-| 팀 Phase | 필요한 태스크 |
-|---|---|
-| Phase 1 (이미지 흐름, 2~3주) | Task 0 → 1 → 2 → 3 → 4, 그리고 11을 앞당겨 실행(인태님 compose 연동용, 스모크는 `/health`·`/vision/detect`만) |
-| Phase 2 (음성 흐름, 4~5주) | Task 5 → 6 → 7 → 8 → 9 → 10 |
+| 팀 Phase | 필요한 태스크 | 종료 시 |
+|---|---|---|
+| Phase 1 (이미지 흐름, 2~3주) | Task 0 → 1 → 2 → 3 → 4, Task 11을 앞당겨 실행(스모크는 `/health`·`/vision/detect`만) | `feature/ai-model` → main PR |
+| Phase 2 (음성 흐름, 4~5주) | Task 5 → 6 → 7 → 8 → 9 → 10, Task 11 갱신 | `feature/ai-model` → main PR |
+
+## 이 계획 밖의 후속 작업 (별도 계획으로)
+
+- 택배 전용 YOLO11 파인튜닝: 실제 마운트 각도로 촬영한 데이터와 공개 택배 데이터셋 수집 → 학습 → Task 10 비전 평가로 YOLOE 대비 개선 확인 → `package_weights` 교체.
+- `facingCamera`/`bbox` 선택 필드: 팀 동의 시 YOLO11-pose 추가.
+- `purpose` 최종 목록 확정(덕민님) 시 `Analysis.purpose`, 프롬프트, 규칙, 평가셋을 함께 갱신.
+- STT·LLM 모델 교체 비교(예: Whisper large-v3, EXAONE, Qwen3-8B 4bit)는 Task 9·10 도구로 같은 조건에서 측정.
