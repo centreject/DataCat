@@ -1,4 +1,11 @@
-from bench.benchmark import TARGETS_MS, judge, percentile
+from bench.benchmark import TARGETS_MS, judge, percentile, timed
+
+
+def test_timed_cycles_inputs_and_reports_first_call_separately():
+    seen = []
+    stats = timed(seen.append, ["a", "b", "c"], runs=5)
+    assert seen == ["a", "a", "b", "c", "a", "b"]  # first (cold) call, then 5 timed runs cycling inputs
+    assert set(stats) == {"first", "p50", "p95"}
 
 
 def test_percentile_nearest_rank():

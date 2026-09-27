@@ -39,24 +39,31 @@ def gpu_used_mib() -> int:
     return int(out.stdout.split()[0])
 
 
-def timed(fn, runs: int) -> dict[str, float]:
-    fn()  # warm-up, excluded
+def timed(fn, inputs: list, runs: int) -> dict[str, float]:
+    """Time fn over `runs` calls cycling through `inputs`. The first (cold) call is reported
+    separately as "first": it is what the first visitor after a restart waits for."""
+    start = time.perf_counter()
+    fn(inputs[0])
+    first = (time.perf_counter() - start) * 1000
     samples = []
-    for _ in range(runs):
+    for i in range(runs):
         start = time.perf_counter()
-        fn()
+        fn(inputs[i % len(inputs)])
         samples.append((time.perf_counter() - start) * 1000)
-    return {"p50": round(percentile(samples, 50), 1), "p95": round(percentile(samples, 95), 1)}
+    return {
+        "first": round(first, 1),
+        "p50": round(percentile(samples, 50), 1),
+        "p95": round(percentile(samples, 95), 1),
+    }
 
 
-def inputs() -> tuple[bytes, bytes]:
+def inputs() -> tuple[list[bytes], list[bytes]]:
+    """All person images and all clean TTS utterances (varied lengths), or synthetic fallbacks."""
     from tests.fixtures.make_fixtures import noisy_jpeg, tone_wav
 
-    images = sorted((DATA_DIR / "images" / "person").glob("*.jpg"))
-    audio = DATA_DIR / "audio" / "tts" / "delivery_01.wav"
-    jpeg = images[0].read_bytes() if images else noisy_jpeg(1280, 720)
-    wav = audio.read_bytes() if audio.exists() else tone_wav(5)
-    return jpeg, wav
+    images = [p.read_bytes() for p in sorted((DATA_DIR / "images" / "person").glob("*.jpg"))]
+    wavs = [p.read_bytes() for p in sorted((DATA_DIR / "audio" / "tts").glob("*.wav"))]
+    return images or [noisy_jpeg(1280, 720)], wavs or [tone_wav(5)]
 
 
 def main() -> None:
@@ -90,14 +97,16 @@ def main() -> None:
             "nvidia_smi_delta_mib": gpu_used_mib() - before,
         }
     registry = ModelRegistry(ready=True, **models)
-    jpeg, wav = inputs()
-    transcript = registry.stt.transcribe(decode_wav(wav))
+    jpegs, wavs = inputs()
+    # Real transcripts for the language step: the eval sentences, in the same order as the audio.
+    cases = Path(__file__).resolve().parent.parent / "eval" / "purpose_cases.jsonl"
+    transcripts = [json.loads(line)["transcript"] for line in cases.read_text().splitlines() if line.strip()]
 
     stats = {
-        "vision": timed(lambda: registry.vision.detect(decode_jpeg(jpeg)), args.runs),
-        "stt": timed(lambda: registry.stt.transcribe(decode_wav(wav)), args.runs),
-        "language": timed(lambda: registry.language.analyze(transcript), args.runs),
-        "audio_process": timed(lambda: process_audio(registry, wav), args.runs),
+        "vision": timed(lambda jpeg: registry.vision.detect(decode_jpeg(jpeg)), jpegs, args.runs),
+        "stt": timed(lambda wav: registry.stt.transcribe(decode_wav(wav)), wavs, args.runs),
+        "language": timed(registry.language.analyze, transcripts, args.runs),
+        "audio_process": timed(lambda wav: process_audio(registry, wav), wavs, args.runs),
     }
     verdicts = judge(args.profile, stats)
     result = {
@@ -120,11 +129,12 @@ def main() -> None:
     for name, load in loads.items():
         print(f"| {name} | {load['load_s']} | {load['nvidia_smi_delta_mib']} |")
     print(f"\n전체 사용 {result['all_loaded_mib']} MiB (시작 전 {baseline_mib} MiB 포함) / {total_mib} MiB\n")
-    print("| 단계 | p50 (ms) | p95 (ms) | 목표 |\n|---|---:|---:|---|")
+    print(f"입력: 이미지 {len(jpegs)}장, 음성 {len(wavs)}개, 문장 {len(transcripts)}개를 돌아가며 사용\n")
+    print("| 단계 | 첫 요청 (ms) | p50 (ms) | p95 (ms) | 목표 (p95) |\n|---|---:|---:|---:|---|")
     for name, s in stats.items():
         limit = TARGETS_MS[args.profile].get(name)
         target = f"≤ {limit} {'PASS' if verdicts[name] else 'FAIL'}" if limit else "—"
-        print(f"| {name} | {s['p50']} | {s['p95']} | {target} |")
+        print(f"| {name} | {s['first']} | {s['p50']} | {s['p95']} | {target} |")
 
     RESULTS.mkdir(exist_ok=True)
     out = RESULTS / f"{re.sub(r'[^A-Za-z0-9]+', '-', gpu).strip('-')}_{args.profile}.json"

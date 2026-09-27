@@ -2,46 +2,50 @@
   "gpu": "NVIDIA GeForce RTX 3060 Ti",
   "total_mib": 8191,
   "profile": "lite",
-  "runs": 20,
+  "runs": 40,
   "models": {
     "stt": "large-v3-turbo",
     "stt_compute": "int8_float16",
     "llm": "Qwen/Qwen3-4B-Instruct-2507",
     "llm_4bit": true
   },
-  "desktop_baseline_mib": 628,
-  "all_loaded_mib": 4907,
-  "torch_max_allocated_mib": 2965,
+  "desktop_baseline_mib": 1335,
+  "all_loaded_mib": 5520,
+  "torch_max_allocated_mib": 2973,
   "loads": {
     "vision": {
-      "load_s": 4.9,
-      "nvidia_smi_delta_mib": 323
+      "load_s": 6.0,
+      "nvidia_smi_delta_mib": 265
     },
     "stt": {
-      "load_s": 47.0,
-      "nvidia_smi_delta_mib": 994
+      "load_s": 4.2,
+      "nvidia_smi_delta_mib": 1087
     },
     "language": {
-      "load_s": 12.2,
-      "nvidia_smi_delta_mib": 2852
+      "load_s": 9.9,
+      "nvidia_smi_delta_mib": 2820
     }
   },
   "latency_ms": {
     "vision": {
-      "p50": 34.0,
-      "p95": 38.5
+      "first": 70.9,
+      "p50": 38.6,
+      "p95": 54.3
     },
     "stt": {
-      "p50": 250.8,
-      "p95": 254.2
+      "first": 568.5,
+      "p50": 245.1,
+      "p95": 278.7
     },
     "language": {
-      "p50": 1537.4,
-      "p95": 1590.9
+      "first": 1602.2,
+      "p50": 1686.8,
+      "p95": 2388.6
     },
     "audio_process": {
-      "p50": 1787.4,
-      "p95": 1816.6
+      "first": 2268.5,
+      "p50": 1932.7,
+      "p95": 2398.2
     }
   },
   "pass": {
