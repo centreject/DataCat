@@ -29,5 +29,5 @@ class Analysis(BaseModel):
 
 class AudioProcessResponse(BaseModel):
     transcript: str
-    purpose: str
+    purpose: Purpose
     summary: str

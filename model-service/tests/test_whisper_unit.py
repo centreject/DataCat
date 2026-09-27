@@ -33,6 +33,18 @@ def test_warm_up_runs_the_decoder(monkeypatch):
     assert warm_up["decoded"] is True
 
 
+def test_cuda12_preload_skips_missing_nvidia_namespace(monkeypatch):
+    # On a PC without the nvidia-* wheels, find_spec("nvidia.cublas") raises ModuleNotFoundError
+    # (parent package missing) instead of returning None (review R2, M8).
+    import importlib.util
+
+    def missing(name, *args, **kwargs):
+        raise ModuleNotFoundError(f"No module named '{name.split('.')[0]}'")
+
+    monkeypatch.setattr(importlib.util, "find_spec", missing)
+    whisper_module._preload_cuda12_libs()  # must not raise
+
+
 def test_warm_up_failure_fails_loading(monkeypatch):
     class BrokenCuda(StubWhisperModel):
         def transcribe(self, audio, **kwargs):

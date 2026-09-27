@@ -45,6 +45,15 @@ def test_process_audio_contract():
     }
 
 
+def test_audio_process_response_only_accepts_known_purposes():
+    import pydantic
+
+    from app.schemas import AudioProcessResponse
+
+    with pytest.raises(pydantic.ValidationError):
+        AudioProcessResponse(transcript="x", purpose="FOOD", summary="x")
+
+
 def test_process_audio_silence():
     lm = FakeLanguage(Analysis(summary="should not be used", purpose="VISIT"))
     with ready_client(stt=FakeSpeech(""), language=lm) as client:

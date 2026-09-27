@@ -13,7 +13,10 @@ def _preload_cuda12_libs() -> None:
     path, so their sonames are already resolved when CTranslate2 dlopens them.
     """
     for package, pattern in (("nvidia.cublas", "libcublas*.so.12"), ("nvidia.cudnn", "libcudnn*.so.9")):
-        spec = importlib.util.find_spec(package)
+        try:
+            spec = importlib.util.find_spec(package)
+        except ModuleNotFoundError:  # no nvidia-* wheels at all (e.g. CPU-only PC)
+            continue
         if spec is None:
             continue
         for location in spec.submodule_search_locations:
