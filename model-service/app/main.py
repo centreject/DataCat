@@ -21,21 +21,56 @@ MAX_UPLOAD_BYTES = 16 * 1024 * 1024
 MultiPartParser.spool_max_size = MAX_UPLOAD_BYTES
 
 
+class _UploadTooLarge(Exception):
+    pass
+
+
 class UploadLimit:
-    """Plain ASGI middleware: reject oversized requests by Content-Length before parsing."""
+    """Plain ASGI middleware: reject requests over MAX_UPLOAD_BYTES before anything spills to disk.
+
+    Checks Content-Length up front, and also counts body bytes as they arrive, because a chunked
+    upload (Transfer-Encoding: chunked, no Content-Length) would otherwise pass the header check.
+    """
 
     def __init__(self, app):
         self.app = app
 
+    @staticmethod
+    def _too_large() -> JSONResponse:
+        message = f"업로드가 너무 큽니다(최대 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)."
+        return JSONResponse(status_code=400, content={"code": "INVALID_REQUEST", "message": message})
+
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http":
-            length = dict(scope["headers"]).get(b"content-length", b"")
-            if length.isdigit() and int(length) > MAX_UPLOAD_BYTES:
-                message = f"업로드가 너무 큽니다(최대 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)."
-                response = JSONResponse(status_code=400, content={"code": "INVALID_REQUEST", "message": message})
-                await response(scope, receive, send)
-                return
-        await self.app(scope, receive, send)
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        length = dict(scope["headers"]).get(b"content-length", b"")
+        if length.isdigit() and int(length) > MAX_UPLOAD_BYTES:
+            await self._too_large()(scope, receive, send)
+            return
+
+        received = 0
+        started = False
+
+        async def counting_receive():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > MAX_UPLOAD_BYTES:
+                    raise _UploadTooLarge  # before the parser sees (and spools) this chunk
+            return message
+
+        async def tracking_send(message):
+            nonlocal started
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self.app(scope, counting_receive, tracking_send)
+        except _UploadTooLarge:
+            if not started:
+                await self._too_large()(scope, receive, send)
 
 
 def create_app(

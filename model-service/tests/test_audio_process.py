@@ -76,6 +76,40 @@ def test_process_audio_writes_no_files(no_disk, seconds):
     assert response.status_code == 200
 
 
+def test_chunked_upload_over_limit_is_rejected_without_disk(monkeypatch):
+    # Record (not block) disk spills: blocking would itself turn into a 400 and hide the bug.
+    spills = []
+    original = tempfile.SpooledTemporaryFile.rollover
+
+    def spy(self):
+        spills.append(self)
+        return original(self)
+
+    monkeypatch.setattr(tempfile.SpooledTemporaryFile, "rollover", spy)
+    # Spring's WebClient may stream multipart with Transfer-Encoding: chunked (no Content-Length).
+    boundary = "b0undary"
+    head = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="audio"; filename="a.wav"\r\n'
+        "Content-Type: audio/wav\r\n\r\n"
+    ).encode()
+
+    def body():
+        yield head
+        for _ in range(17):
+            yield b"\x00" * (1024 * 1024)
+        yield f"\r\n--{boundary}--\r\n".encode()
+
+    stt = FakeSpeech("x")
+    lm = FakeLanguage(Analysis(summary="x", purpose="ETC"))
+    with ready_client(stt=stt, language=lm) as client:
+        response = client.post(
+            URL, content=body(), headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
+        )
+    assert spills == []
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_REQUEST"
+
+
 def test_process_audio_stt_not_ready():
     lm = FakeLanguage(Analysis(summary="x", purpose="ETC"))
     with ready_client(stt=None, language=lm) as client:
