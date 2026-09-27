@@ -1,6 +1,7 @@
 from fastapi import APIRouter, File, Request, UploadFile
 
 from app.errors import ApiError
+from app.media import decode_jpeg
 from app.registry import ModelRegistry
 from app.schemas import Analysis, AnalyzeRequest, DetectResponse
 
@@ -15,9 +16,10 @@ def require(registry: ModelRegistry | None, name: str):
 
 
 @router.post("/vision/detect", response_model=DetectResponse)
-async def detect(request: Request, image: UploadFile = File(...)):
+def detect(request: Request, image: UploadFile = File(...)):
+    # Sync handler: FastAPI runs it in a worker thread, so GPU inference doesn't block the event loop.
     model = require(request.app.state.registry, "vision")
-    raise ApiError(503, "MODEL_NOT_READY", "vision 엔드포인트가 아직 구현되지 않았습니다.")
+    return DetectResponse(detections=model.detect(decode_jpeg(image.file.read())))
 
 
 @router.post("/language/analyze", response_model=Analysis)
