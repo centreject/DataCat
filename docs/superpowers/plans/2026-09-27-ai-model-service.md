@@ -88,7 +88,7 @@ model-service/
 **Files:** 없음 (로컬 환경)
 
 - [ ] **Step 1:** PowerShell(관리자)에서 `wsl --install -d Ubuntu-22.04` → 재부팅 → Ubuntu 사용자 생성. 확인: WSL 안에서 `nvidia-smi`에 3060 Ti 표시(Windows 드라이버가 GPU를 WSL에 전달하므로 WSL 안에 드라이버를 설치하지 않는다).
-- [ ] **Step 2:** WSL에서 `sudo apt update && sudo apt install -y python3.11 python3.11-venv git`, 그리고 `git clone https://github.com/centreject/DataCat.git ~/DataCat && cd ~/DataCat && git checkout feature/ai-model`. 이 세션의 작업 폴더를 `\\wsl$\Ubuntu-22.04\home\<user>\DataCat`로 옮긴다(이전 임시 clone은 폐기).
+- [ ] **Step 2:** WSL에서 Python 3.11 **정식판**을 deadsnakes PPA로 설치(Ubuntu 22.04 기본 저장소의 `python3.11`은 `3.11.0rc1` 릴리스 후보라 쓰지 않는다): `sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt update && sudo apt install -y python3.11 python3.11-venv python3.11-dev git`. 확인: `python3.11 --version` → `Python 3.11.x`(rc 아님). 저장소 전용 커밋 계정 설정(`git config user.name/user.email`). 그리고 `git clone https://github.com/centreject/DataCat.git ~/DataCat && cd ~/DataCat && git checkout feature/ai-model`. 이 세션의 작업 폴더를 `\\wsl$\Ubuntu-22.04\home\<user>\DataCat`로 옮긴다(이전 임시 clone은 폐기).
 - [ ] **Step 3:** `python3.11 -m venv model-service/.venv`, `pip install torch --index-url https://download.pytorch.org/whl/cu124`. 확인: `python -c "import torch;print(torch.cuda.is_available())"` → `True`.
 - [ ] **Step 4:** Docker Desktop 설치(WSL2 백엔드, Ubuntu 통합 켬). Task 11 전까지만 끝내면 된다. 확인: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`.
 
