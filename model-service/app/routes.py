@@ -2,6 +2,7 @@ from fastapi import APIRouter, File, Request, UploadFile
 
 from app.errors import ApiError
 from app.media import decode_jpeg, decode_wav
+from app.pipeline import analyze_transcript
 from app.registry import ModelRegistry
 from app.schemas import Analysis, AnalyzeRequest, DetectResponse, TranscribeResponse
 
@@ -31,4 +32,4 @@ def transcribe(request: Request, audio: UploadFile = File(...)):
 @router.post("/language/analyze", response_model=Analysis)
 def analyze(request: Request, body: AnalyzeRequest):
     model = require(request.app.state.registry, "language")
-    return model.analyze(body.transcript)
+    return analyze_transcript(model, body.transcript)
