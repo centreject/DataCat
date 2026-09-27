@@ -62,7 +62,7 @@
 
 ### 2. Phase 2 — 음성 처리
 - [x] **T5** STT: faster-whisper, 무음 환각 필터, `/speech/transcribe` — `89fd332`
-- [x] **T6** 언어 처리: 요약 20자 정리, 용건 값 정리, 키워드 폴백, `/language/analyze` — (이 커밋)
+- [x] **T6** 언어 처리: 요약 20자 정리, 용건 값 정리, 키워드 폴백, `/language/analyze` — 71ca5c7
 - [ ] **T7** 🔄 Qwen3 언어 모델 (lite는 4bit)
 - [ ] **T8** `/audio/process` 통합, 음성 무저장 테스트
 - [ ] **T10** TTS 평가 음성 생성, 정확도 평가 스크립트(용건·STT·비전)
