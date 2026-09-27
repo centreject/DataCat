@@ -1,6 +1,6 @@
 import pytest
 
-from app.language.normalize import parse_llm_output, truncate_summary
+from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
 from app.language.rules import rule_analyze
 from app.pipeline import analyze_transcript
 from app.schemas import Analysis
@@ -70,6 +70,29 @@ def test_parse_lowercase_purpose():
 def test_parse_long_summary_truncated():
     out = parse_llm_output('{"summary": "' + "가" * 30 + '", "purpose": "ETC"}')
     assert len(out.summary) == 20
+
+
+def test_parse_strips_cjk_ideographs():
+    # Qwen sometimes writes Chinese characters in Korean text ("방문者 인사", review 2026-09-27).
+    assert parse_llm_output('{"summary": "방문者 인사", "purpose": "ETC"}').summary == "방문 인사"
+
+
+def test_parse_summary_only_cjk_is_none():
+    assert parse_llm_output('{"summary": "訪問者", "purpose": "ETC"}') is None
+
+
+@pytest.mark.parametrize(
+    "summary, transcript, grounded",
+    [
+        ("택배 문 앞 보관", "택배 왔습니다. 문 앞에 놓고 갈게요.", True),
+        ("경비실 물품 맡김", "부재중이셔서 경비실에 맡겨 둘게요.", True),
+        ("가스 검침 방문", "가스 검침하러 왔습니다.", True),
+        ("근처 약국 문의", "어 그게", False),
+        ("이웃 방문", "누나", False),
+    ],
+)
+def test_is_grounded(summary, transcript, grounded):
+    assert is_grounded(summary, transcript) is grounded
 
 
 # --- rule_analyze -----------------------------------------------------------

@@ -1,10 +1,23 @@
 import json
+import re
 from typing import get_args
 
 from app.schemas import Analysis, Purpose
 
 PURPOSES = get_args(Purpose)
 SUMMARY_LIMIT = 20  # API v1.3 §7.3: max 20 characters including spaces
+# Qwen occasionally mixes Chinese characters into Korean ("방문者 인사").
+CJK_IDEOGRAPHS = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
+_WORD = re.compile(r"[가-힣A-Za-z0-9]{2,}")
+
+
+def is_grounded(summary: str, transcript: str) -> bool:
+    """True when at least one word (2+ chars) of the summary occurs in what the visitor said.
+
+    Catches summaries copied from few-shot examples or invented outright ("어 그게" → "근처 약국 문의").
+    """
+    spoken = re.sub(r"\s+", "", transcript)
+    return any(word in spoken for word in _WORD.findall(summary))
 
 
 def truncate_summary(s: str, limit: int = SUMMARY_LIMIT) -> str:
@@ -24,7 +37,8 @@ def parse_llm_output(raw: str) -> Analysis | None:
         return None
     if not isinstance(data, dict):
         return None
-    summary = truncate_summary(str(data.get("summary") or ""))
+    summary = CJK_IDEOGRAPHS.sub("", str(data.get("summary") or ""))
+    summary = truncate_summary(re.sub(r"\s{2,}", " ", summary))
     if not summary:
         return None
     purpose = str(data.get("purpose") or "").strip().upper()

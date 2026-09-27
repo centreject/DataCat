@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 from app.config import Settings
-from app.language.normalize import PURPOSES, parse_llm_output
+from app.language.normalize import PURPOSES, is_grounded, parse_llm_output
 from app.language.rules import rule_analyze
 from eval.metrics import TARGETS, per_class_scores, verdict
 
@@ -23,6 +23,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cases = [json.loads(line) for line in CASES.read_text().splitlines() if line.strip()]
+    ungrounded: list[str] = []
     if args.rules_only:
         name, fallbacks = "rules", 0
         results = [rule_analyze(c["transcript"]) for c in cases]
@@ -35,7 +36,9 @@ def main() -> None:
         for c in cases:
             parsed = parse_llm_output(qwen.generate(build_messages(c["transcript"])))
             fallbacks += parsed is None
-            results.append(parsed or rule_analyze(c["transcript"]))
+            if parsed is not None and not is_grounded(parsed.summary, c["transcript"]):
+                ungrounded.append(f"{c['id']}: \"{c['transcript']}\" → \"{parsed.summary}\"")
+            results.append(qwen.analyze(c["transcript"]))
 
     gold = [c["purpose"] for c in cases]
     pred = [r.purpose for r in results]
@@ -53,6 +56,9 @@ def main() -> None:
     print(f"\n정확도 {accuracy:.0%} (목표 ≥ {TARGETS['purpose_accuracy']:.0%}) → {verdict(accuracy >= TARGETS['purpose_accuracy'])}")
     print(f"요약 20자 초과 {over_20:.0%} (목표 0%) → {verdict(over_20 <= TARGETS['summary_over_20_max'])}")
     print(f"LLM 출력 파싱 실패로 규칙 사용: {fallbacks}건")
+    print(f"말하지 않은 내용이라 요약을 전사문으로 바꿈: {len(ungrounded)}건")
+    for line in ungrounded:
+        print(f"- {line}")
 
 
 if __name__ == "__main__":

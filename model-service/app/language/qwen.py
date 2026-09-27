@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.hub_cache import load_cached_first
-from app.language.normalize import parse_llm_output
+from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
 from app.language.rules import rule_analyze
 from app.schemas import Analysis
 
@@ -34,12 +34,17 @@ FEW_SHOTS = (
 )
 
 
+# The first part of an utterance carries the purpose; longer input only slows the LLM down and
+# made it lose track (a 1018-char delivery transcript came back as "약국 위치 문의").
+MAX_TRANSCRIPT_CHARS = 300
+
+
 def build_messages(transcript: str) -> list[dict]:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for utterance, answer in FEW_SHOTS:
         messages.append({"role": "user", "content": utterance})
         messages.append({"role": "assistant", "content": json.dumps(answer, ensure_ascii=False)})
-    messages.append({"role": "user", "content": transcript})
+    messages.append({"role": "user", "content": transcript[:MAX_TRANSCRIPT_CHARS]})
     return messages
 
 
@@ -84,4 +89,10 @@ class QwenLanguage:
         return self.tokenizer.decode(output[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
 
     def analyze(self, transcript: str) -> Analysis:
-        return parse_llm_output(self.generate(build_messages(transcript))) or rule_analyze(transcript)
+        parsed = parse_llm_output(self.generate(build_messages(transcript)))
+        if parsed is None:
+            return rule_analyze(transcript)
+        if not is_grounded(parsed.summary, transcript):
+            # Keep the LLM's purpose (98% vs 88% for rules) but never show an invented summary.
+            return Analysis(summary=truncate_summary(transcript), purpose=parsed.purpose)
+        return parsed
