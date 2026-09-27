@@ -5,3 +5,4 @@ __pycache__/
 data/
 *.pt
 bench/results/*.tmp
+mobileclip*.ts

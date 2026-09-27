@@ -13,5 +13,8 @@ class ModelRegistry:
 
 
 def load_registry(settings: Settings) -> ModelRegistry:
-    # Real models are wired in by later tasks (vision: Task 4, STT: Task 5, LLM: Task 7).
-    return ModelRegistry(vision=None, stt=None, language=None, ready=True)
+    # Imported here so the app (and unit tests) start without GPU libraries loaded.
+    from app.vision.yolo import YoloVision
+
+    # STT and LLM are wired in by later tasks (STT: Task 5, LLM: Task 7).
+    return ModelRegistry(vision=YoloVision(settings), stt=None, language=None, ready=True)
