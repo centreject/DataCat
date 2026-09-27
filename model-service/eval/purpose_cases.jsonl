@@ -1,0 +1,40 @@
+{"id": "delivery_01", "transcript": "택배 왔습니다. 문 앞에 놓고 갈게요.", "purpose": "DELIVERY"}
+{"id": "delivery_02", "transcript": "쿠팡입니다. 문 앞에 두고 갑니다.", "purpose": "DELIVERY"}
+{"id": "delivery_03", "transcript": "배달의민족 음식 배달 왔습니다.", "purpose": "DELIVERY"}
+{"id": "delivery_04", "transcript": "등기 우편 왔는데요, 서명이 필요해서요.", "purpose": "DELIVERY"}
+{"id": "delivery_05", "transcript": "부재중이셔서 경비실에 맡겨 둘게요.", "purpose": "DELIVERY"}
+{"id": "delivery_06", "transcript": "네 치킨이요. 문 앞에 두고 갑니다.", "purpose": "DELIVERY"}
+{"id": "delivery_07", "transcript": "로켓프레시 보냉백 문 앞에 뒀습니다.", "purpose": "DELIVERY"}
+{"id": "delivery_08", "transcript": "우체국 소포 왔습니다.", "purpose": "DELIVERY"}
+{"id": "delivery_09", "transcript": "아까 주문하신 거 가져왔어요.", "purpose": "DELIVERY"}
+{"id": "delivery_10", "transcript": "대한통운이에요, 박스가 커서 문 옆에 세워 둘게요.", "purpose": "DELIVERY"}
+{"id": "inspection_01", "transcript": "가스 검침하러 왔습니다.", "purpose": "INSPECTION"}
+{"id": "inspection_02", "transcript": "관리사무소에서 소방 점검 나왔습니다.", "purpose": "INSPECTION"}
+{"id": "inspection_03", "transcript": "택배 아니고요, 관리실에서 수도 점검 왔어요.", "purpose": "INSPECTION"}
+{"id": "inspection_04", "transcript": "정수기 필터 교체하러 왔습니다.", "purpose": "INSPECTION"}
+{"id": "inspection_05", "transcript": "전기 계량기 확인하러 한전에서 나왔습니다.", "purpose": "INSPECTION"}
+{"id": "inspection_06", "transcript": "인터넷 기사입니다. 오늘 방문 예약되어 있으셔서요.", "purpose": "INSPECTION"}
+{"id": "inspection_07", "transcript": "아랫집에 물이 새서 누수 확인하러 왔습니다.", "purpose": "INSPECTION"}
+{"id": "inspection_08", "transcript": "방역 소독 나왔습니다.", "purpose": "INSPECTION"}
+{"id": "inspection_09", "transcript": "보일러 고장 신고하셔서 왔는데요.", "purpose": "INSPECTION"}
+{"id": "inspection_10", "transcript": "엘리베이터 공사 안내문 드리러 관리실에서 왔어요.", "purpose": "INSPECTION"}
+{"id": "visit_01", "transcript": "엄마, 나야. 문 좀 열어줘.", "purpose": "VISIT"}
+{"id": "visit_02", "transcript": "나 민수야, 근처 왔다가 들렀어. 전화 좀 줘.", "purpose": "VISIT"}
+{"id": "visit_03", "transcript": "언니 나 왔어. 반찬 좀 가져왔어.", "purpose": "VISIT"}
+{"id": "visit_04", "transcript": "놀러 왔는데 집에 없나 보네.", "purpose": "VISIT"}
+{"id": "visit_05", "transcript": "아들, 아빠다. 김치 가져왔다.", "purpose": "VISIT"}
+{"id": "visit_06", "transcript": "선배님, 저 지훈입니다. 빌린 책 돌려드리러 왔어요.", "purpose": "VISIT"}
+{"id": "visit_07", "transcript": "옆집 사는 사람인데요, 이사 와서 인사드리러 왔어요.", "purpose": "VISIT"}
+{"id": "visit_08", "transcript": "할머니 왔다. 문 열어봐라.", "purpose": "VISIT"}
+{"id": "visit_09", "transcript": "연락이 안 돼서 걱정돼서 와 봤어.", "purpose": "VISIT"}
+{"id": "visit_10", "transcript": "저 수진이요, 약속 시간 맞춰 왔어요.", "purpose": "VISIT"}
+{"id": "etc_01", "transcript": "혹시 이 근처에 약국 있나요?", "purpose": "ETC"}
+{"id": "etc_02", "transcript": "교회에서 나왔는데 잠깐 말씀 좀 나눌 수 있을까요?", "purpose": "ETC"}
+{"id": "etc_03", "transcript": "설문조사 하고 있는데 잠깐 시간 되세요?", "purpose": "ETC"}
+{"id": "etc_04", "transcript": "안녕하세요.", "purpose": "ETC"}
+{"id": "etc_05", "transcript": "음, 잘못 찾아온 것 같네요. 죄송합니다.", "purpose": "ETC"}
+{"id": "etc_06", "transcript": "정수기 렌탈 홍보하러 왔습니다.", "purpose": "ETC"}
+{"id": "etc_07", "transcript": "여기가 302호 맞나요?", "purpose": "ETC"}
+{"id": "etc_08", "transcript": "전단지 좀 붙이고 갈게요.", "purpose": "ETC"}
+{"id": "etc_09", "transcript": "길고양이 밥 주시는 분 찾고 있어요.", "purpose": "ETC"}
+{"id": "etc_10", "transcript": "누구 계세요?", "purpose": "ETC"}
