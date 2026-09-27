@@ -50,6 +50,13 @@ def test_transcribe_route():
     assert fake.seen.shape == (16000,)
 
 
+def test_transcribe_route_trims_long_audio():
+    fake = FakeSpeech("x")
+    with ready_client(stt=fake) as client:
+        post_audio(client, tone_wav(45))
+    assert fake.seen.shape == (30 * 16000,)
+
+
 def test_transcribe_route_rejects_stereo():
     with ready_client(stt=FakeSpeech("x")) as client:
         response = post_audio(client, tone_wav(1, channels=2))

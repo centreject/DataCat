@@ -13,8 +13,10 @@ URL = "/internal/v1/audio/process"
 class FakeSpeech:
     def __init__(self, text: str):
         self.text = text
+        self.samples = None
 
     def transcribe(self, audio):
+        self.samples = len(audio)
         return self.text
 
 
@@ -108,6 +110,24 @@ def test_chunked_upload_over_limit_is_rejected_without_disk(monkeypatch):
     assert spills == []
     assert response.status_code == 400
     assert response.json()["code"] == "INVALID_REQUEST"
+
+
+def test_long_audio_is_trimmed_to_30_seconds():
+    # 240 s took ~6.4 s end to end on the 3060 Ti; the Pi gives up after 3-5 s.
+    stt = FakeSpeech("택배 왔습니다")
+    lm = FakeLanguage(Analysis(summary="택배 도착", purpose="DELIVERY"))
+    with ready_client(stt=stt, language=lm) as client:
+        response = post_audio(client, tone_wav(120))
+    assert response.status_code == 200
+    assert stt.samples == 30 * 16000
+
+
+def test_short_audio_is_not_trimmed():
+    stt = FakeSpeech("x")
+    lm = FakeLanguage(Analysis(summary="x", purpose="ETC"))
+    with ready_client(stt=stt, language=lm) as client:
+        post_audio(client, tone_wav(5))
+    assert stt.samples == 5 * 16000
 
 
 def test_process_audio_stt_not_ready():

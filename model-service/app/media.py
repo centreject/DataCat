@@ -9,6 +9,7 @@ from PIL import Image, UnidentifiedImageError
 from app.errors import ApiError
 
 AUDIO_RATE = 16000
+MAX_AUDIO_SECONDS = 30
 PCM, FLOAT, EXTENSIBLE = 1, 3, 0xFFFE
 REQUIRED = "PCM 16-bit, mono, 16000Hz"
 # Camera Module 3 full resolution is 4608x2592 ≈ 12 MP; allow headroom, refuse absurd sizes.
@@ -71,4 +72,7 @@ def decode_wav(data: bytes) -> np.ndarray:
     samples = samples[: len(samples) - len(samples) % 2]
     if not samples:
         raise _invalid_audio("음성 데이터가 비어 있습니다.")
+    # Only the first MAX_AUDIO_SECONDS are used: longer audio would blow the Pi's 3-5 s timeout
+    # (240 s took ~6.4 s on the 3060 Ti) and hold the STT lock for the next visitor.
+    samples = samples[: MAX_AUDIO_SECONDS * AUDIO_RATE * 2]
     return np.frombuffer(samples, dtype="<i2").astype(np.float32) / 32768.0
