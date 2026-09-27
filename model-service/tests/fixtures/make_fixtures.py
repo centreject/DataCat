@@ -50,6 +50,16 @@ def silence_wav(seconds: float) -> bytes:
     return buf.getvalue()
 
 
+def noisy_jpeg(width: int, height: int) -> bytes:
+    """Random pixels compress badly, so this is a realistically large JPEG (a few MB)."""
+    import numpy as np
+
+    pixels = np.random.default_rng(0).integers(0, 256, (height, width, 3), dtype=np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(pixels).save(buf, format="JPEG", quality=95)
+    return buf.getvalue()
+
+
 def tiny_jpeg(fmt: str = "JPEG") -> bytes:
     buf = io.BytesIO()
     Image.new("RGB", (8, 8), (200, 120, 40)).save(buf, format=fmt)

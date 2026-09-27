@@ -2,9 +2,15 @@ from fastapi import APIRouter, File, Request, UploadFile
 
 from app.errors import ApiError
 from app.media import decode_jpeg, decode_wav
-from app.pipeline import analyze_transcript
+from app.pipeline import analyze_transcript, process_audio
 from app.registry import ModelRegistry
-from app.schemas import Analysis, AnalyzeRequest, DetectResponse, TranscribeResponse
+from app.schemas import (
+    Analysis,
+    AnalyzeRequest,
+    AudioProcessResponse,
+    DetectResponse,
+    TranscribeResponse,
+)
 
 router = APIRouter(prefix="/internal/v1")
 
@@ -27,6 +33,14 @@ def detect(request: Request, image: UploadFile = File(...)):
 def transcribe(request: Request, audio: UploadFile = File(...)):
     model = require(request.app.state.registry, "stt")
     return TranscribeResponse(transcript=model.transcribe(decode_wav(audio.file.read())))
+
+
+@router.post("/audio/process", response_model=AudioProcessResponse)
+def audio_process(request: Request, audio: UploadFile = File(...)):
+    registry = request.app.state.registry
+    require(registry, "stt")
+    require(registry, "language")
+    return process_audio(registry, audio.file.read())
 
 
 @router.post("/language/analyze", response_model=Analysis)
