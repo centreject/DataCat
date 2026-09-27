@@ -95,6 +95,25 @@ def test_decode_jpeg_rejects_png():
     assert_api_error(e, "INVALID_IMAGE")
 
 
+def test_decode_jpeg_rejects_decompression_bomb(monkeypatch):
+    # Pillow raises DecompressionBombError (not OSError) above 2 × MAX_IMAGE_PIXELS.
+    from PIL import Image
+
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
+    with pytest.raises(ApiError) as e:
+        decode_jpeg(tiny_jpeg())  # 8×8 = 64 px > 2 × 10
+    assert_api_error(e, "INVALID_IMAGE")
+
+
+def test_decode_jpeg_rejects_resolution_over_limit(monkeypatch):
+    import app.media
+
+    monkeypatch.setattr(app.media, "MAX_IMAGE_PIXELS", 32)
+    with pytest.raises(ApiError) as e:
+        decode_jpeg(tiny_jpeg())  # 64 px
+    assert_api_error(e, "INVALID_IMAGE", "8x8")
+
+
 def test_decode_jpeg_rejects_garbage():
     with pytest.raises(ApiError) as e:
         decode_jpeg(b"\xff\xd8\xff not really")

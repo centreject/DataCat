@@ -11,6 +11,8 @@ from app.errors import ApiError
 AUDIO_RATE = 16000
 PCM, FLOAT, EXTENSIBLE = 1, 3, 0xFFFE
 REQUIRED = "PCM 16-bit, mono, 16000Hz"
+# Camera Module 3 full resolution is 4608x2592 ≈ 12 MP; allow headroom, refuse absurd sizes.
+MAX_IMAGE_PIXELS = 40_000_000
 
 
 def decode_jpeg(data: bytes) -> Image.Image:
@@ -18,8 +20,14 @@ def decode_jpeg(data: bytes) -> Image.Image:
         image = Image.open(io.BytesIO(data))
         if image.format != "JPEG":
             raise ApiError(400, "INVALID_IMAGE", f"JPEG 이미지만 허용됩니다(받은 형식: {image.format}).")
+        # Checked before decoding: the header alone gives the size, decoding a huge image costs GBs of RAM.
+        width, height = image.size
+        if width * height > MAX_IMAGE_PIXELS:
+            raise ApiError(
+                400, "INVALID_IMAGE", f"이미지 해상도가 너무 큽니다({width}x{height}, 최대 {MAX_IMAGE_PIXELS // 1_000_000}MP)."
+            )
         return image.convert("RGB")
-    except (UnidentifiedImageError, OSError):
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise ApiError(400, "INVALID_IMAGE", "이미지를 읽을 수 없습니다. JPEG 파일이어야 합니다.")
 
 
