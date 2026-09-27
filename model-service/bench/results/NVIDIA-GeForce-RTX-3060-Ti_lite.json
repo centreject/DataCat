@@ -1,0 +1,50 @@
+{
+  "gpu": "NVIDIA GeForce RTX 3060 Ti",
+  "total_mib": 8191,
+  "profile": "lite",
+  "runs": 20,
+  "models": {
+    "stt": "large-v3-turbo",
+    "stt_compute": "int8_float16",
+    "llm": "Qwen/Qwen3-4B-Instruct-2507",
+    "llm_4bit": true
+  },
+  "desktop_baseline_mib": 628,
+  "all_loaded_mib": 4907,
+  "torch_max_allocated_mib": 2965,
+  "loads": {
+    "vision": {
+      "load_s": 4.9,
+      "nvidia_smi_delta_mib": 323
+    },
+    "stt": {
+      "load_s": 47.0,
+      "nvidia_smi_delta_mib": 994
+    },
+    "language": {
+      "load_s": 12.2,
+      "nvidia_smi_delta_mib": 2852
+    }
+  },
+  "latency_ms": {
+    "vision": {
+      "p50": 34.0,
+      "p95": 38.5
+    },
+    "stt": {
+      "p50": 250.8,
+      "p95": 254.2
+    },
+    "language": {
+      "p50": 1537.4,
+      "p95": 1590.9
+    },
+    "audio_process": {
+      "p50": 1787.4,
+      "p95": 1816.6
+    }
+  },
+  "pass": {
+    "audio_process": true
+  }
+}
