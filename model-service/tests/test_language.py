@@ -87,6 +87,27 @@ def test_rules_purpose(transcript, purpose):
     assert rule_analyze(transcript).purpose == purpose
 
 
+# Held-out sentences (not in eval/purpose_cases.jsonl) for the expanded keyword list (M5).
+@pytest.mark.parametrize(
+    "transcript, purpose",
+    [
+        ("한진입니다, 박스 하나 경비실에 맡겼어요", "DELIVERY"),
+        ("주문하신 꽃 가져왔습니다", "DELIVERY"),
+        ("퀵서비스입니다", "DELIVERY"),
+        ("한국전력에서 계량기 보러 왔어요", "INSPECTION"),
+        ("윗집 누수 때문에 연락받고 왔어요", "INSPECTION"),
+        ("정수기 필터 갈러 왔어요", "INSPECTION"),
+        ("이모야, 문 열어 봐", "VISIT"),
+        ("할아버지 왔다", "VISIT"),
+        ("저 후배 지영이에요", "VISIT"),
+        ("교회에서 전도하러 왔어요", "ETC"),
+        ("여론조사 기관에서 나왔습니다", "ETC"),
+    ],
+)
+def test_rules_expanded_keywords(transcript, purpose):
+    assert rule_analyze(transcript).purpose == purpose
+
+
 def test_rules_summary_is_truncated_transcript():
     assert rule_analyze("가" * 30).summary == "가" * 19 + "…"
 
