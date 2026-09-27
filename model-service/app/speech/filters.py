@@ -12,7 +12,8 @@ HALLUCINATION_PHRASES = (
 def clean_segments(segments: Iterable[tuple[str, float]], max_no_speech_prob: float = 0.6) -> str:
     """Join (text, no_speech_prob) segments, dropping likely non-speech and known hallucinations."""
     kept = [
-        text.strip()
+        # U+FFFD appears when Whisper cuts a multi-byte token in half; never show it to users.
+        text.replace("�", "").strip()
         for text, no_speech_prob in segments
         if no_speech_prob <= max_no_speech_prob and not any(p in text for p in HALLUCINATION_PHRASES)
     ]

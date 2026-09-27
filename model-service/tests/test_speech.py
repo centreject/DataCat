@@ -36,6 +36,11 @@ def test_clean_drops_hallucination_variants():
     assert clean_segments(segments) == ""
 
 
+def test_clean_removes_broken_characters():
+    # Whisper can cut a multi-byte token in half, leaving U+FFFD ("열어�" seen in eval, 2026-09-27).
+    assert clean_segments([("엄마, 나야 문 좀 열어�", 0.1)]) == "엄마, 나야 문 좀 열어"
+
+
 def test_transcribe_route():
     fake = FakeSpeech("택배 왔습니다.")
     with ready_client(stt=fake) as client:

@@ -34,6 +34,14 @@ def test_korean_tts_sample(stt):
     assert "택배" in stt.transcribe(decode_wav(path.read_bytes()))
 
 
+def test_delivery_brand_words_recognized(stt):
+    # Was "로켓프렛이 본행백" before delivery words were added to the prompt (eval 2026-09-27).
+    path = TTS / "delivery_07.wav"
+    if not path.exists():
+        pytest.skip(f"missing {path.relative_to(DATA_DIR.parent)} (run eval/make_tts_audio.py)")
+    assert "보냉백" in stt.transcribe(decode_wav(path.read_bytes()))
+
+
 def test_load_registry_loads_stt(gpu_registry):
     from app.speech.whisper import WhisperSpeech
 

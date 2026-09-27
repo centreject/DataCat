@@ -30,7 +30,7 @@ from app.config import Settings  # noqa: E402
 from app.speech.filters import clean_segments  # noqa: E402
 
 # Domain words bias decoding toward what visitors actually say at the door.
-DOMAIN_PROMPT = "택배, 배달, 배송, 검침, 점검, 관리사무소, 방문"
+DOMAIN_PROMPT = "택배, 배달, 배송, 등기, 소포, 쿠팡, 로켓프레시, 보냉백, 경비실, 검침, 점검, 관리사무소, 방문"
 
 
 class WhisperSpeech:
