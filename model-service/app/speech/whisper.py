@@ -46,7 +46,15 @@ class WhisperSpeech:
             )
         )
         self.lock = threading.Lock()
-        self.transcribe(np.zeros(16000, dtype=np.float32))  # warm-up
+        self._warm_up()
+
+    def _warm_up(self) -> None:
+        """Run the decoder once at start-up. With VAD on, silence would skip decoding entirely, so a
+        broken CUDA 12 cuBLAS/cuDNN would surface only on the first real request (after /health ok)."""
+        tone = (0.1 * np.sin(2 * np.pi * 440 * np.arange(16000) / 16000)).astype(np.float32)
+        segments, _ = self.model.transcribe(tone, language="ko", beam_size=1, vad_filter=False)
+        for _ in segments:  # decoding happens while consuming the generator
+            pass
 
     def transcribe(self, audio: np.ndarray) -> str:
         with self.lock:
