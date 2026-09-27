@@ -24,7 +24,8 @@ VOLUME /models
 EXPOSE 8000
 
 # First start downloads ~10 GB of weights, so allow a long start period.
+# "degraded" (e.g. LLM failed to load, keyword rules in use) still serves requests, so it counts as healthy.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=900s --retries=3 \
-    CMD python -c "import json,sys,urllib.request; sys.exit(json.load(urllib.request.urlopen('http://localhost:8000/health'))['status'] != 'ok')"
+    CMD python -c "import json,sys,urllib.request; sys.exit(json.load(urllib.request.urlopen('http://localhost:8000/health'))['status'] not in ('ok', 'degraded'))"
 
 CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

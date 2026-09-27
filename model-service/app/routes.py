@@ -22,6 +22,13 @@ def require(registry: ModelRegistry | None, name: str):
     return model
 
 
+def require_loaded(registry: ModelRegistry | None) -> ModelRegistry:
+    """For endpoints that can do without the LLM (keyword rules): only wait for loading to finish."""
+    if registry is None or not registry.ready:
+        raise ApiError(503, "MODEL_NOT_READY", "모델을 불러오는 중입니다.")
+    return registry
+
+
 @router.post("/vision/detect", response_model=DetectResponse)
 def detect(request: Request, image: UploadFile = File(...)):
     # Sync handler: FastAPI runs it in a worker thread, so GPU inference doesn't block the event loop.
@@ -38,12 +45,11 @@ def transcribe(request: Request, audio: UploadFile = File(...)):
 @router.post("/audio/process", response_model=AudioProcessResponse)
 def audio_process(request: Request, audio: UploadFile = File(...)):
     registry = request.app.state.registry
-    require(registry, "stt")
-    require(registry, "language")
+    require(registry, "stt")  # the LLM is optional: keyword rules stand in if it failed to load
     return process_audio(registry, audio.file.read())
 
 
 @router.post("/language/analyze", response_model=Analysis)
 def analyze(request: Request, body: AnalyzeRequest):
-    model = require(request.app.state.registry, "language")
-    return analyze_transcript(model, body.transcript)
+    registry = require_loaded(request.app.state.registry)
+    return analyze_transcript(registry.language, body.transcript)

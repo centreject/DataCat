@@ -163,6 +163,13 @@ def test_analyze_route_contract():
     assert response.json() == {"summary": "택배 문 앞 보관", "purpose": "DELIVERY"}
 
 
+def test_analyze_route_uses_rules_when_llm_failed_to_load():
+    with ready_client(language=None) as client:
+        response = client.post(URL, json={"transcript": "택배 왔어요"})
+    assert response.status_code == 200
+    assert response.json() == {"summary": "택배 왔어요", "purpose": "DELIVERY"}
+
+
 def test_analyze_route_empty_transcript():
     with ready_client(language=FakeLanguage(error=AssertionError())) as client:
         response = client.post(URL, json={"transcript": ""})

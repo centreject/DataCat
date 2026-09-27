@@ -102,13 +102,18 @@ def create_app(
     app.add_middleware(UploadLimit)
 
     @app.get("/health")
-    def health():
-        if app.state.load_failed:
+    async def health():  # async: must answer even while inference threads are busy
+        registry = app.state.registry
+        body = {"profile": settings.model_profile}
+        if app.state.load_failed or (registry is not None and len(registry.failed) == 3):
             status = "error"
-        elif app.state.registry is not None and app.state.registry.ready:
-            status = "ok"
-        else:
+        elif registry is None or not registry.ready:
             status = "loading"
-        return {"status": status, "profile": settings.model_profile}
+        elif registry.failed:
+            status = "degraded"
+            body["failed"] = list(registry.failed)
+        else:
+            status = "ok"
+        return {"status": status, **body}
 
     return app

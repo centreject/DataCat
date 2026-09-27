@@ -36,6 +36,50 @@ def test_health_reports_error_when_loading_fails():
         assert client.get("/health").json() == {"status": "error", "profile": "lite"}
 
 
+def test_health_degraded_when_a_model_failed():
+    registry = ModelRegistry(vision=object(), stt=object(), language=None, ready=True, failed=("language",))
+    app = create_app(lambda s: registry)
+    with TestClient(app) as client:
+        app.state.loader.join(timeout=5)
+        body = client.get("/health").json()
+    assert body == {"status": "degraded", "profile": "lite", "failed": ["language"]}
+
+
+def test_health_error_when_every_model_failed():
+    registry = ModelRegistry(
+        vision=None, stt=None, language=None, ready=True, failed=("vision", "stt", "language")
+    )
+    app = create_app(lambda s: registry)
+    with TestClient(app) as client:
+        app.state.loader.join(timeout=5)
+        assert client.get("/health").json()["status"] == "error"
+
+
+def test_load_registry_keeps_working_models_when_one_fails(monkeypatch):
+    import app.language.qwen
+    import app.speech.whisper
+    import app.vision.yolo
+    from app.config import Settings
+    from app.registry import load_registry
+
+    class Works:
+        def __init__(self, settings):
+            pass
+
+    class OutOfMemory:
+        def __init__(self, settings):
+            raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setattr(app.vision.yolo, "YoloVision", Works)
+    monkeypatch.setattr(app.speech.whisper, "WhisperSpeech", Works)
+    monkeypatch.setattr(app.language.qwen, "QwenLanguage", OutOfMemory)
+    registry = load_registry(Settings())
+    assert isinstance(registry.vision, Works) and isinstance(registry.stt, Works)
+    assert registry.language is None
+    assert registry.failed == ("language",)
+    assert registry.ready is True
+
+
 def test_detect_while_loading_returns_503():
     release = threading.Event()
     app = create_app(blocking_factory(release))

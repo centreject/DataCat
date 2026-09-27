@@ -9,10 +9,12 @@ from app.schemas import Analysis, AudioProcessResponse
 log = logging.getLogger(__name__)
 
 
-def analyze_transcript(model: LanguageModel, transcript: str) -> Analysis:
+def analyze_transcript(model: LanguageModel | None, transcript: str) -> Analysis:
     # No speech: Spring/app decide what to show (agreed 2026-09-27), so return empty summary + ETC.
     if not transcript.strip():
         return Analysis(summary="", purpose="ETC")
+    if model is None:  # LLM failed to load
+        return rule_analyze(transcript)
     try:
         return model.analyze(transcript)
     except Exception:

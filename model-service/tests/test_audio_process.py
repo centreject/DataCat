@@ -130,6 +130,13 @@ def test_short_audio_is_not_trimmed():
     assert stt.samples == 5 * 16000
 
 
+def test_process_audio_uses_rules_when_llm_failed_to_load():
+    with ready_client(stt=FakeSpeech("택배 왔습니다"), language=None) as client:
+        response = post_audio(client, tone_wav(1))
+    assert response.status_code == 200
+    assert response.json() == {"transcript": "택배 왔습니다", "purpose": "DELIVERY", "summary": "택배 왔습니다"}
+
+
 def test_process_audio_stt_not_ready():
     lm = FakeLanguage(Analysis(summary="x", purpose="ETC"))
     with ready_client(stt=None, language=lm) as client:
