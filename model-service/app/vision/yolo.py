@@ -44,10 +44,11 @@ class YoloVision:
     def detect(self, image: Image.Image) -> list[Detection]:
         with self.lock:
             people = self.person_model.predict(
-                image, classes=[COCO_PERSON], conf=self.settings.person_conf, half=True, verbose=False
+                image, classes=[COCO_PERSON], conf=self.settings.person_conf, quantize=16, verbose=False
             )[0]
+            # agnostic_nms: overlapping prompts ("box", "cardboard box") on one object count once.
             packages = self.package_model.predict(
-                image, conf=self.settings.package_conf, half=True, verbose=False
+                image, conf=self.settings.package_conf, agnostic_nms=True, quantize=16, verbose=False
             )[0]
         return [
             Detection(label="person", confidence=round(float(c), 4)) for c in people.boxes.conf

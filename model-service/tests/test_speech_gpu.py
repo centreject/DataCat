@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from app.config import DATA_DIR, Settings
+from app.config import DATA_DIR
 from app.media import decode_wav
 from tests.fixtures.make_fixtures import silence_wav, tone_wav
 
@@ -15,10 +15,8 @@ TTS = DATA_DIR / "audio" / "tts"
 
 
 @pytest.fixture(scope="module")
-def stt():
-    from app.speech.whisper import WhisperSpeech
-
-    return WhisperSpeech(Settings())
+def stt(gpu_registry):
+    return gpu_registry.stt
 
 
 def test_silence_gives_empty(stt):
@@ -36,8 +34,7 @@ def test_korean_tts_sample(stt):
     assert "택배" in stt.transcribe(decode_wav(path.read_bytes()))
 
 
-def test_load_registry_loads_stt():
-    from app.registry import load_registry
+def test_load_registry_loads_stt(gpu_registry):
     from app.speech.whisper import WhisperSpeech
 
-    assert isinstance(load_registry(Settings()).stt, WhisperSpeech)
+    assert isinstance(gpu_registry.stt, WhisperSpeech)

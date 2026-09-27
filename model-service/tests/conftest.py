@@ -13,6 +13,15 @@ def _default_profile(monkeypatch):
     monkeypatch.delenv("MODEL_PROFILE", raising=False)
 
 
+@pytest.fixture(scope="session")
+def gpu_registry():
+    """Real models loaded once for the whole GPU test session (8 GB cards can't hold two copies)."""
+    from app.config import Settings
+    from app.registry import load_registry
+
+    return load_registry(Settings())
+
+
 @contextmanager
 def ready_client(vision=None, stt=None, language=None):
     """TestClient whose registry is already loaded with the given (fake) models."""

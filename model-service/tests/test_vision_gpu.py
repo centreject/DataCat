@@ -14,10 +14,8 @@ IMAGES = Path(__file__).resolve().parent.parent / "data" / "images"
 
 
 @pytest.fixture(scope="module")
-def vision():
-    from app.vision.yolo import YoloVision
-
-    return YoloVision(Settings())
+def vision(gpu_registry):
+    return gpu_registry.vision
 
 
 def representative(folder: str) -> Image.Image:
@@ -77,10 +75,8 @@ def test_loading_writes_nothing_to_working_directory(tmp_path, monkeypatch):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_load_registry_loads_vision():
-    from app.registry import load_registry
+def test_load_registry_loads_vision(gpu_registry):
     from app.vision.yolo import YoloVision
 
-    registry = load_registry(Settings())
-    assert isinstance(registry.vision, YoloVision)
-    assert registry.ready is True
+    assert isinstance(gpu_registry.vision, YoloVision)
+    assert gpu_registry.ready is True
