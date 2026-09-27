@@ -1,0 +1,24 @@
+# Runtime dependencies for the Docker image, pinned to the versions tested on 2026-09-27
+# (RTX 3060 Ti, lite profile; see PROGRESS.md T9). Transitive packages are resolved by pip.
+fastapi==0.141.1
+uvicorn==0.54.0
+pydantic-settings==2.15.0
+python-multipart==0.0.32
+pillow==12.3.0
+numpy==2.4.6
+
+# PyPI torch 2.14 is built for CUDA 13; the host driver must support CUDA 13 (591.xx does).
+torch==2.14.0
+torchvision==0.29.0
+ultralytics==8.4.163
+# YOLOE's text prompts need Ultralytics' CLIP fork (not on PyPI); zip URL so the image needs no git.
+clip @ https://github.com/ultralytics/CLIP/archive/a13192f8cb767260d7dfd98c843b0716593169e7.zip
+transformers==5.17.0
+accelerate==1.15.0
+bitsandbytes==0.50.2
+
+# CTranslate2 (faster-whisper) needs CUDA 12 cuBLAS/cuDNN; preloaded in app/speech/whisper.py.
+faster-whisper==1.2.1
+ctranslate2==4.8.2
+nvidia-cublas-cu12==12.4.5.8
+nvidia-cudnn-cu12==9.1.0.70

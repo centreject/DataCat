@@ -29,6 +29,14 @@ def stub_vision(people, packages) -> YoloVision:
     return vision
 
 
+def test_ultralytics_never_pip_installs_at_runtime():
+    # Ultralytics silently pip-installs missing requirements (it did for CLIP); in a container or at a
+    # demo that means network access and unpinned versions. Dependencies come from requirements.txt.
+    from ultralytics.utils import AUTOINSTALL
+
+    assert AUTOINSTALL is False
+
+
 def test_maps_both_models_to_labels_with_rounded_confidence():
     vision = stub_vision(people=[0.912345], packages=[0.5, 0.33333])
     assert vision.detect(Image.new("RGB", (4, 4))) == [

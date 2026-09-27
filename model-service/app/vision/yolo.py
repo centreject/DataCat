@@ -11,6 +11,8 @@ from app.schemas import Detection
 _CONFIG_DIR = DATA_DIR / "ultralytics"
 _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("YOLO_CONFIG_DIR", str(_CONFIG_DIR))
+# Never pip-install missing packages at runtime (Ultralytics' default); they are pinned in requirements.txt.
+os.environ.setdefault("YOLO_AUTOINSTALL", "false")
 
 from ultralytics import YOLO, YOLOE  # noqa: E402
 from ultralytics.utils import SETTINGS  # noqa: E402
