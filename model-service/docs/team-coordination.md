@@ -41,6 +41,12 @@
 > **4. 명세 수정 PR 올릴게요**
 > - label 확정, 발화 없을 때 응답 규칙, `/health` 추가, 모델 서비스 오류 코드 목록 — 명세만 고치는 작은 PR이라 리뷰 부탁드립니다
 >
+> **5. Spring 쪽에서 알아 두실 것 (추가)**
+> - 음성은 앞 **30초**만 처리합니다(그보다 길면 Pi 타임아웃을 넘겨서요). 업로드는 16MB까지.
+> - `/health`가 `degraded`면 일부 모델만 실패한 상태예요. 이미지 인식·STT는 되고, 용건 분류는 키워드 규칙으로 대신합니다. 응답에 `failed` 목록이 붙어요.
+> - `purpose`는 방문객이 말로 바꿀 수 있는 값이라, 출입이나 보안 판단에는 쓰지 말아 주세요.
+> - 이 PC(8GB)에서 음성 처리 전체 1.8초, 용건 분류 정확도 98%(평가 문장 40개 기준)입니다.
+>
 > 테스트는 이렇게 해보실 수 있어요: `curl -F image=@door.jpg http://localhost:8000/internal/v1/vision/detect`
 
 ---
@@ -58,9 +64,10 @@
 > 1. **7.1 이미지 인식** — `label` 허용 값을 `person`, `package`로 확정(`box` 삭제). `package` 범위: 택배 박스, 비닐 택배봉투, 배달 음식 봉지·용기, 보냉백. 사람이 들고 있는 물건도 `package`로 나올 수 있음(구분하지 않음).
 > 2. **7.2~7.4 발화 없음** — 전사 결과가 비면 `transcript=""`, `summary=""`, `purpose="ETC"`. 알림 문구는 Spring·앱이 `transcript`가 비었는지 보고 정한다.
 > 3. **7.3 요약 문체** — 명사형(예: `택배 문 앞 보관`), 공백 포함 20자 이내. *(덕민님 확인 대기)*
-> 4. **7.5 신규: 상태 확인** — `GET /health` → `{"status": "loading" | "ok" | "error", "profile": "lite" | "full"}`. 로딩 중·실패 시 추론 요청은 503 `MODEL_NOT_READY`.
+> 4. **7.5 신규: 상태 확인** — `GET /health` → `{"status": "loading" | "ok" | "degraded" | "error", "profile": "lite" | "full"}` (`degraded`면 `failed` 목록 추가). 로딩 중·실패 시 추론 요청은 503 `MODEL_NOT_READY`.
 > 5. **12장 오류 코드(모델 서비스)** — `INVALID_IMAGE`(400), `INVALID_AUDIO`(400), `INVALID_REQUEST`(400), `NOT_FOUND`(404), `METHOD_NOT_ALLOWED`(405), `MODEL_NOT_READY`(503), `INFERENCE_FAILED`(500).
 > 6. **16장 TBD 4** — 모델 서비스 포트 `8000` 제안 (Docker 서비스 이름은 compose 확정 시).
+> 7. **7.2·7.4 음성 길이** — 음성은 앞 30초만 전사한다(더 길면 Pi 타임아웃 3~5초를 넘김). 업로드는 16MB까지, 넘으면 400 `INVALID_REQUEST`.
 >
 > **바뀌지 않는 것:** 엔드포인트 경로, 요청 형식(JPEG / WAV PCM 16-bit·16kHz·mono), 응답 필드 이름.
 >
