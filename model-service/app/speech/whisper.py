@@ -27,6 +27,7 @@ _preload_cuda12_libs()
 from faster_whisper import WhisperModel  # noqa: E402
 
 from app.config import Settings  # noqa: E402
+from app.hub_cache import load_cached_first  # noqa: E402
 from app.speech.filters import clean_segments  # noqa: E402
 
 # Domain words bias decoding toward what visitors actually say at the door.
@@ -35,11 +36,14 @@ DOMAIN_PROMPT = "택배, 배달, 배송, 등기, 소포, 쿠팡, 로켓프레시
 
 class WhisperSpeech:
     def __init__(self, settings: Settings):
-        self.model = WhisperModel(
-            settings.stt_model,
-            device="cuda",
-            compute_type=settings.stt_compute_type,
-            download_root=str(Path(settings.weights_dir) / "whisper"),
+        self.model = load_cached_first(
+            lambda local_files_only: WhisperModel(
+                settings.stt_model,
+                device="cuda",
+                compute_type=settings.stt_compute_type,
+                download_root=str(Path(settings.weights_dir) / "whisper"),
+                local_files_only=local_files_only,
+            )
         )
         self.lock = threading.Lock()
         self.transcribe(np.zeros(16000, dtype=np.float32))  # warm-up

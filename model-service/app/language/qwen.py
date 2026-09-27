@@ -3,6 +3,7 @@ import threading
 from pathlib import Path
 
 from app.config import Settings
+from app.hub_cache import load_cached_first
 from app.language.normalize import parse_llm_output
 from app.language.rules import rule_analyze
 from app.schemas import Analysis
@@ -57,8 +58,16 @@ class QwenLanguage:
         else:
             kwargs["dtype"] = torch.bfloat16
         self.torch = torch
-        self.tokenizer = AutoTokenizer.from_pretrained(settings.llm_model, cache_dir=cache)
-        self.model = AutoModelForCausalLM.from_pretrained(settings.llm_model, **kwargs)
+        self.tokenizer = load_cached_first(
+            lambda local_files_only: AutoTokenizer.from_pretrained(
+                settings.llm_model, cache_dir=cache, local_files_only=local_files_only
+            )
+        )
+        self.model = load_cached_first(
+            lambda local_files_only: AutoModelForCausalLM.from_pretrained(
+                settings.llm_model, local_files_only=local_files_only, **kwargs
+            )
+        )
         self.max_new_tokens = settings.llm_max_new_tokens
         self.lock = threading.Lock()
         self.analyze("택배 왔습니다")  # warm-up
