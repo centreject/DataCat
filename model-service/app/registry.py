@@ -14,10 +14,13 @@ class ModelRegistry:
 
 def load_registry(settings: Settings) -> ModelRegistry:
     # Imported here so the app (and unit tests) start without GPU libraries loaded.
+    from app.language.qwen import QwenLanguage
     from app.speech.whisper import WhisperSpeech
     from app.vision.yolo import YoloVision
 
-    # The LLM is wired in by Task 7.
     return ModelRegistry(
-        vision=YoloVision(settings), stt=WhisperSpeech(settings), language=None, ready=True
+        vision=YoloVision(settings),
+        stt=WhisperSpeech(settings),
+        language=QwenLanguage(settings),
+        ready=True,
     )

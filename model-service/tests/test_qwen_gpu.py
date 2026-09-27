@@ -2,16 +2,18 @@
 
 import pytest
 
-from app.config import Settings
-
 pytestmark = pytest.mark.gpu
 
 
 @pytest.fixture(scope="module")
-def qwen():
+def qwen(gpu_registry):
+    return gpu_registry.language
+
+
+def test_load_registry_loads_language(gpu_registry):
     from app.language.qwen import QwenLanguage
 
-    return QwenLanguage(Settings())
+    assert isinstance(gpu_registry.language, QwenLanguage)
 
 
 def test_qwen_delivery(qwen):
