@@ -19,6 +19,9 @@ ml = [
     # CTranslate2 needs CUDA 12 libraries even when torch is built for CUDA 13.
     "nvidia-cublas-cu12",
     "nvidia-cudnn-cu12==9.*",
+    "transformers>=5",
+    "accelerate",
+    "bitsandbytes",
 ]
 eval = ["edge-tts>=7"]
 
