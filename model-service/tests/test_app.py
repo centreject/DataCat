@@ -1,4 +1,5 @@
 import threading
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -56,6 +57,46 @@ def test_validation_error_uses_error_format():
         response = client.post("/internal/v1/language/analyze", json={})
     assert response.status_code == 400
     assert response.json()["code"] == "INVALID_REQUEST"
+
+
+def test_unknown_path_uses_error_format():
+    app = create_app(lambda s: ModelRegistry(vision=None, stt=None, language=None, ready=True))
+    with TestClient(app) as client:
+        response = client.get("/nope")
+    assert response.status_code == 404
+    assert response.json()["code"] == "NOT_FOUND"
+    assert response.json()["message"]
+
+
+def test_wrong_method_uses_error_format():
+    app = create_app(lambda s: ModelRegistry(vision=None, stt=None, language=None, ready=True))
+    with TestClient(app) as client:
+        response = client.get("/internal/v1/vision/detect")
+    assert response.status_code == 405
+    assert response.json()["code"] == "METHOD_NOT_ALLOWED"
+
+
+def test_model_exception_returns_inference_failed():
+    class Broken:
+        def detect(self, image):
+            raise RuntimeError("CUDA error")
+
+    from tests.fixtures.make_fixtures import tiny_jpeg
+
+    app = create_app(lambda s: ModelRegistry(vision=Broken(), stt=None, language=None, ready=True))
+    with TestClient(app, raise_server_exceptions=False) as client:
+        app.state.loader.join(timeout=5)
+        response = client.post(
+            "/internal/v1/vision/detect", files={"image": ("x.jpg", tiny_jpeg(), "image/jpeg")}
+        )
+    assert response.status_code == 500
+    assert response.json()["code"] == "INFERENCE_FAILED"
+
+
+def test_weights_dir_is_independent_of_working_directory(tmp_path, monkeypatch):
+    service_root = Path(__file__).resolve().parent.parent
+    monkeypatch.chdir(tmp_path)
+    assert Path(Settings().weights_dir) == service_root / "data" / "weights"
 
 
 def test_profile_derived_settings():

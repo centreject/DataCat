@@ -4,16 +4,21 @@ from pathlib import Path
 
 from PIL import Image
 
-# Keep Ultralytics' settings file inside the project instead of ~/.config.
-os.environ.setdefault("YOLO_CONFIG_DIR", str(Path("data/ultralytics").resolve()))
+from app.config import DATA_DIR, Settings
+from app.schemas import Detection
+
+# Keep Ultralytics' settings file inside the project instead of ~/.config (must exist before import).
+_CONFIG_DIR = DATA_DIR / "ultralytics"
+_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("YOLO_CONFIG_DIR", str(_CONFIG_DIR))
 
 from ultralytics import YOLO, YOLOE  # noqa: E402
-
-from app.config import Settings
-from app.schemas import Detection
+from ultralytics.utils import SETTINGS  # noqa: E402
+from ultralytics.utils.downloads import attempt_download_asset  # noqa: E402
 
 PERSON_WEIGHTS = "yolo11s.pt"
 PACKAGE_WEIGHTS = "yoloe-11s-seg.pt"
+TEXT_ENCODER = "mobileclip_blt.ts"  # YOLOE's prompt encoder; fetched by bare name otherwise
 COCO_PERSON = 0
 
 
@@ -23,6 +28,11 @@ class YoloVision:
     def __init__(self, settings: Settings):
         weights = Path(settings.weights_dir)
         weights.mkdir(parents=True, exist_ok=True)
+        # Ultralytics resolves bare asset names against SETTINGS["weights_dir"], else downloads to
+        # the working directory. Pre-fetch the text encoder there so nothing lands in the cwd.
+        SETTINGS.update({"weights_dir": str(weights)})
+        attempt_download_asset(weights / TEXT_ENCODER)
+
         self.settings = settings
         self.person_model = YOLO(str(weights / PERSON_WEIGHTS))
         self.package_model = YOLOE(str(weights / PACKAGE_WEIGHTS))

@@ -1,13 +1,19 @@
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings
+
+# model-service/ — anchors data paths so they don't depend on the working directory.
+SERVICE_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = SERVICE_ROOT / "data"
 
 
 class Settings(BaseSettings):
     model_profile: Literal["full", "lite"] = "lite"
     person_conf: float = 0.4
-    # Tuned on Open Images val/test subset (eval/prepare_images.py), 2026-09-27:
-    # at 0.25 → box 53%, plastic bag 72%, empty hallway false positive 3%.
+    # Tuned on the Open Images val/test subset from eval/prepare_images.py (2026-09-27),
+    # measured per whole folder: person 93%, box 53%, plastic bag 72%,
+    # empty-hallway false positives 3-7%. Zero-shot; below the 85% package target.
     package_conf: float = 0.25
     package_prompts: list[str] = [
         "box",
@@ -20,7 +26,7 @@ class Settings(BaseSettings):
         "takeout container",
         "cooler bag",
     ]
-    weights_dir: str = "data/weights"
+    weights_dir: str = str(DATA_DIR / "weights")
     stt_model: str = "large-v3-turbo"
     llm_model: str = "Qwen/Qwen3-4B-Instruct-2507"
     llm_max_new_tokens: int = 64

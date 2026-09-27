@@ -25,6 +25,21 @@ def tone_wav(seconds: float, rate: int = 16000, channels: int = 1, sampwidth: in
     return buf.getvalue()
 
 
+PCM_TAG, FLOAT_TAG, EXTENSIBLE_TAG = 1, 3, 0xFFFE
+_PCM_SUBFORMAT = struct.pack("<H", PCM_TAG) + bytes.fromhex("000000001000800000aa00389b71")
+
+
+def raw_wav(tag: int, channels: int, rate: int, bits: int, data: bytes, subformat_tag: int = PCM_TAG) -> bytes:
+    """Hand-built RIFF/WAVE, for layouts the stdlib `wave` writer cannot produce (float, EXTENSIBLE)."""
+    align = channels * bits // 8
+    fmt = struct.pack("<HHIIHH", tag, channels, rate, rate * align, align, bits)
+    if tag == EXTENSIBLE_TAG:
+        sub = struct.pack("<H", subformat_tag) + _PCM_SUBFORMAT[2:]
+        fmt += struct.pack("<HHI", 22, bits, 0) + sub
+    chunks = b"fmt " + struct.pack("<I", len(fmt)) + fmt + b"data" + struct.pack("<I", len(data)) + data
+    return b"RIFF" + struct.pack("<I", 4 + len(chunks)) + b"WAVE" + chunks
+
+
 def silence_wav(seconds: float) -> bytes:
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:

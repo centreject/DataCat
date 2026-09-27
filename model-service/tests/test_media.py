@@ -3,7 +3,14 @@ import pytest
 
 from app.errors import ApiError
 from app.media import decode_jpeg, decode_wav
-from tests.fixtures.make_fixtures import silence_wav, tiny_jpeg, tone_wav
+from tests.fixtures.make_fixtures import (
+    EXTENSIBLE_TAG,
+    FLOAT_TAG,
+    raw_wav,
+    silence_wav,
+    tiny_jpeg,
+    tone_wav,
+)
 
 
 def assert_api_error(exc_info, code: str, fragment: str | None = None):
@@ -38,6 +45,30 @@ def test_decode_wav_rejects_32bit():
     with pytest.raises(ApiError) as e:
         decode_wav(tone_wav(1, sampwidth=4))
     assert_api_error(e, "INVALID_AUDIO", "16-bit")
+
+
+def test_decode_wav_float_stereo_names_every_problem():
+    data = np.zeros(2 * 44100, dtype="<f4").tobytes()
+    with pytest.raises(ApiError) as e:
+        decode_wav(raw_wav(FLOAT_TAG, channels=2, rate=44100, bits=32, data=data))
+    assert_api_error(e, "INVALID_AUDIO")
+    # Says what was received, not only what is required.
+    for fragment in ("float", "2ch", "44100", "16-bit", "mono", "16000"):
+        assert fragment in e.value.message
+
+
+def test_decode_wav_accepts_extensible_pcm16():
+    samples = (np.arange(16000) % 100).astype("<i2")
+    audio = decode_wav(raw_wav(EXTENSIBLE_TAG, channels=1, rate=16000, bits=16, data=samples.tobytes()))
+    assert audio.shape == (16000,)
+    assert audio.dtype == np.float32
+
+
+def test_decode_wav_rejects_extensible_float():
+    data = np.zeros(16000, dtype="<f4").tobytes()
+    with pytest.raises(ApiError) as e:
+        decode_wav(raw_wav(EXTENSIBLE_TAG, 1, 16000, 32, data, subformat_tag=FLOAT_TAG))
+    assert_api_error(e, "INVALID_AUDIO", "float")
 
 
 def test_decode_wav_rejects_garbage():

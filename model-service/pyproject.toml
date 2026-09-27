@@ -19,4 +19,4 @@ ml = ["ultralytics>=8.4"]
 pythonpath = ["."]
 testpaths = ["tests"]
 markers = ["gpu: needs CUDA and real weights"]
-addopts = "-m 'not gpu'"
+addopts = "-m 'not gpu' -rs"

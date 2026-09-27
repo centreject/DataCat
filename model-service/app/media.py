@@ -1,7 +1,7 @@
 """Decode uploads in memory only. Audio never touches disk (Zero-Storage, API v1.3 §6.3)."""
 
 import io
-import wave
+import struct
 
 import numpy as np
 from PIL import Image, UnidentifiedImageError
@@ -9,6 +9,8 @@ from PIL import Image, UnidentifiedImageError
 from app.errors import ApiError
 
 AUDIO_RATE = 16000
+PCM, FLOAT, EXTENSIBLE = 1, 3, 0xFFFE
+REQUIRED = "PCM 16-bit, mono, 16000Hz"
 
 
 def decode_jpeg(data: bytes) -> Image.Image:
@@ -25,21 +27,40 @@ def _invalid_audio(message: str) -> ApiError:
     return ApiError(400, "INVALID_AUDIO", message)
 
 
+def _read_riff(data: bytes) -> tuple[tuple[int, int, int, int], bytes]:
+    """Return ((format tag, channels, rate, bits), sample bytes).
+
+    Parsed by hand instead of the stdlib `wave` module, which rejects float and
+    WAVE_FORMAT_EXTENSIBLE files without saying what they are.
+    """
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise _invalid_audio(f"WAV 파일을 읽을 수 없습니다({REQUIRED} 필요).")
+    fmt = samples = None
+    pos = 12
+    while pos + 8 <= len(data):
+        chunk_id = data[pos : pos + 4]
+        (size,) = struct.unpack_from("<I", data, pos + 4)
+        body = data[pos + 8 : pos + 8 + size]
+        if chunk_id == b"fmt " and len(body) >= 16:
+            tag, channels, rate, _, _, bits = struct.unpack_from("<HHIIHH", body)
+            if tag == EXTENSIBLE and len(body) >= 26:
+                (tag,) = struct.unpack_from("<H", body, 24)  # first field of the SubFormat GUID
+            fmt = (tag, channels, rate, bits)
+        elif chunk_id == b"data":
+            samples = body
+        pos += 8 + size + (size & 1)
+    if fmt is None or samples is None:
+        raise _invalid_audio(f"WAV 파일을 읽을 수 없습니다({REQUIRED} 필요).")
+    return fmt, samples
+
+
 def decode_wav(data: bytes) -> np.ndarray:
-    try:
-        with wave.open(io.BytesIO(data), "rb") as w:
-            channels, width, rate, frames = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
-            pcm = w.readframes(frames)
-    except (wave.Error, EOFError):
-        raise _invalid_audio("WAV 파일을 읽을 수 없습니다(PCM 16-bit, 16000Hz, mono 필요).")
-
-    if channels != 1:
-        raise _invalid_audio(f"mono 음성만 허용됩니다(받은 채널 수: {channels}).")
-    if rate != AUDIO_RATE:
-        raise _invalid_audio(f"샘플레이트는 {AUDIO_RATE}Hz여야 합니다(받은 값: {rate}Hz).")
-    if width != 2:
-        raise _invalid_audio(f"PCM 16-bit만 허용됩니다(받은 값: {8 * width}-bit).")
-    if frames == 0 or not pcm:
+    (tag, channels, rate, bits), samples = _read_riff(data)
+    if (tag, channels, rate, bits) != (PCM, 1, AUDIO_RATE, 16):
+        kind = {PCM: "PCM", FLOAT: "float"}.get(tag, f"format {tag}")
+        received = f"{kind} {bits}-bit, {channels}ch, {rate}Hz"
+        raise _invalid_audio(f"지원하지 않는 음성 형식입니다: {received} → {REQUIRED} 필요.")
+    samples = samples[: len(samples) - len(samples) % 2]
+    if not samples:
         raise _invalid_audio("음성 데이터가 비어 있습니다.")
-
-    return np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
+    return np.frombuffer(samples, dtype="<i2").astype(np.float32) / 32768.0

@@ -44,6 +44,39 @@ def test_empty_hallway_has_no_detections(vision):
     assert vision.detect(representative("empty")) == []
 
 
+# Regression floors, set just under what the zero-shot setup measured on 2026-09-27
+# (person 93%, box 53%, bag 72%, empty FP 3-7%). They guard against regressions;
+# they are NOT the plan's accuracy targets (person 95%, package 85%).
+FLOORS = {"person": ("person", 0.90), "package_box": ("package", 0.45), "package_bag": ("package", 0.65)}
+
+
+def hit_rate(vision, folder: str, label: str) -> float:
+    files = sorted((IMAGES / folder).glob("*.jpg"))
+    if not files:
+        pytest.skip(f"no images in data/images/{folder}")
+    hits = sum(any(d.label == label for d in vision.detect(Image.open(f).convert("RGB"))) for f in files)
+    return hits / len(files)
+
+
+@pytest.mark.parametrize("folder", sorted(FLOORS))
+def test_folder_hit_rate_does_not_regress(vision, folder):
+    label, floor = FLOORS[folder]
+    assert hit_rate(vision, folder, label) >= floor
+
+
+def test_empty_hallway_false_positive_rate(vision):
+    assert hit_rate(vision, "empty", "package") <= 0.10
+    assert hit_rate(vision, "empty", "person") <= 0.10
+
+
+def test_loading_writes_nothing_to_working_directory(tmp_path, monkeypatch):
+    from app.vision.yolo import YoloVision
+
+    monkeypatch.chdir(tmp_path)
+    YoloVision(Settings())
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_load_registry_loads_vision():
     from app.registry import load_registry
     from app.vision.yolo import YoloVision
