@@ -6,12 +6,13 @@
 ## 할 일
 
 - [ ] **인태님 메시지 전달** — 아래 [초안 1](#초안-1-인태님께-보낼-메시지)
-- [ ] **API 명세 PR 올리기** (`API_v1_3.md`만 수정하는 작은 PR) — 아래 [초안 2](#초안-2-api-명세-pr)
+- [ ] **API 명세 PR 올리기** — 준비 완료: 로컬 브랜치 `docs/api-model-service`(main 기준)에 `API_v1_4.md` 커밋 `a13dbe5`, 아직 push 안 함. 민중님 승인 시 push 후 PR 생성. 본문은 [초안 2](#초안-2-api-명세-pr)
 - [ ] 인태님과 합의: 택배 대체 규칙("사람 없음 + ToF 감지" = 물건 도착) — 초안 1에 포함
 - [ ] 덕민님: `purpose` 4개 값(`DELIVERY`/`INSPECTION`/`VISIT`/`ETC`) 승인, 요약 문체 예시 5개 확인 — 요약에 말하지 않은 단어만 있으면 전사문을 대신 보여 주는 규칙도 확인(예: "엄마, 나야" → "가족 방문" 대신 원문)
 - [ ] 팀원들께 사진 요청: 배달 음식 봉지·용기, 보냉백(프레시백) — 문 앞 바닥에 놓인 모습, 얼굴 없이
 - [ ] 시연 PC(3090) 관리자: Task 9·10 끝나면 `bench/benchmark.py --profile full`, `eval/*` 실행 요청
 - [ ] Phase 2 초반: 인태님·덕민님께 `facingCamera`/`bbox` 선택 필드 제안 (떠나는 택배 기사 대응)
+- [ ] **Phase 1+2 PR** (`feature/ai-model` → main) — C2(택배 대체 규칙) 합의 후. 본문은 [초안 3](#초안-3-phase-12-pr)
 
 ---
 
@@ -53,7 +54,7 @@
 
 ## 초안 2. API 명세 PR
 
-**브랜치:** `docs/api-model-service` (main에서 분기) · **대상:** main · **리뷰어:** 인태님
+**브랜치:** `docs/api-model-service` (main에서 분기, 로컬 커밋 `a13dbe5`) · **파일:** `API_v1_4.md` 신규(v1.3 복사 후 수정, 기존 버전 파일 방식 유지) · **대상:** main · **리뷰어:** 인태님
 **PR 제목:** `docs(api): 모델 서비스 응답 규칙 확정 (label, 빈 전사, /health, 오류 코드)`
 
 ### PR 본문
@@ -91,3 +92,43 @@
 
 **변경 이력 행**
 > | `v1.4` | (병합일) | 모델 서비스: `label` 값 확정(`person`/`package`)과 package 범위, 빈 전사 응답 규칙, 요약 문체, `GET /health`, 모델 서비스 오류 코드 목록, 포트 8000 제안 |
+
+---
+
+## 초안 3. Phase 1+2 PR
+
+**브랜치:** `feature/ai-model` → main · **리뷰어:** 인태님
+**PR 제목:** `feat(model-service): 이미지 인식·STT·요약/용건 분류 모델 서비스`
+
+### PR 본문
+
+> AI 모델 서비스(`model-service/`)입니다. Spring이 부르는 내부 API 4개와 상태 확인 API를 제공합니다. 다른 폴더는 건드리지 않았습니다.
+>
+> **엔드포인트** (명세 v1.4 7장)
+> - `POST /internal/v1/vision/detect` — `person` / `package`
+> - `POST /internal/v1/speech/transcribe` — 전사문 (앞 30초)
+> - `POST /internal/v1/language/analyze` — 20자 요약 + 용건
+> - `POST /internal/v1/audio/process` — 음성 한 번에 처리 (Spring이 실제로 쓰는 경로)
+> - `GET /health` — `loading` / `ok` / `degraded` / `error`
+>
+> **실행**: `docker build -t datacat-model model-service` → `docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model`. 확인은 `python model-service/docker/smoke.py`. 루트 compose에 넣을 블록은 `model-service/README.md`에 있습니다.
+>
+> **측정 (RTX 3060 Ti 8GB, lite)**
+> | 항목 | 결과 | 목표 |
+> |---|---|---|
+> | 음성 처리 전체 p95 | 2.40초 (첫 요청 2.27초) | ≤ 4초 |
+> | 이미지 인식 p95 | 54ms | ≤ 300ms |
+> | 용건 분류 정확도 | 98% (평가 문장 40개, 낙관적) | ≥ 90% |
+> | STT 글자 오류율 | 3.6–4.7% (TTS 음성) | ≤ 15% |
+> | 사람 / 택배 인식 | 93% / 53–72% | 95% / 85% — **미달, 팀 사진으로 학습 예정** |
+>
+> **알아 두실 것**
+> - 택배 인식률이 목표보다 낮아서, Spring에서 "사람 없음 + ToF 감지 = 물건 도착" 규칙도 함께 써 주세요(합의 사항).
+> - 음성은 앞 30초만 처리, 업로드 16MB까지. 음성은 메모리에서만 처리하고 디스크에 쓰지 않습니다(테스트로 확인).
+> - `purpose`는 방문객이 말로 바꿀 수 있어 출입·보안 판단에 쓰지 말아 주세요.
+> - 컨테이너는 root가 아닌 일반 사용자로 실행됩니다. 첫 실행 때 가중치 약 10GB를 받습니다.
+> - 시연 PC(3090) full 프로필 측정은 아직입니다.
+>
+> **테스트**: 단위 120개, GPU 24개 통과(음식·보냉백 사진이 없어 2개 건너뜀). 코드 리뷰 2회 반영.
+>
+> 🤖 Generated with [Claude Code](https://claude.com/claude-code)
