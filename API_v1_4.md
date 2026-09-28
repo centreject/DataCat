@@ -1,10 +1,11 @@
 # DataCat 무인현관 API 명세서
 
-> **Version**: v1.2  
-> **Date**: 2026-09-21  
+> **Version**: v1.4  
+> **Date**: 2026-09-27  
 > **Scope**: Raspberry Pi ↔ Spring Boot ↔ 모델 서비스 ↔ Flutter App  
 > **Status**: 팀 합의용 확정본. `TBD` 항목은 이벤트 분류 기획 또는 실측 과정에서 확정한다.  
-> **v1.2 변경**: 13.2 음성 시퀀스 다이어그램 참여자 단일화(7.4 통합 엔드포인트 반영), 8장 purpose 후보 용어 통일(`MAINTENANCE` → `INSPECTION`), 14장 Event 엔티티에 `distanceMm` 필드 추가.
+> **v1.4 변경**: 모델 서비스(7장) 응답 규칙 확정 — `label` 값(`person`/`package`)과 package 범위, 발화 없음 응답, 요약 문체·검증, 음성 30초 처리, 상태 확인 API(7.5), 모델 서비스 오류 코드(12장), 포트 8000 제안(16장).  
+> **v1.3 변경**: ToF 재확인 게이트를 Spring(서버, 지연된 값 재사용)에서 Pi(현관기기, 실시간 로컬 판단)로 이동. 6.4 세션 종료 API의 트리거 조건을 이 로직에 맞춰 구체화. `EventStatus`를 실제 관측되는 상태만 남기도록 축소. 12장 오류 코드에서 미구현 인증(401) 제거. 4.1 모델 서비스 주소를 예시 표기임을 명확히 함. 13.1/13.2 시퀀스 다이어그램을 Pi-로컬 ToF 재확인 반영해 수정.
 
 ---
 
@@ -88,10 +89,10 @@ https://api.{도메인}/api/v1
 Spring → 모델 서비스 내부 API:
 
 ```text
-http://model-service:{port}/internal/v1
+http://{model-service-host}:{port}/internal/v1
 ```
 
-> 실제 호스트명/포트는 Docker Compose 및 실행 환경에서 확정한다.
+> 예시 표기이며, 실제 호스트명/포트/Docker 서비스 이름은 Docker Compose 및 실행 환경에서 확정한다(16장 TBD 참고).
 
 ### 4.2 Content-Type
 
@@ -142,13 +143,11 @@ deviceId: door-01
 
 | 값 | 의미 |
 |---|---|
-| `CREATED` | Event 생성 |
-| `VISION_ANALYZING` | 이미지 분석 중 |
 | `WAITING_AUDIO` | 방문객 음성 입력 대기 |
-| `SPEECH_ANALYZING` | STT/NLP 처리 중 |
-| `CLASSIFYING` | 서버 이벤트 분류 중 |
 | `COMPLETED` | 정상 종료 |
 | `FAILED` | 처리 실패 |
+
+> 전체 파이프라인은 Pi의 요청-응답 한 번 안에서 동기적으로 처리되며 별도의 폴링(polling) 수단이 없다. `CREATED`, `VISION_ANALYZING`, `SPEECH_ANALYZING`, `CLASSIFYING` 같은 중간 상태는 어떤 API 응답에서도 관측될 수 없으므로 v1.3에서 제거했다. 위 3개 값만 실제로 응답에 등장한다.
 
 ### 5.3 DeviceAction
 
@@ -161,6 +160,10 @@ deviceId: door-01
 | `ERROR` | 로컬 오류 안내 후 종료 |
 
 > **마이크 개방 시퀀스 제약**: `START_RECEPTION`을 받은 Pi는 반드시 프리셋 음성 출력이 끝난 뒤에만 마이크를 연다. 예고 없이 마이크를 여는 것은 금지한다 — 도청 관련 법적 리스크를 막기 위한 필수 제약이다.
+
+> **ToF 재확인 게이트(Pi 로컬 처리)**: `START_RECEPTION`을 받은 Pi는 프리셋 음성을 재생하기 **직전** 자신의 ToF 센서를 다시 한번(로컬, 즉시) 읽어 사람이 여전히 있는지 확인한다. 1차 촬영과 서버 왕복 사이의 지연 동안 방문객(주로 배달 기사)이 이미 이탈했을 수 있기 때문이다. 이 재확인은 서버로 데이터를 보내 판정받지 않고 Pi가 전적으로 로컬에서 즉시 판단한다 — ToF는 Pi에 붙은 센서라 네트워크 왕복 없이 확인 가능하고, 지연 없는 최신값을 쓸 수 있기 때문이다.
+> - ToF가 여전히 근접 범위를 감지하면 그대로 프리셋을 재생하고 정상 진행한다.
+> - ToF가 기준선(빈 상태)으로 복귀했으면 프리셋을 재생하지 않고, `POST /api/v1/device/events/{eventId}/end`를 `reason: VISITOR_LEFT`로 호출해 세션을 무응답으로 종료한다(6.4 참고).
 
 ---
 
@@ -196,7 +199,7 @@ POST /api/v1/device/events
 }
 ```
 
-> `distanceMm`: 촬영 시점 ToF 실시간 거리값(mm). Vision 판정과 교차 검증해 이탈 여부를 가리는 데 사용한다(아래 처리 순서 6번 참고).
+> `distanceMm`: 촬영 시점 ToF 거리값(mm). 이벤트 기록·로그용 정보이며, 방문객 이탈 재확인은 Pi가 로컬에서 별도로 수행한다(5.3 참고). Spring의 판정에는 사용하지 않는다.
 
 ### Spring 처리 순서
 
@@ -208,12 +211,11 @@ POST /api/v1/device/events
 3. 1차 이미지 저장
 4. Vision API 호출
 5. Vision 결과 수신 (사람/물체 감지 여부)
-6. 사람이 감지된 경우, 응대(START_RECEPTION)를 내리기 직전 distanceMm이
-   기준선(빈 상태)으로 복귀 중인지 재확인 — 복귀 중이면 이미 이탈한 것으로
-   간주해 SILENT_STANDBY로 전환 (ToF 재확인 게이트)
-7. 현재 이벤트 분류/정책 적용
-8. Pi가 수행할 action 반환
+6. 현재 이벤트 분류/정책 적용
+7. Pi가 수행할 action 반환
 ```
+
+> 사람 감지 시 `START_RECEPTION`을 반환하지만, 이 시점 이후 방문객이 실제로 자리에 있는지에 대한 최종 확인은 Pi가 로컬 ToF로 수행한다(5.3 참고). Spring은 지연된 값으로 재판정하지 않는다.
 
 ### Response 예시 — 사람 응대 필요
 
@@ -332,6 +334,8 @@ POST /api/v1/device/events/{eventId}/audio
 
 ToF로 방문객 이탈을 감지했거나 Pi가 세션 종료 사실을 서버에 알려야 할 때 사용한다.
 
+> Pi는 5.3의 ToF 재확인 게이트에서 방문객이 이미 이탈한 것으로 판단되면(프리셋 재생 직전), 프리셋을 재생하지 않고 이 API를 `reason: VISITOR_LEFT`로 즉시 호출해 세션을 무응답으로 종료한다. 이것이 `VISITOR_LEFT`의 표준 트리거 조건이다.
+
 ### Endpoint
 
 ```http
@@ -347,11 +351,13 @@ POST /api/v1/device/events/{eventId}/end
 }
 ```
 
-`reason` 예시:
+`reason` 값:
 
-- `VISITOR_LEFT`
-- `DEVICE_CANCELLED`
-- `TIMEOUT`
+| 값 | 트리거 조건 |
+|---|---|
+| `VISITOR_LEFT` | Pi의 ToF 재확인 게이트(5.3)가 프리셋 재생 직전 방문객 이탈을 감지했을 때 |
+| `TIMEOUT` | 마이크 개방 후 방문객 발화 없이 VAD 대기 시간이 초과되었을 때 |
+| `DEVICE_CANCELLED` | *(예약, 현재 미사용)* — Pi 단말이 로컬 사유(전원 차단, 하드웨어 오류 등)로 세션을 강제 종료해야 할 경우를 위해 남겨둔 값. 현재 펌웨어 로직에는 이를 발생시키는 조건이 없으며, Phase 3 이후 트리거 조건이 정의되면 사용한다. |
 
 ### Response
 
@@ -414,14 +420,14 @@ POST /internal/v1/vision/detect
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `detections` | Array | 이미지에서 인식된 항목 목록 |
-| `label` | String | 모델이 반환한 클래스 이름. 허용 값: `person`, `box`(또는 `package`) |
+| `label` | String | 인식된 항목. 허용 값: `person`, `package`. `package`는 택배 박스, 비닐 택배봉투, 배달 음식 봉지·용기, 보냉백을 모두 포함한다. 사람이 들고 있는 물건도 `package`로 나올 수 있다(구분하지 않음). |
 | `confidence` | Number | 모델 신뢰도, 0.0 ~ 1.0 |
 
 > `YOLO`는 현재 후보 모델이지만 구현체가 바뀌어도 이 API 계약은 유지한다.
 
 > bounding box가 서버 판정에 필요해질 경우 `bbox` 필드를 선택적으로 추가할 수 있다. 현재 MVP에서는 필수 아님.
 
-> **1차 판별 가이드(잠정)**: `detections` 배열 내 `label == 'person'` 존재 여부를 기본 신호로 삼고, 6.1의 `distanceMm`(ToF 복귀 거리)과 결합해 최종 응대 여부를 판별한다. 세부 조건문은 이벤트 분류 기획 확정 후 Spring에 구현한다.
+> **1차 판별 가이드(잠정)**: `detections` 배열 내 `label == 'person'` 존재 여부를 기본 신호로 Spring이 `START_RECEPTION`/`SILENT_STANDBY`를 판정한다. 이 판정 이후 실제 응대 시점(프리셋 재생 직전)에 방문객이 여전히 있는지에 대한 재확인은 Spring이 아니라 Pi가 로컬 ToF로 수행한다(5.3 참고) — Vision 응답은 지연된 이미지 한 장에 대한 판단일 뿐이므로 이탈 여부의 최종 근거로 쓰지 않는다. 세부 조건문은 이벤트 분류 기획 확정 후 Spring에 구현한다.
 
 ---
 
@@ -456,6 +462,8 @@ POST /internal/v1/speech/transcribe
 | `transcript` | String | 음성을 텍스트로 변환한 전사 결과 |
 
 > Whisper 등 어떤 STT 모델을 쓰더라도 Spring은 동일한 응답 형식을 받는다.
+
+> **음성 길이**: 앞 30초만 전사한다. 더 긴 음성을 모두 처리하면 Pi 타임아웃(3~5초)을 넘기기 때문이다. 업로드는 16MB까지이며, 넘으면 400 `INVALID_REQUEST`.
 
 > **Zero-Storage 원칙**: 모델 서비스도 전사 완료 즉시 수신한 음성 파일을 삭제하며, 별도로 보관하지 않는다.
 
@@ -492,7 +500,7 @@ POST /internal/v1/language/analyze
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|---:|---|
-| `summary` | String | 방문객 발화 요약. **공백 포함 최대 20자 이내.** Spring Boot 수신 시 20자 초과분은 `substring(0, 19) + "…"`로 방어적 절단(truncate)한다 |
+| `summary` | String | 방문객 발화 요약. **공백 포함 최대 20자 이내**, 명사형(예: `택배 문 앞 보관`, 이벤트 분류 담당 확인 대기). 모델 서비스도 같은 규칙(`substring(0, 19) + "…"`)으로 자르고, Spring Boot도 수신 시 방어적으로 절단한다. 모델이 방문객이 말하지 않은 내용으로 요약하면 전사문을 요약으로 대신 보낸다 |
 | `purpose` | String | 자연어 모델이 판단한 용건 분류 결과 |
 
 > `Qwen` 계열 sLM은 현재 후보 모델이며 다른 모델로 변경될 수 있다. Spring은 모델 이름이 아니라 위 API 계약에만 의존한다.
@@ -530,6 +538,40 @@ POST /internal/v1/audio/process
 ```
 
 > 내부적으로 STT → 용건분류를 순차 처리하며, 중간 결과를 Spring으로 돌려보내지 않는다. `transcript`/`purpose`/`summary` 각 필드의 제약은 7.2, 7.3과 동일하다. Zero-Storage 원칙도 동일하게 적용한다.
+
+> **발화가 없을 때**: 전사 결과가 비어 있으면(무음·잡음만 녹음된 경우) `{"transcript": "", "purpose": "ETC", "summary": ""}`를 반환한다. 표시 문구는 Spring·앱이 `transcript`가 비었는지 보고 정한다.
+
+> **`purpose` 사용 주의**: 방문객이 말로 모델을 유도해 값을 바꿀 수 있다. 허용 값은 항상 지켜지지만, 출입·보안 판단에는 쓰지 않고 알림 분류·기록 용도로만 쓴다.
+
+---
+
+## 7.5 모델 서비스 상태 확인
+
+### Endpoint
+
+```http
+GET /health
+```
+
+서비스 루트 경로다(`/internal/v1` 아래가 아님).
+
+### Response
+
+```json
+{
+  "status": "ok",
+  "profile": "lite"
+}
+```
+
+| `status` | 의미 |
+|---|---|
+| `loading` | 모델을 불러오는 중. 추론 요청은 503 `MODEL_NOT_READY` |
+| `ok` | 모든 모델 준비 완료 |
+| `degraded` | 일부 모델만 실패. `failed` 목록이 함께 온다(예: `["language"]`). 언어 모델이 빠지면 요약·용건은 키워드 규칙으로 대신한다 |
+| `error` | 모든 모델 로딩 실패. 추론 요청은 503 |
+
+`profile`은 `lite`(GPU 8GB) 또는 `full`(시연 PC). Docker healthcheck와 Spring 기동 순서 확인(`depends_on: condition: service_healthy`)에 사용한다.
 
 ---
 
@@ -771,11 +813,23 @@ GET /api/v1/events/101
 | `200` | 정상 처리 |
 | `201` | 리소스 생성 성공 |
 | `400` | 잘못된 요청 |
-| `401` | 인증 실패 |
+| `401` | 인증 실패 — *Phase 3 예약, 현재 미구현(인증 체계 자체가 없음)* |
 | `404` | Event/Device 등 리소스 없음 |
 | `409` | 현재 Event 상태에서 수행할 수 없는 요청 |
 | `500` | Spring 내부 오류 |
 | `503` | 모델 서비스 또는 외부 의존 서비스 사용 불가 |
+
+모델 서비스(7장) 오류 코드:
+
+| HTTP Status | `code` | 의미 |
+|---:|---|---|
+| `400` | `INVALID_IMAGE` | JPEG가 아니거나 깨졌거나 해상도가 너무 큼(40MP 초과) |
+| `400` | `INVALID_AUDIO` | WAV 형식 불일치. 메시지에 받은 형식과 필요한 형식(PCM 16-bit, mono, 16000Hz)을 함께 적는다 |
+| `400` | `INVALID_REQUEST` | 필드 누락·형식 오류, 업로드 16MB 초과 |
+| `404` | `NOT_FOUND` | 없는 경로 |
+| `405` | `METHOD_NOT_ALLOWED` | 허용되지 않는 메서드 |
+| `500` | `INFERENCE_FAILED` | 모델 추론 중 오류 |
+| `503` | `MODEL_NOT_READY` | 모델 로딩 중이거나 해당 모델 로딩 실패 |
 
 **서버 응답 대기 타임아웃**: 초기 권장 **3~5초**. 10초 이상은 방문객이 기기를 고장으로 오인해 이탈할 수 있으므로 상한으로 두지 않는다. 2.4GHz Wi-Fi·Cloudflare Tunnel 왕복 지연 실측 후 조정하되, 오탐(false timeout)이 잦으면 상향 조정한다.
 
@@ -799,14 +853,19 @@ sequenceDiagram
     participant DB as MySQL
     participant App as Flutter App
 
-    Pi->>Spring: 이벤트 + 1차 이미지 + distanceMm
+    Pi->>Spring: 이벤트 + 1차 이미지 + distanceMm(로그용)
     Spring->>Spring: 유예 윈도우 내 기존 eventId 있는지 확인(병합 또는 신규 발급)
     Spring->>Vision: 이미지 분석 요청
     Vision-->>Spring: detections
-    Spring->>Spring: ToF 재확인 게이트(응대 직전 이탈 여부 재검증)
     Spring->>Spring: 이벤트 분류/정책 적용
     Spring->>DB: Event 저장
-    Spring-->>Pi: action + preset
+    Spring-->>Pi: action(START_RECEPTION) + preset
+    Pi->>Pi: ToF 재확인 게이트(로컬, 프리셋 재생 직전)
+    alt 방문객 여전히 존재
+        Pi->>Pi: 프리셋 재생 및 정상 진행
+    else 방문객 이탈 확인
+        Pi->>Spring: 세션 종료(reason=VISITOR_LEFT)
+    end
     App->>Spring: Event 조회
     Spring-->>App: Event 데이터
 ```
@@ -842,7 +901,7 @@ Event
 - id
 - deviceId
 - triggerType
-- distanceMm       // 촬영 시점 ToF 실시간 거리값(mm)
+- distanceMm       // 촬영 시점 ToF 거리값(mm), 로그·기록용 (이탈 판정은 Pi 로컬에서 수행, 5.3 참고)
 - status
 - eventType        // 최종 이벤트 분류, TBD
 - purpose          // NLP 용건 분석 결과
@@ -919,7 +978,7 @@ POST /api/v1/device/events/{eventId}/end
 1. `purpose`의 최종 허용 값 — 초기 후보(7.3 참고)는 제시됨, 이벤트 분류 담당 최종 승인 필요
 2. 최종 `eventType` 종류와 분류 조건 — 초기 후보(8장 참고)는 제시됨, 이벤트 분류 담당 최종 승인 필요
 3. 각 상황에 연결할 프리셋 종류/문구
-4. 모델 서비스 실제 포트 및 Docker 서비스 이름
+4. 모델 서비스 실제 포트 및 Docker 서비스 이름 — 포트 `8000` 제안(모델 서비스 Dockerfile 기본값), 서비스 이름은 compose 확정 시
 5. 기기 인증 방식 및 키 발급 방법
 6. Push 서비스의 최종 선택/세부 payload
 7. Vision 응답에 bounding box가 필요한지 여부
@@ -984,3 +1043,5 @@ docs: add initial API specification
 | `v1.0` | 2026-09-20 | 최초 API 명세서 |
 | `v1.1` | 2026-09-21 | 세션 유예 윈도우 병합, ToF 재확인 게이트, 마이크 개방 시퀀스, VAD 종료 기준, 파일 포맷(JPEG/WAV) 명시, Zero-Storage 원칙, FCM 인플레이스 태그, 확정 수치(타임아웃 3~5초·요약 20자) 반영, STT+용건분류 통합 엔드포인트(7.4) 추가, 프리셋 수정 API Phase 3 이동, Base URL을 HTTPS로 변경 |
 | `v1.2` | 2026-09-21 | 13.2 음성 처리 시퀀스 다이어그램 단일화(Model Service 일괄 처리 반영), 8장 용건 예시 용어 통일(`MAINTENANCE` → `INSPECTION`), 14장 Event 엔티티에 `distanceMm` 필드 추가, Phase 2 아키텍처 표기 보완 |
+| `v1.3` | 2026-09-27 | **ToF 재확인 게이트를 Spring→Pi로 이동**(6.1 `distanceMm`은 로그용으로 격하, Spring 처리 순서에서 재확인 단계 제거, 5.3에 Pi 로컬 게이트 블록 추가), 6.4 `reason` 값에 트리거 조건 표로 명시(`VISITOR_LEFT`=Pi 게이트 발동, `DEVICE_CANCELLED`=예약/미사용), `EventStatus`를 실제 관측 가능한 3개 값(`WAITING_AUDIO`/`COMPLETED`/`FAILED`)으로 축소, 12장 `401` 오류 코드에 Phase 3 예약·미구현 주석 추가, 4.1 모델 서비스 Base URL을 예시 플레이스홀더로 변경, 7.1 판별 가이드에서 Spring의 `distanceMm` 재판정 언급 제거, 13.1 시퀀스 다이어그램을 Pi-로컬 ToF 게이트 반영해 수정 |
+| `v1.4` | 2026-09-27 | **모델 서비스 응답 규칙 확정**: 7.1 `label`을 `person`/`package`로 확정하고 package 범위 명시, 7.2 음성 앞 30초만 전사·업로드 16MB, 7.3 요약 명사형·말하지 않은 내용 금지(전사문으로 대체), 7.4 발화 없음 응답과 `purpose` 사용 주의, 7.5 `GET /health` 신설(`loading`/`ok`/`degraded`/`error`), 12장 모델 서비스 오류 코드 표, 16장 포트 8000 제안 |
