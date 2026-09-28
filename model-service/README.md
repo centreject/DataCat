@@ -1,6 +1,6 @@
 # DataCat 모델 서비스
 
-Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_3.md`](../API_v1_3.md) 7장.
+Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_4.md`](../API_v1_4.md) 7장.
 
 진행 현황: [`PROGRESS.md`](PROGRESS.md) · 정확도: [`eval/README.md`](eval/README.md) · 속도: [`bench/results/`](bench/results/)
 

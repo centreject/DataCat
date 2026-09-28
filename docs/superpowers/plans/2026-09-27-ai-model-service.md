@@ -8,7 +8,7 @@
 
 **Tech Stack:** WSL2 Ubuntu, Python 3.11, FastAPI, pydantic-settings, Ultralytics(YOLO11s + YOLOE), faster-whisper, transformers(+bitsandbytes), PyTorch CUDA, pytest, Docker.
 
-**Spec:** `API_v1_3.md` 4장, 7장, 12장, 16장 (모델 서비스 부분). 모델 선정 근거와 아래 결정 사항은 2026-09-27 팀 대화·검토(grilling) 결과를 따른다.
+**Spec:** `API_v1_4.md` 4장, 7장, 12장, 16장 (모델 서비스 부분; 계획 작성 당시 v1.3, 이 계획의 결정을 반영해 v1.4로 개정). 모델 선정 근거와 아래 결정 사항은 2026-09-27 팀 대화·검토(grilling) 결과를 따른다.
 
 ## Global Constraints
 
@@ -349,7 +349,7 @@ model-service/
 각 항목은 보내기 전에 민중님 확인을 받는다.
 
 - [ ] **인태님 — 저장소·병합 방식 제안 (즉시):** 모노레포 폴더 구조(`spring-server/`, `model-service/`, `pi/`, `app/`), 각자 브랜치 + Phase 종료마다 main 병합, 루트 compose는 인태님 관리.
-- [ ] **명세 PR (Task 4 전):** `API_v1_3.md` 수정만 담은 작은 PR — 7.1 `label`을 `person`/`package`로 확정 및 package 범위 명시, 7.3·7.4 빈 전사 응답 규칙, 모델 서비스 `GET /health` 추가.
+- [x] **명세 PR (Task 4 전):** 명세만 담은 작은 PR — 완료: PR #1로 `API_v1_4.md` 병합, v1.2·v1.3 삭제 — 7.1 `label`을 `person`/`package`로 확정 및 package 범위 명시, 7.3·7.4 빈 전사 응답 규칙, 모델 서비스 `GET /health` 추가.
 - [ ] **덕민님 — 요약 문체 확인 (Task 7 전):** 명사형 예시 5개(`택배 문 앞 보관`, `가스 검침 방문`, `관리실 소방 점검`, `친구 방문`, `음식 배달 도착`)로 앱 표시에 맞는지 확인. `purpose` 4개 값 최종 승인 요청.
 - [ ] **인태님·덕민님 — 비전 선택 필드 제안 (Phase 2 초반):** 떠나는 택배 기사 대응용 `facingCamera`(YOLO11-pose)와 `bbox`. 동의 시 별도 계획으로 추가.
 - [ ] **시연 PC 관리자 — full 벤치마크·평가 실행 요청 (Task 9·10 후).**
