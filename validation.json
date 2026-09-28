@@ -1,0 +1,128 @@
+{
+  "units": "mm",
+  "enclosure_dimensions": [
+    120.0,
+    215.0,
+    50.0
+  ],
+  "parts": {
+    "01_front_fascia": {
+      "watertight": true,
+      "winding_consistent": true,
+      "solid_count": 1,
+      "faces": 13284,
+      "volume_mm3": 58610.948,
+      "bounds_mm": [
+        [
+          -60.0,
+          -107.5,
+          41.0
+        ],
+        [
+          60.0,
+          107.5,
+          50.0
+        ]
+      ]
+    },
+    "02_main_body": {
+      "watertight": true,
+      "winding_consistent": true,
+      "solid_count": 1,
+      "faces": 3328,
+      "volume_mm3": 84199.307,
+      "bounds_mm": [
+        [
+          -60.0,
+          -107.5,
+          4.0
+        ],
+        [
+          60.0,
+          107.5,
+          44.0
+        ]
+      ]
+    },
+    "03_rear_plate": {
+      "watertight": true,
+      "winding_consistent": true,
+      "solid_count": 1,
+      "faces": 4256,
+      "volume_mm3": 102591.995,
+      "bounds_mm": [
+        [
+          -60.0,
+          -107.5,
+          0.0
+        ],
+        [
+          60.0,
+          107.5,
+          7.0
+        ]
+      ]
+    },
+    "04_black_visor": {
+      "watertight": true,
+      "winding_consistent": true,
+      "solid_count": 1,
+      "faces": 1308,
+      "volume_mm3": 1453.209,
+      "bounds_mm": [
+        [
+          -36.0,
+          64.0,
+          48.8
+        ],
+        [
+          36.0,
+          88.0,
+          50.0
+        ]
+      ]
+    },
+    "05_control_panel": {
+      "watertight": true,
+      "winding_consistent": true,
+      "solid_count": 1,
+      "faces": 3424,
+      "volume_mm3": 7066.488,
+      "bounds_mm": [
+        [
+          -43.0,
+          -86.0,
+          48.8
+        ],
+        [
+          43.0,
+          38.0,
+          50.0
+        ]
+      ]
+    }
+  },
+  "assembly_intersections_mm3": {
+    "01_front_fascia__02_main_body": 0.0,
+    "01_front_fascia__03_rear_plate": 0.0,
+    "01_front_fascia__04_black_visor": 0.0,
+    "01_front_fascia__05_control_panel": 0.0,
+    "02_main_body__03_rear_plate": -0.0,
+    "02_main_body__04_black_visor": 0.0,
+    "02_main_body__05_control_panel": 0.0,
+    "03_rear_plate__04_black_visor": 0.0,
+    "03_rear_plate__05_control_panel": 0.0,
+    "04_black_visor__05_control_panel": 0.0
+  },
+  "component_collisions_mm3": {
+    "LCD_allowance_64x96x14": -0.0,
+    "Pi4_allowance_60x90x24": 0.0,
+    "camera_allowance_30x30x22": 0.0,
+    "ToF_allowance_16x29x14": 0.0,
+    "button_allowance_d24x42": -0.0,
+    "speaker_allowance_d28x24": -0.0,
+    "amp_allowance_22x21x14": 0.0,
+    "mic_allowance_20x16x8": -0.0,
+    "power_cable_bay_12x25x22": 0.0
+  }
+}
