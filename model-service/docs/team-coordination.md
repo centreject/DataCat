@@ -21,7 +21,7 @@
 > 인태님, AI 모델 쪽 Phase 1(이미지 인식) 1차 구현이 끝나서 공유드립니다. 확인 부탁드릴 게 4가지 있어요.
 >
 > **1. 저장소·브랜치 방식 제안**
-> - 저장소 하나에 파트별 폴더: `spring-server/`, `model-service/`, `pi/`, `app/`
+> - 저장소 하나에 파트별 폴더: `server/`, `model-service/`, `pi/`, `app/`
 > - 각자 자기 브랜치에서 작업하고, **Phase가 끝날 때마다** main에 PR로 병합 (Phase 1 끝, Phase 2 끝)
 > - 루트 `docker-compose.yml`은 인태님이 관리해 주시고, 모델 서비스 블록은 제가 PR로 제안드릴게요
 > - 제 작업은 `feature/ai-model` 브랜치, `model-service/` 폴더에 있습니다
