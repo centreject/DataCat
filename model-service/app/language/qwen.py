@@ -1,3 +1,4 @@
+import copy
 import json
 import threading
 from pathlib import Path
@@ -82,18 +83,45 @@ class QwenLanguage:
         )
         self.max_new_tokens = settings.llm_max_new_tokens
         self.lock = threading.Lock()
+        self._build_prefix_cache()
         self.analyze("택배 왔습니다")  # warm-up
 
-    def generate(self, messages: list[dict]) -> str:
-        prompt = self.tokenizer.apply_chat_template(
+    def _render(self, messages: list[dict]) -> str:
+        return self.tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
         )
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+
+    def _build_prefix_cache(self) -> None:
+        """Run the fixed part of the prompt (instructions + examples, ~1.5k tokens) once.
+
+        Every request shares it, so each call then only processes the visitor's words. Without this
+        the 9-purpose prompt took ~4.4 s per answer on the 3060 Ti (2026-09-29).
+        """
+        self._prefix_messages = build_messages("")[:-1]
+        probe = self._render(self._prefix_messages + [{"role": "user", "content": "x"}])
+        prefix_text = probe[: probe.rindex("<|im_start|>user")]
+        self._prefix_ids = self.tokenizer(prefix_text, return_tensors="pt").input_ids.to(self.model.device)
+        with self.torch.inference_mode():
+            self._prefix_cache = self.model(input_ids=self._prefix_ids, use_cache=True).past_key_values
+
+    def generate(self, messages: list[dict], use_prefix_cache: bool = True) -> str:
+        inputs = self.tokenizer(self._render(messages), return_tensors="pt").to(self.model.device)
+        ids = inputs["input_ids"]
+        n = self._prefix_ids.shape[1]
+        cached = (
+            use_prefix_cache
+            and messages[:-1] == self._prefix_messages
+            and ids.shape[1] > n
+            and self.torch.equal(ids[:, :n], self._prefix_ids)
+        )
         with self.lock, self.torch.inference_mode():
             output = self.model.generate(
-                **inputs, max_new_tokens=self.max_new_tokens, do_sample=False
+                **inputs,
+                past_key_values=copy.deepcopy(self._prefix_cache) if cached else None,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=False,
             )
-        return self.tokenizer.decode(output[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
+        return self.tokenizer.decode(output[0][ids.shape[1] :], skip_special_tokens=True)
 
     def analyze(self, transcript: str) -> Analysis:
         parsed = parse_llm_output(self.generate(build_messages(transcript)))

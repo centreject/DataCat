@@ -1,40 +1,100 @@
-{"id": "delivery_01", "transcript": "택배 왔습니다. 문 앞에 놓고 갈게요.", "purpose": "DELIVERY"}
-{"id": "delivery_02", "transcript": "쿠팡입니다. 문 앞에 두고 갑니다.", "purpose": "DELIVERY"}
-{"id": "delivery_03", "transcript": "배달의민족 음식 배달 왔습니다.", "purpose": "DELIVERY"}
-{"id": "delivery_04", "transcript": "등기 우편 왔는데요, 서명이 필요해서요.", "purpose": "DELIVERY"}
-{"id": "delivery_05", "transcript": "부재중이셔서 경비실에 맡겨 둘게요.", "purpose": "DELIVERY"}
-{"id": "delivery_06", "transcript": "네 치킨이요. 문 앞에 두고 갑니다.", "purpose": "DELIVERY"}
-{"id": "delivery_07", "transcript": "로켓프레시 보냉백 문 앞에 뒀습니다.", "purpose": "DELIVERY"}
-{"id": "delivery_08", "transcript": "우체국 소포 왔습니다.", "purpose": "DELIVERY"}
-{"id": "delivery_09", "transcript": "아까 주문하신 거 가져왔어요.", "purpose": "DELIVERY"}
-{"id": "delivery_10", "transcript": "대한통운이에요, 박스가 커서 문 옆에 세워 둘게요.", "purpose": "DELIVERY"}
-{"id": "inspection_01", "transcript": "가스 검침하러 왔습니다.", "purpose": "INSPECTION"}
-{"id": "inspection_02", "transcript": "관리사무소에서 소방 점검 나왔습니다.", "purpose": "INSPECTION"}
-{"id": "inspection_03", "transcript": "택배 아니고요, 관리실에서 수도 점검 왔어요.", "purpose": "INSPECTION"}
-{"id": "inspection_04", "transcript": "정수기 필터 교체하러 왔습니다.", "purpose": "INSPECTION"}
-{"id": "inspection_05", "transcript": "전기 계량기 확인하러 한전에서 나왔습니다.", "purpose": "INSPECTION"}
-{"id": "inspection_06", "transcript": "인터넷 기사입니다. 오늘 방문 예약되어 있으셔서요.", "purpose": "INSPECTION"}
-{"id": "inspection_07", "transcript": "아랫집에 물이 새서 누수 확인하러 왔습니다.", "purpose": "INSPECTION"}
-{"id": "inspection_08", "transcript": "방역 소독 나왔습니다.", "purpose": "INSPECTION"}
-{"id": "inspection_09", "transcript": "보일러 고장 신고하셔서 왔는데요.", "purpose": "INSPECTION"}
-{"id": "inspection_10", "transcript": "엘리베이터 공사 안내문 드리러 관리실에서 왔어요.", "purpose": "INSPECTION"}
-{"id": "visit_01", "transcript": "엄마, 나야. 문 좀 열어줘.", "purpose": "VISIT"}
-{"id": "visit_02", "transcript": "나 민수야, 근처 왔다가 들렀어. 전화 좀 줘.", "purpose": "VISIT"}
-{"id": "visit_03", "transcript": "언니 나 왔어. 반찬 좀 가져왔어.", "purpose": "VISIT"}
-{"id": "visit_04", "transcript": "놀러 왔는데 집에 없나 보네.", "purpose": "VISIT"}
-{"id": "visit_05", "transcript": "아들, 아빠다. 김치 가져왔다.", "purpose": "VISIT"}
-{"id": "visit_06", "transcript": "선배님, 저 지훈입니다. 빌린 책 돌려드리러 왔어요.", "purpose": "VISIT"}
-{"id": "visit_07", "transcript": "옆집 사는 사람인데요, 이사 와서 인사드리러 왔어요.", "purpose": "VISIT"}
-{"id": "visit_08", "transcript": "할머니 왔다. 문 열어봐라.", "purpose": "VISIT"}
-{"id": "visit_09", "transcript": "연락이 안 돼서 걱정돼서 와 봤어.", "purpose": "VISIT"}
-{"id": "visit_10", "transcript": "저 수진이요, 약속 시간 맞춰 왔어요.", "purpose": "VISIT"}
-{"id": "etc_01", "transcript": "혹시 이 근처에 약국 있나요?", "purpose": "ETC"}
-{"id": "etc_02", "transcript": "교회에서 나왔는데 잠깐 말씀 좀 나눌 수 있을까요?", "purpose": "ETC"}
-{"id": "etc_03", "transcript": "설문조사 하고 있는데 잠깐 시간 되세요?", "purpose": "ETC"}
-{"id": "etc_04", "transcript": "안녕하세요.", "purpose": "ETC"}
-{"id": "etc_05", "transcript": "음, 잘못 찾아온 것 같네요. 죄송합니다.", "purpose": "ETC"}
-{"id": "etc_06", "transcript": "정수기 렌탈 홍보하러 왔습니다.", "purpose": "ETC"}
-{"id": "etc_07", "transcript": "여기가 302호 맞나요?", "purpose": "ETC"}
-{"id": "etc_08", "transcript": "전단지 좀 붙이고 갈게요.", "purpose": "ETC"}
-{"id": "etc_09", "transcript": "길고양이 밥 주시는 분 찾고 있어요.", "purpose": "ETC"}
-{"id": "etc_10", "transcript": "누구 계세요?", "purpose": "ETC"}
+{"id": "delivery_01", "transcript": "택배 왔습니다. 문 앞에 놓고 갈게요.", "purpose": "DELIVERY", "subtype": "PARCEL"}
+{"id": "delivery_02", "transcript": "쿠팡입니다. 문 앞에 두고 갑니다.", "purpose": "DELIVERY", "subtype": "PARCEL"}
+{"id": "delivery_03", "transcript": "배달의민족 음식 배달 왔습니다.", "purpose": "DELIVERY", "subtype": "FOOD"}
+{"id": "delivery_04", "transcript": "등기 우편 왔는데요, 서명이 필요해서요.", "purpose": "DELIVERY", "subtype": "MAIL"}
+{"id": "delivery_05", "transcript": "부재중이셔서 경비실에 맡겨 둘게요.", "purpose": "DELIVERY", "subtype": "OTHER"}
+{"id": "delivery_06", "transcript": "네 치킨이요. 문 앞에 두고 갑니다.", "purpose": "DELIVERY", "subtype": "FOOD"}
+{"id": "delivery_07", "transcript": "로켓프레시 보냉백 문 앞에 뒀습니다.", "purpose": "DELIVERY", "subtype": "GROCERY"}
+{"id": "delivery_08", "transcript": "소포 하나 왔습니다.", "purpose": "DELIVERY", "subtype": "PARCEL"}
+{"id": "delivery_09", "transcript": "아까 주문하신 거 가져왔어요.", "purpose": "DELIVERY", "subtype": "OTHER"}
+{"id": "delivery_10", "transcript": "대한통운이에요, 박스가 커서 문 옆에 세워 둘게요.", "purpose": "DELIVERY", "subtype": "PARCEL"}
+{"id": "delivery_11", "transcript": "피자 배달입니다. 따뜻할 때 드세요.", "purpose": "DELIVERY", "subtype": "FOOD"}
+{"id": "delivery_12", "transcript": "마트 새벽 배송이에요. 냉장 식품이라 빨리 넣어 주세요.", "purpose": "DELIVERY", "subtype": "GROCERY"}
+{"id": "delivery_13", "transcript": "퀵서비스인데요, 서류 봉투 문에 끼워 둘게요.", "purpose": "DELIVERY", "subtype": "QUICK"}
+{"id": "delivery_14", "transcript": "냉장고 배송 왔습니다. 들여놓을 자리 확인 부탁드려요.", "purpose": "DELIVERY", "subtype": "LARGE"}
+{"id": "delivery_15", "transcript": "꽃 배달 왔습니다. 문 앞에 두고 갈게요.", "purpose": "DELIVERY", "subtype": "GIFT"}
+{"id": "delivery_16", "transcript": "케이크 선물 배송입니다.", "purpose": "DELIVERY", "subtype": "GIFT"}
+{"id": "delivery_17", "transcript": "한진택배입니다. 박스 두 개 문 옆에 놨어요.", "purpose": "DELIVERY", "subtype": "PARCEL"}
+{"id": "delivery_18", "transcript": "내용증명 우편이라 직접 받으셔야 해요.", "purpose": "DELIVERY", "subtype": "MAIL"}
+{"id": "pickup_01", "transcript": "주문 취소하신 매트리스 도로 가져가려고 왔습니다.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_02", "transcript": "교환 상품 회수하러 왔어요. 문 앞에 내놓으신 거 맞죠?", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_03", "transcript": "세탁물 수거하러 왔습니다.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_04", "transcript": "정수기 필터 수거하러 왔어요.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_05", "transcript": "어제 반찬 드린 용기 회수하러 왔어요.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_06", "transcript": "보냉가방 수거하러 왔습니다.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_07", "transcript": "폐가전 무료 수거 신청하셨죠? 세탁기 가지러 왔어요.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_08", "transcript": "공병 수거입니다.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_09", "transcript": "렌탈 끝난 공기청정기 회수하러 왔습니다.", "purpose": "PICKUP", "subtype": null}
+{"id": "pickup_10", "transcript": "아까 잘못 배송된 택배 다시 가져가겠습니다.", "purpose": "PICKUP", "subtype": null}
+{"id": "personal_01", "transcript": "엄마, 나야. 문 좀 열어줘.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_02", "transcript": "나 민수야, 근처 왔다가 들렀어. 전화 좀 줘.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_03", "transcript": "언니 나 왔어. 반찬 좀 가져왔어.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_04", "transcript": "놀러 왔는데 집에 없나 보네.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_05", "transcript": "아들, 아빠다. 김치 가져왔다.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_06", "transcript": "선배님, 저 지훈입니다. 빌린 책 돌려드리러 왔어요.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_07", "transcript": "옆집 사는 사람인데요, 이사 와서 인사드리러 왔어요.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_08", "transcript": "할머니 왔다. 문 열어봐라.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_09", "transcript": "연락이 안 돼서 걱정돼서 와 봤어.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_10", "transcript": "저 수진이요, 약속 시간 맞춰 왔어요.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_11", "transcript": "누구 계세요?", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "personal_12", "transcript": "지민이 친구인데요, 같이 과제하기로 했어요.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "service_01", "transcript": "가스 검침하러 왔습니다.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_02", "transcript": "관리사무소에서 소방 점검 나왔습니다.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_03", "transcript": "택배 아니고요, 관리실에서 수도 점검 왔어요.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_04", "transcript": "정수기 필터 교체하러 왔습니다.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_05", "transcript": "전기 계량기 확인하러 한전에서 나왔습니다.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_06", "transcript": "인터넷 기사입니다. 오늘 방문 예약되어 있으셔서요.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_07", "transcript": "아랫집에 물이 새서 누수 확인하러 왔습니다.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_08", "transcript": "방역 소독 나왔습니다.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_09", "transcript": "보일러 고장 신고하셔서 왔는데요.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_10", "transcript": "엘리베이터 공사 안내문 드리러 관리실에서 왔어요.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_11", "transcript": "이사 업체입니다. 짐 옮기러 왔어요.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "service_12", "transcript": "부동산에서 집 보러 왔습니다. 약속 잡혀 있어요.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "emergency_01", "transcript": "경찰입니다. 신고 받고 왔는데 문 좀 열어 주시겠어요?", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_02", "transcript": "불이야! 3층에 불났어요, 빨리 대피하세요!", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_03", "transcript": "가스 새는 냄새가 나서 확인하러 왔습니다. 가스안전공사입니다.", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_04", "transcript": "119 구급대입니다. 신고하신 분 계세요?", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_05", "transcript": "주민센터에서 나왔습니다. 긴급 안내문 전달드리러 왔어요.", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_06", "transcript": "옆집에서 연기가 나요! 빨리 나오세요!", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_07", "transcript": "아래층에 사람이 쓰러졌어요, 도와주세요!", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_08", "transcript": "건물 누수로 전기가 위험합니다. 관리사무소 긴급 대피 안내입니다.", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_09", "transcript": "법원에서 서류 전달하러 왔습니다.", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "emergency_10", "transcript": "구청 재난안전과입니다. 태풍 대비 긴급 안내드립니다.", "purpose": "PUBLIC_EMERGENCY", "subtype": null}
+{"id": "safety_01", "transcript": "문 안 열면 가만 안 둔다.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_02", "transcript": "문 열 때까지 여기서 안 간다. 각오해.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_03", "transcript": "당장 나와, 죽여버릴 거야.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_04", "transcript": "문 따고 들어갈 거야.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_05", "transcript": "빨리 나와. 박살 내기 전에.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_06", "transcript": "돈 갚을 때까지 매일 찾아올 거다.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_07", "transcript": "너 이 문 부숴서라도 들어간다.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_08", "transcript": "안에 있는 거 다 알아. 창문 깨고 들어간다.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "solicit_01", "transcript": "교회에서 나왔는데 잠깐 말씀 좀 나눌 수 있을까요?", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_02", "transcript": "설문조사 하고 있는데 잠깐 시간 되세요?", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_03", "transcript": "정수기 렌탈 홍보하러 왔습니다.", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_04", "transcript": "전단지 좀 붙이고 갈게요.", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_05", "transcript": "통신사 바꾸시면 현금 지원해 드려요.", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_06", "transcript": "새로 생긴 헬스장 홍보하러 왔습니다.", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_07", "transcript": "불우이웃 돕기 모금 중입니다. 잠깐 시간 되세요?", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_08", "transcript": "기호 3번 후보입니다. 인사드리러 왔습니다.", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_09", "transcript": "긴급 할인 행사 안내드려요. 오늘만 반값입니다.", "purpose": "SOLICITATION", "subtype": null}
+{"id": "solicit_10", "transcript": "성당에서 나왔는데 좋은 말씀 전해 드리고 싶어요.", "purpose": "SOLICITATION", "subtype": null}
+{"id": "wrong_01", "transcript": "음, 잘못 찾아온 것 같네요. 죄송합니다.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_02", "transcript": "어, 벨 누른 거 실수예요. 죄송합니다.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_03", "transcript": "어, 여기 김민수 씨 댁 아닌가요? 다른 집인가 보네요.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_04", "transcript": "택배 주소를 잘못 봤네요. 옆 동이었어요.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_05", "transcript": "503호인 줄 알았는데 403호네요, 죄송합니다.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_06", "transcript": "잘못 왔습니다, 실례했습니다.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_07", "transcript": "아 여기 아니구나, 주소를 잘못 찾았어요.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_08", "transcript": "친구 집인 줄 알았는데 아니네요. 죄송해요.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_09", "transcript": "음식 배달인데 호수를 잘못 봤어요. 다시 갈게요.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "wrong_10", "transcript": "동을 착각했네요. 실례했습니다.", "purpose": "WRONG_VISIT", "subtype": null}
+{"id": "unknown_01", "transcript": "혹시 이 근처에 약국 있나요?", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_02", "transcript": "안녕하세요.", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_03", "transcript": "여기가 302호 맞나요?", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_04", "transcript": "음… 저기요.", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_05", "transcript": "여보세요? 음… 아니에요.", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_06", "transcript": "그러니까 그게… 아 뭐였지.", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_07", "transcript": "잠깐만요, 전화 좀 받고요.", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_08", "transcript": "여기 엘리베이터 어디 있어요?", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_09", "transcript": "지금 몇 시예요?", "purpose": "UNKNOWN", "subtype": null}
+{"id": "unknown_10", "transcript": "아 네 네… 알겠습니다.", "purpose": "UNKNOWN", "subtype": null}

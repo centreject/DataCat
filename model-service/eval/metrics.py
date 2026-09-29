@@ -5,6 +5,9 @@ TARGETS = {
     "package_recall": 0.85,
     "stt_cer_max": 0.15,
     "purpose_accuracy": 0.90,
+    # Emergencies and threats must not slip through as ordinary visits (plan: "긴급·위험 신호 우선").
+    "critical_recall": 0.95,
+    "subtype_accuracy": 0.80,
     "summary_over_20_max": 0.0,
 }
 
@@ -34,6 +37,18 @@ def per_class_scores(gold: list[str], pred: list[str], labels: list[str]) -> dic
         actual = sum(g == label for g in gold)
         scores[label] = (tp / predicted if predicted else 0.0, tp / actual if actual else 0.0)
     return scores
+
+
+def group_recall(gold: list[str], pred: list[str], group: set[str]) -> float:
+    """Share of gold cases in `group` whose prediction is also in `group` (any member counts)."""
+    hits = [p in group for g, p in zip(gold, pred) if g in group]
+    return sum(hits) / len(hits) if hits else 0.0
+
+
+def subtype_accuracy(gold: list[tuple[str, str | None]], pred: list[tuple[str, str | None]]) -> float:
+    """Exact (purpose, subtype) match over cases that have a gold subtype."""
+    pairs = [(g, p) for g, p in zip(gold, pred) if g[1] is not None]
+    return sum(g == p for g, p in pairs) / len(pairs) if pairs else 0.0
 
 
 def verdict(ok: bool) -> str:

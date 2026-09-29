@@ -1,6 +1,6 @@
 import pytest
 
-from eval.metrics import cer, per_class_scores
+from eval.metrics import cer, group_recall, per_class_scores, subtype_accuracy
 
 
 def test_cer_identical_is_zero():
@@ -22,6 +22,19 @@ def test_cer_empty_hypothesis_is_one():
 
 def test_cer_counts_insertions():
     assert cer("택배", "택배요") == pytest.approx(1 / 2)
+
+
+def test_group_recall_counts_any_label_in_the_group():
+    # Missing an emergency or a threat is the costly error; both labels count as "caught".
+    gold = ["PUBLIC_EMERGENCY", "SAFETY_REVIEW", "SAFETY_REVIEW", "DELIVERY"]
+    pred = ["SAFETY_REVIEW", "SAFETY_REVIEW", "UNKNOWN", "PUBLIC_EMERGENCY"]
+    assert group_recall(gold, pred, {"PUBLIC_EMERGENCY", "SAFETY_REVIEW"}) == pytest.approx(2 / 3)
+
+
+def test_subtype_accuracy_only_over_cases_with_a_gold_subtype():
+    gold = [("DELIVERY", "FOOD"), ("DELIVERY", "PARCEL"), ("PICKUP", None)]
+    pred = [("DELIVERY", "FOOD"), ("DELIVERY", "OTHER"), ("PICKUP", None)]
+    assert subtype_accuracy(gold, pred) == pytest.approx(0.5)
 
 
 def test_per_class_scores():

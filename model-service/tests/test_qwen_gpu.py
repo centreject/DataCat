@@ -45,5 +45,16 @@ def test_qwen_strangers_and_services(qwen, transcript, purpose):
     assert qwen.analyze(transcript).purpose == purpose
 
 
+@pytest.mark.parametrize(
+    "transcript",
+    ["택배 왔습니다. 문 앞에 놓고 갈게요.", "관리사무소에서 소방 점검 나왔습니다", "지금 몇 시예요?"],
+)
+def test_prefix_cache_gives_the_same_answer(qwen, transcript):
+    from app.language.qwen import build_messages
+
+    messages = build_messages(transcript)
+    assert qwen.generate(messages) == qwen.generate(messages, use_prefix_cache=False)
+
+
 def test_qwen_visit(qwen):
     assert qwen.analyze("나 민수야, 근처 왔다가 들렀어. 전화 좀 줘").purpose == "PERSONAL_VISIT"
