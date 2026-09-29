@@ -34,13 +34,14 @@ def post_audio(client, data: bytes):
 
 def test_process_audio_contract():
     stt = FakeSpeech("택배 문 앞에 두고 갑니다.")
-    lm = FakeLanguage(Analysis(summary="택배 문 앞 보관", purpose="DELIVERY"))
+    lm = FakeLanguage(Analysis(summary="택배 문 앞 보관", purpose="DELIVERY", subtype="PARCEL"))
     with ready_client(stt=stt, language=lm) as client:
         response = post_audio(client, tone_wav(1))
     assert response.status_code == 200
     assert response.json() == {
         "transcript": "택배 문 앞에 두고 갑니다.",
         "purpose": "DELIVERY",
+        "subtype": "PARCEL",
         "summary": "택배 문 앞 보관",
     }
 
@@ -55,10 +56,10 @@ def test_audio_process_response_only_accepts_known_purposes():
 
 
 def test_process_audio_silence():
-    lm = FakeLanguage(Analysis(summary="should not be used", purpose="VISIT"))
+    lm = FakeLanguage(Analysis(summary="should not be used", purpose="PERSONAL_VISIT"))
     with ready_client(stt=FakeSpeech(""), language=lm) as client:
         response = post_audio(client, tone_wav(1))
-    assert response.json() == {"transcript": "", "purpose": "ETC", "summary": ""}
+    assert response.json() == {"transcript": "", "purpose": "UNKNOWN", "subtype": None, "summary": ""}
 
 
 @pytest.fixture
@@ -111,7 +112,7 @@ def test_chunked_upload_over_limit_is_rejected_without_disk(monkeypatch):
         yield f"\r\n--{boundary}--\r\n".encode()
 
     stt = FakeSpeech("x")
-    lm = FakeLanguage(Analysis(summary="x", purpose="ETC"))
+    lm = FakeLanguage(Analysis(summary="x", purpose="UNKNOWN"))
     with ready_client(stt=stt, language=lm) as client:
         response = client.post(
             URL, content=body(), headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
@@ -133,7 +134,7 @@ def test_long_audio_is_trimmed_to_30_seconds():
 
 def test_short_audio_is_not_trimmed():
     stt = FakeSpeech("x")
-    lm = FakeLanguage(Analysis(summary="x", purpose="ETC"))
+    lm = FakeLanguage(Analysis(summary="x", purpose="UNKNOWN"))
     with ready_client(stt=stt, language=lm) as client:
         post_audio(client, tone_wav(5))
     assert stt.samples == 5 * 16000
@@ -143,11 +144,13 @@ def test_process_audio_uses_rules_when_llm_failed_to_load():
     with ready_client(stt=FakeSpeech("택배 왔습니다"), language=None) as client:
         response = post_audio(client, tone_wav(1))
     assert response.status_code == 200
-    assert response.json() == {"transcript": "택배 왔습니다", "purpose": "DELIVERY", "summary": "택배 왔습니다"}
+    assert response.json() == {
+        "transcript": "택배 왔습니다", "purpose": "DELIVERY", "subtype": "PARCEL", "summary": "택배 왔습니다"
+    }
 
 
 def test_process_audio_stt_not_ready():
-    lm = FakeLanguage(Analysis(summary="x", purpose="ETC"))
+    lm = FakeLanguage(Analysis(summary="x", purpose="UNKNOWN"))
     with ready_client(stt=None, language=lm) as client:
         response = post_audio(client, tone_wav(1))
     assert response.status_code == 503

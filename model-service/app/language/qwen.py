@@ -5,32 +5,39 @@ from pathlib import Path
 from app.config import Settings
 from app.hub_cache import load_cached_first
 from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
+from app.language.purposes import CATALOG
 from app.language.rules import rule_analyze
 from app.schemas import Analysis
 
-SYSTEM_PROMPT = """너는 무인 현관 초인종의 접수 도우미다. 방문객이 말한 내용을 보고 JSON 한 줄만 출력한다.
-형식: {"summary": "...", "purpose": "..."}
+def _system_prompt() -> str:
+    purposes = "\n".join(f"- {p['id']}: {p['name']}. {p['description']}" for p in CATALOG.purposes)
+    subtypes = "\n".join(f"- {s['id']}: {s['name']}" for s in CATALOG.get("DELIVERY").get("subtypes", []))
+    rules = "\n".join(f"- {r}" for r in CATALOG.rules)
+    return f"""너는 무인 현관 초인종의 접수 도우미다. 방문객이 말한 내용을 보고 JSON 한 줄만 출력한다.
+형식: {{"summary": "...", "purpose": "...", "subtype": "..." 또는 null}}
 
-purpose는 아래 4개 중 하나:
-- DELIVERY: 택배, 음식 배달, 물건 배송. 물건을 문 앞·경비실·관리실에 두거나 맡겼다는 말도 포함
-- INSPECTION: 검침, 시설 점검, 관리사무소·관리실 업무, 수리·설치·소독 기사의 방문(예약 방문 포함)
-- VISIT: 집에 사는 사람과 개인적으로 아는 사이(가족, 친구, 지인, 이웃)의 방문
-- ETC: 위에 해당하지 않거나 용건을 알 수 없음. 모르는 사람의 영업·홍보·보험·종교·설문, 길이나 호수 묻기, 전단지 부착은 모두 ETC
+purpose는 아래 중 하나 (위에 있을수록 우선):
+{purposes}
 
-"방문", "왔다"라는 말만으로 VISIT으로 판단하지 않는다. 방문객과 집주인이 아는 사이일 때만 VISIT이다.
+DELIVERY의 subtype은 아래 중 하나:
+{subtypes}
+
+판단 규칙:
+{rules}
 
 summary 규칙:
 - 공백 포함 20자 이내
 - 명사형으로 끝낸다 (예: "택배 문 앞 보관", "가스 검침 방문")
 - 방문객이 말하지 않은 내용은 만들지 않는다
 
-"택배 아니고"처럼 부정한 내용은 용건으로 보지 않는다. JSON 외의 설명은 쓰지 않는다."""
+JSON 외의 설명은 쓰지 않는다."""
 
-FEW_SHOTS = (
-    ("택배 왔습니다. 문 앞에 두고 갈게요.", {"summary": "택배 문 앞 보관", "purpose": "DELIVERY"}),
-    ("안녕하세요, 가스 검침하러 왔습니다.", {"summary": "가스 검침 방문", "purpose": "INSPECTION"}),
-    ("엄마, 나야. 반찬 가져왔어.", {"summary": "가족 반찬 전달 방문", "purpose": "VISIT"}),
-    ("혹시 이 근처에 약국 있나요?", {"summary": "약국 위치 문의", "purpose": "ETC"}),
+
+# Built from purposes.json, so the classification plan can change without touching this code.
+SYSTEM_PROMPT = _system_prompt()
+FEW_SHOTS = tuple(
+    (s["transcript"], {"summary": s["summary"], "purpose": s["purpose"], "subtype": s["subtype"]})
+    for s in CATALOG.few_shots
 )
 
 
@@ -94,5 +101,5 @@ class QwenLanguage:
             return rule_analyze(transcript)
         if not is_grounded(parsed.summary, transcript):
             # Keep the LLM's purpose (98% vs 88% for rules) but never show an invented summary.
-            return Analysis(summary=truncate_summary(transcript), purpose=parsed.purpose)
+            return Analysis(summary=truncate_summary(transcript), purpose=parsed.purpose, subtype=parsed.subtype)
         return parsed

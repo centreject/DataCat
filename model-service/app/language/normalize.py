@@ -1,11 +1,11 @@
 import json
 import re
-from typing import get_args
 
-from app.schemas import Analysis, Purpose
+from app.language.purposes import CATALOG
+from app.schemas import Analysis
 
-PURPOSES = get_args(Purpose)
-SUMMARY_LIMIT = 20  # API v1.3 §7.3: max 20 characters including spaces
+PURPOSES = CATALOG.ids
+SUMMARY_LIMIT = 20  # API v1.4 §7.3: max 20 characters including spaces
 # Qwen occasionally mixes Chinese characters into Korean ("방문者 인사").
 CJK_IDEOGRAPHS = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
 _WORD = re.compile(r"[가-힣A-Za-z0-9]{2,}")
@@ -26,8 +26,17 @@ def truncate_summary(s: str, limit: int = SUMMARY_LIMIT) -> str:
     return s if len(s) <= limit else s[: limit - 1] + "…"
 
 
+def normalize_subtype(purpose: str, subtype: object) -> str | None:
+    """Subtype valid for the purpose, the purpose's default if it has subtypes, else None."""
+    allowed = CATALOG.subtypes(purpose)
+    if not allowed:
+        return None
+    value = str(subtype or "").strip().upper()
+    return value if value in allowed else CATALOG.subtype_default(purpose)
+
+
 def parse_llm_output(raw: str) -> Analysis | None:
-    """Extract {"summary", "purpose"} from LLM text; None when unusable."""
+    """Extract {"summary", "purpose", "subtype"} from LLM text; None when unusable."""
     start, end = raw.find("{"), raw.rfind("}")
     if start == -1 or end <= start:
         return None
@@ -42,4 +51,6 @@ def parse_llm_output(raw: str) -> Analysis | None:
     if not summary:
         return None
     purpose = str(data.get("purpose") or "").strip().upper()
-    return Analysis(summary=summary, purpose=purpose if purpose in PURPOSES else "ETC")
+    if purpose not in PURPOSES:
+        purpose = CATALOG.default
+    return Analysis(summary=summary, purpose=purpose, subtype=normalize_subtype(purpose, data.get("subtype")))
