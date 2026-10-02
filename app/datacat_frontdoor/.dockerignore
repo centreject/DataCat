@@ -1,0 +1,8 @@
+build/
+.dart_tool/
+.idea/
+*.iml
+android/.gradle/
+android/app/build/
+ios/Pods/
+ios/.symlinks/

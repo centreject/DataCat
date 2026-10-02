@@ -1,0 +1,88 @@
+# DataCat 무인현관 — 로컬/서버 공용 실행 묶음
+#
+#   docker compose up -d --build                     앱(웹) + 목업 API
+#   docker compose --profile backend up -d --build   + MySQL (Spring 붙일 때)
+#   docker compose --profile tunnel up -d            + Cloudflare Tunnel (외부 HTTPS 접속)
+#
+# 접속:  앱  http://localhost:${APP_PORT}      API  http://localhost:${API_PORT}/api/v1/events
+name: datacat
+
+services:
+  # Flutter 앱을 웹으로 빌드해 nginx 로 서빙. /api/ 요청은 api 서비스로 넘긴다.
+  app:
+    build:
+      context: ../app/datacat_frontdoor
+      args:
+        API_URL: same-origin
+    image: datacat/app:local
+    ports:
+      - "${APP_PORT:-8081}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 지금은 목업 API. Spring Boot 가 준비되면 build 경로만 Spring 프로젝트로 바꾼다.
+  #   build: ../server           (Spring 프로젝트 폴더, 안에 Dockerfile)
+  #   environment:
+  #     SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${DB_NAME}
+  #     SPRING_DATASOURCE_USERNAME: ${DB_USER}
+  #     SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+  #     MODEL_SERVICE_URL: http://model:8000
+  api:
+    build: ./mock-api
+    image: datacat/mock-api:local
+    ports:
+      - "${API_PORT:-8080}:8080"      # Pi 가 직접 붙을 수 있게 열어 둔다
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Spring 이 붙을 때부터 사용 (--profile backend)
+  db:
+    image: mysql:8.4
+    profiles: ["backend"]
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-datacat}
+      MYSQL_USER: ${DB_USER:-datacat}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-datacat-local}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root-local}
+      TZ: Asia/Seoul
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "${DB_PORT:-3307}:3306"       # DB 툴로 들여다볼 때만. 서버에 올릴 땐 지워도 된다
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # 모델 서버 (GPU 있는 서버 PC 에서만). 모델 담당의 Dockerfile 이 나오면 주석을 푼다.
+  # model:
+  #   build: ../model-service
+  #   profiles: ["gpu"]
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+
+  # 집 밖(Pi, 팀원 폰)에서 HTTPS 로 접속할 때 (--profile tunnel)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:-}
+    depends_on: [app]
+    restart: unless-stopped
+
+volumes:
+  db-data:
