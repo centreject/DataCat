@@ -1,0 +1,133 @@
+{
+ "units": "mm",
+ "overall_WxHxD": [
+  105.0,
+  215.0,
+  42.0
+ ],
+ "parts": {
+  "01_front_shell": {
+   "valid": true,
+   "volume_cm3": 90.38,
+   "bbox": [
+    -52.5,
+    52.5,
+    -0.0,
+    215.0,
+    -0.0,
+    42.0
+   ]
+  },
+  "02_lcd_pi_chassis": {
+   "valid": true,
+   "volume_cm3": 11.02,
+   "bbox": [
+    -40.0,
+    40.0,
+    47.05,
+    140.95,
+    14.0,
+    33.5
+   ]
+  },
+  "03_wall_plate": {
+   "valid": true,
+   "volume_cm3": 57.22,
+   "bbox": [
+    -49.6,
+    49.6,
+    10.3,
+    212.1,
+    0.0,
+    11.0
+   ]
+  },
+  "04_black_visor": {
+   "valid": true,
+   "volume_cm3": 1.71,
+   "bbox": [
+    -35.85,
+    35.85,
+    165.15,
+    188.85,
+    40.8,
+    42.0
+   ]
+  },
+  "05_led_light_pipe": {
+   "valid": true,
+   "volume_cm3": 0.2,
+   "bbox": [
+    -10.2,
+    10.2,
+    138.3,
+    143.7,
+    38.3,
+    42.0
+   ]
+  }
+ },
+ "components": {},
+ "interference_mm3": {},
+ "component_outside_envelope_mm3": {
+  "Raspberry Pi 4": 0.0,
+  "USB-C L형 플러그": 0.0,
+  "3.5인치 LCD": 0.0,
+  "Camera Module 3 Wide": 0.0,
+  "VL53L5CX ToF": 0.0,
+  "INMP441 마이크": 0.0,
+  "MAX98357A 앰프": 0.0,
+  "스피커 ø28": 0.0,
+  "16mm 호출벨": 0,
+  "상태 LED": 0.0
+ },
+ "mounting_path_collision_mm3": {
+  "dy=+7.4, dz=+12.0": 0.0,
+  "dy=+7.4, dz=+8.0": 0.0,
+  "dy=+7.4, dz=+4.0": 0.0,
+  "dy=+7.4, dz=+2.0": 0.0,
+  "dy=+7.4, dz=+0.0": 0.0,
+  "dy=+6.0, dz=+0.0": 0.0,
+  "dy=+4.5, dz=+0.0": 0.0,
+  "dy=+3.0, dz=+0.0": 0.0,
+  "dy=+1.5, dz=+0.0": 0.0,
+  "dy=+0.0, dz=+0.0": 0.0
+ },
+ "fov_blocked_mm3": {
+  "camera_H106_V72": 0.002,
+  "tof_45x45": 0.0
+ },
+ "camera_tilt_deg": 10.0,
+ "screen": {
+  "active_mm": [
+   48.96,
+   73.44
+  ],
+  "window_mm": [
+   49.5,
+   74.0
+  ],
+  "margin_each_side_mm": [
+   0.27,
+   0.28
+  ]
+ },
+ "z_stack_mm": {
+  "front_face": 42.0,
+  "front_inner_face": 39.5,
+  "lcd_glass_front": 39.5,
+  "lcd_pcb_back": 33.5,
+  "chassis": [
+   28.5,
+   33.5
+  ],
+  "pi_component_side": 14.0,
+  "pi_solder_side": 12.6,
+  "wall_plate": [
+   0,
+   3.0
+  ],
+  "camera_lens_front": 41.2
+ },
+ "build_seconds": 17.1
+}
