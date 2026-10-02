@@ -1,14 +1,16 @@
 name: datacat_frontdoor
-description: "A new Flutter project."
+description: DataCat 무인현관 — 방문 기록을 확인하는 모바일 앱
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
-  sdk: ^3.13.4
+  sdk: ^3.9.0
 
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.2.2
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:

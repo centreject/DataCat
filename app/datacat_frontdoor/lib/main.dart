@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 
-import 'app/app.dart';
-import 'features/events/data/mock_event_repository.dart';
+import 'app.dart';
+import 'state/event_store.dart';
+import 'state/settings.dart';
 
-void main() {
-  runApp(MunapApp(eventRepository: MockEventRepository()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final settings = AppSettings();
+  await settings.load();
+
+  runApp(DataCatApp(
+    settings: settings,
+    store: EventStore(settings.createApi()),
+  ));
 }
