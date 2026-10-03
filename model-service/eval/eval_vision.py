@@ -10,7 +10,7 @@ from eval.metrics import TARGETS, verdict
 
 # folder -> label that should be found there
 EXPECTED = {"person": "person", "package_box": "package", "package_bag": "package",
-            "package_food": "package", "package_cooler": "package"}
+            "package_food": "package", "package_cooler": "package", "animal": "animal"}
 
 
 def main() -> None:

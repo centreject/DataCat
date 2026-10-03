@@ -11,6 +11,7 @@ from app.schemas import (
     DetectResponse,
     TranscribeResponse,
 )
+from app.vision.quality import low_visibility
 
 router = APIRouter(prefix="/internal/v1")
 
@@ -33,7 +34,9 @@ def require_loaded(registry: ModelRegistry | None) -> ModelRegistry:
 def detect(request: Request, image: UploadFile = File(...)):
     # Sync handler: FastAPI runs it in a worker thread, so GPU inference doesn't block the event loop.
     model = require(request.app.state.registry, "vision")
-    return DetectResponse(detections=model.detect(decode_jpeg(image.file.read())))
+    picture = decode_jpeg(image.file.read())
+    flags = ["LOW_VISIBILITY"] if low_visibility(picture) else []
+    return DetectResponse(detections=model.detect(picture), flags=flags)
 
 
 @router.post("/speech/transcribe", response_model=TranscribeResponse)

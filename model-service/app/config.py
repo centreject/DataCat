@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     model_profile: Literal["full", "lite"] = "lite"
     person_conf: float = 0.4
     # Tuned on the Open Images val/test subset from eval/prepare_images.py (2026-09-27),
-    # measured per whole folder: person 93%, box 53%, plastic bag 72%,
-    # empty-hallway false positives 3-7%. Zero-shot; below the 85% package target.
+    # measured per whole folder (prompts below): person 93%, box 83%, plastic bag 80%,
+    # empty-hallway false positives 10%. Zero-shot; box/bag still just below the 85% target.
     package_conf: float = 0.25
     package_prompts: list[str] = [
         "box",
@@ -25,6 +25,13 @@ class Settings(BaseSettings):
         "food delivery bag",
         "takeout container",
         "cooler bag",
+        # 2026-10-04: items the classification plan lists for 물품만 있음 (box 53→83%, bag 72→80%,
+        # empty-hallway false positives 3→10%).
+        "flower bouquet",
+        "cake box",
+        "gift box",
+        "envelope",
+        "flyer",
     ]
     weights_dir: str = str(DATA_DIR / "weights")
     stt_model: str = "large-v3-turbo"

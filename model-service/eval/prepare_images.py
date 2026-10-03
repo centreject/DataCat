@@ -23,6 +23,7 @@ IMAGE_URL = "https://open-images-dataset.s3.amazonaws.com/{}/{}.jpg"
 
 PEOPLE = {"/m/01g317", "/m/04yx4", "/m/03bt1vf", "/m/01bl7v", "/m/05r655"}  # Person, Man, Woman, Boy, Girl
 BOX, PLASTIC_BAG, DOOR = "/m/025dyy", "/m/05gqfk", "/m/02dgv"
+DOG, CAT = "/m/0bt9lr", "/m/01yrx"
 PACKAGE_LIKE = {BOX, PLASTIC_BAG, "/m/011q46kg", "/m/0hf58v5", "/m/080hkjn", "/m/01940j"}  # + container, bags, handbag, backpack
 
 # folder -> (classes that must be present, min box area fraction, classes that must be absent)
@@ -31,6 +32,7 @@ FOLDERS = {
     "package_box": ({BOX}, 0.05, PEOPLE),
     "package_bag": ({PLASTIC_BAG}, 0.02, PEOPLE),
     "empty": ({DOOR}, 0.10, PEOPLE | PACKAGE_LIKE),
+    "animal": ({DOG, CAT}, 0.10, PEOPLE | PACKAGE_LIKE),
 }
 TEAM_PHOTO_FOLDERS = ("package_food", "package_cooler")
 

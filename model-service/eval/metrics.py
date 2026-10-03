@@ -3,6 +3,7 @@
 TARGETS = {
     "person_recall": 0.95,
     "package_recall": 0.85,
+    "animal_recall": 0.90,
     "stt_cer_max": 0.15,
     "purpose_accuracy": 0.90,
     # Emergencies and threats must not slip through as ordinary visits (plan: "긴급·위험 신호 우선").

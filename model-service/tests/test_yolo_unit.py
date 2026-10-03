@@ -11,13 +11,14 @@ from app.vision.yolo import YoloVision
 
 
 class StubModel:
-    def __init__(self, confidences):
+    def __init__(self, confidences, classes=None):
         self.confidences = confidences
+        self.classes = classes if classes is not None else [0] * len(confidences)
         self.kwargs = None
 
     def predict(self, image, **kwargs):
         self.kwargs = kwargs
-        return [SimpleNamespace(boxes=SimpleNamespace(conf=self.confidences))]
+        return [SimpleNamespace(boxes=SimpleNamespace(conf=self.confidences, cls=self.classes))]
 
 
 def stub_vision(people, packages) -> YoloVision:
@@ -37,6 +38,19 @@ def test_ultralytics_never_pip_installs_at_runtime():
     assert AUTOINSTALL is False
 
 
+def test_coco_animals_become_animal_label():
+    # Plan: "동물만 감지되면 사람 방문으로 응대하지 않는다" — Spring needs to tell animals from people.
+    vision = stub_vision(people=[0.9, 0.8, 0.7], packages=[])
+    vision.person_model.classes = [0, 16, 15]  # person, dog, cat
+    assert [d.label for d in vision.detect(Image.new("RGB", (4, 4)))] == ["person", "animal", "animal"]
+
+
+def test_person_model_also_looks_for_birds_cats_dogs():
+    vision = stub_vision([], [])
+    vision.detect(Image.new("RGB", (4, 4)))
+    assert vision.person_model.kwargs["classes"] == [0, 14, 15, 16]
+
+
 def test_maps_both_models_to_labels_with_rounded_confidence():
     vision = stub_vision(people=[0.912345], packages=[0.5, 0.33333])
     assert vision.detect(Image.new("RGB", (4, 4))) == [
@@ -46,10 +60,9 @@ def test_maps_both_models_to_labels_with_rounded_confidence():
     ]
 
 
-def test_person_model_only_looks_for_coco_person_at_person_threshold():
+def test_person_model_uses_person_threshold():
     vision = stub_vision([], [])
     vision.detect(Image.new("RGB", (4, 4)))
-    assert vision.person_model.kwargs["classes"] == [0]
     assert vision.person_model.kwargs["conf"] == Settings().person_conf
 
 

@@ -15,12 +15,14 @@ Flag = Literal["NO_SPEECH", "SUMMARY_FROM_TRANSCRIPT", "RULES_FALLBACK"]
 
 
 class Detection(BaseModel):
-    label: Literal["person", "package"]
+    label: Literal["person", "package", "animal"]
     confidence: float
 
 
 class DetectResponse(BaseModel):
     detections: list[Detection]
+    # LOW_VISIBILITY: the frame shows (almost) nothing — covered lens or unlit hallway.
+    flags: list[Literal["LOW_VISIBILITY"]] = Field(default_factory=list)
 
 
 class TranscribeResponse(BaseModel):

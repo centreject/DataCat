@@ -22,6 +22,8 @@ PERSON_WEIGHTS = "yolo11s.pt"
 PACKAGE_WEIGHTS = "yoloe-11s-seg.pt"
 TEXT_ENCODER = "mobileclip_blt.ts"  # YOLOE's prompt encoder; fetched by bare name otherwise
 COCO_PERSON = 0
+# COCO bird, cat, dog → "animal" (plan: an animal alone is not a visitor).
+COCO_ANIMALS = (14, 15, 16)
 
 
 class YoloVision:
@@ -46,14 +48,19 @@ class YoloVision:
     def detect(self, image: Image.Image) -> list[Detection]:
         with self.lock:
             people = self.person_model.predict(
-                image, classes=[COCO_PERSON], conf=self.settings.person_conf, quantize=16, verbose=False
+                image,
+                classes=[COCO_PERSON, *COCO_ANIMALS],
+                conf=self.settings.person_conf,
+                quantize=16,
+                verbose=False,
             )[0]
             # agnostic_nms: overlapping prompts ("box", "cardboard box") on one object count once.
             packages = self.package_model.predict(
                 image, conf=self.settings.package_conf, agnostic_nms=True, quantize=16, verbose=False
             )[0]
         return [
-            Detection(label="person", confidence=round(float(c), 4)) for c in people.boxes.conf
+            Detection(label="person" if int(k) == COCO_PERSON else "animal", confidence=round(float(c), 4))
+            for c, k in zip(people.boxes.conf, people.boxes.cls)
         ] + [
             Detection(label="package", confidence=round(float(c), 4)) for c in packages.boxes.conf
         ]
