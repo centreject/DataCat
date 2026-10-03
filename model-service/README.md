@@ -1,6 +1,6 @@
 # DataCat 모델 서비스
 
-Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_4.md`](../API_v1_4.md) 7장.
+Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_5.md`](../API_v1_5.md) 7장(직전 버전 `API_v1_4.md`도 함께 둠).
 
 진행 현황: [`PROGRESS.md`](PROGRESS.md) · 정확도: [`eval/README.md`](eval/README.md) · 속도: [`bench/results/`](bench/results/)
 
@@ -62,7 +62,7 @@ Spring에서는 `http://model-service:8000/internal/v1/...`로 부른다. Spring
 | `POST /internal/v1/audio/process` | multipart `audio` | `{"transcript","purpose","subtype","summary","flags"}` — Spring이 실제로 쓰는 음성 경로 |
 | `GET /health` | — | `{"status":"loading"\|"ok"\|"error","profile":"lite"\|"full"}` |
 
-`purpose` 9개 값과 배송 `subtype`은 [`app/language/purposes.json`](app/language/purposes.json)(덕민님 분류 기획 반영)이 원본이고, 명세 v1.5 초안 7.6에 표로 있다. 분류를 바꿀 때는 이 파일만 고친다.
+`purpose` 9개 값과 배송 `subtype`은 [`app/language/purposes.json`](app/language/purposes.json)(덕민님 분류 기획 반영)이 원본이고, 명세 [`API_v1_5.md`](../API_v1_5.md) 7.6에 표로 있다. 분류를 바꿀 때는 이 파일만 고친다.
 
 `flags` — 언어: `NO_SPEECH`(발화 없음), `SUMMARY_FROM_TRANSCRIPT`(요약이 말한 내용과 달라 전사문 사용), `RULES_FALLBACK`(LLM 실패로 키워드 규칙). 비전: `LOW_VISIBILITY`(화면이 거의 안 보임 — 렌즈 가림 또는 불 꺼진 복도, ToF와 함께 판단).
 
@@ -76,7 +76,7 @@ Spring에서는 `http://model-service:8000/internal/v1/...`로 부른다. Spring
 - 요약에 방문객이 말한 단어가 하나도 없으면(LLM이 지어낸 경우) 전사문을 요약으로 대신 보내고 `SUMMARY_FROM_TRANSCRIPT`를 붙인다. `flags`가 하나라도 있으면 "사용자 확인 필요"로 표시하는 것을 권장.
 - `animal`만 있고 `person`이 없으면 사람 방문으로 응대하지 않는다(분류 기획 공통 조건).
 
-### API v1.4 → v1.5 초안에서 바뀌는 점 (브랜치 `docs/api-v1.5`, PR 대기)
+### API v1.4 → v1.5에서 바뀌는 점 ([`API_v1_5.md`](../API_v1_5.md), 이 브랜치에 있음)
 
 - `purpose`: `INSPECTION`/`VISIT`/`ETC` → 기획의 9개(`SERVICE_VISIT`, `PERSONAL_VISIT`, `UNKNOWN` 등), 배송 `subtype` 추가
 - 언어·비전 응답에 `flags` 추가, Vision `animal` 라벨
