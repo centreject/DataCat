@@ -88,16 +88,16 @@ def main() -> None:
             failures.append(name)
 
     body, ctype = multipart("image", "door.jpg", sample_jpeg(), "image/jpeg")
-    check("vision/detect", *request(f"{base}/internal/v1/vision/detect", body, ctype), {"detections"})
+    check("vision/detect", *request(f"{base}/internal/v1/vision/detect", body, ctype), {"detections", "flags"})
     wav = sample_wav()
     body, ctype = multipart("audio", "voice.wav", wav, "audio/wav")
     check("speech/transcribe", *request(f"{base}/internal/v1/speech/transcribe", body, ctype), {"transcript"})
     text = json.dumps({"transcript": "택배 왔습니다. 문 앞에 놓고 갈게요."}).encode()
     check("language/analyze", *request(f"{base}/internal/v1/language/analyze", text, "application/json"),
-          {"summary", "purpose"})
+          {"summary", "purpose", "subtype", "flags"})
     body, ctype = multipart("audio", "voice.wav", wav, "audio/wav")
     check("audio/process", *request(f"{base}/internal/v1/audio/process", body, ctype),
-          {"transcript", "purpose", "summary"})
+          {"transcript", "purpose", "subtype", "summary", "flags"})
     code, err = request(f"{base}/internal/v1/language/analyze", b"{}", "application/json")
     check_error = code == 400 and err.get("code") == "INVALID_REQUEST"
     print(f"{'PASS' if check_error else 'FAIL'} error format: {code} {err}")
