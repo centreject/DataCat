@@ -1,5 +1,6 @@
 import json
 
+from app.language.normalize import parse_llm_output
 from app.language.purposes import CATALOG
 from app.language.qwen import QwenLanguage, build_messages
 from app.schemas import Analysis
@@ -20,22 +21,29 @@ def test_build_messages_contains_all_purposes():
     system = messages[0]
     assert system["role"] == "system"
     for purpose in CATALOG.ids:
-        assert purpose in system["content"]
+        assert f"- {CATALOG.label(purpose)}:" in system["content"]
     assert "20자" in system["content"]
     assert messages[-1] == {"role": "user", "content": "택배 왔습니다"}
 
 
-def test_build_messages_few_shots_are_valid_short_json():
+def test_few_shots_use_the_compact_answer_line():
     messages = build_messages("x")
     shots = [m for m in messages[1:-1] if m["role"] == "assistant"]
     assert len(shots) == len(CATALOG.few_shots)
     purposes = set()
-    for shot in shots:
-        data = json.loads(shot["content"])
-        assert set(data) == {"summary", "purpose", "subtype"}
-        assert len(data["summary"]) <= 20
-        purposes.add(data["purpose"])
+    for shot, source in zip(shots, CATALOG.few_shots):
+        subtype = CATALOG.label(source["purpose"], source["subtype"]) if source["subtype"] else "-"
+        assert shot["content"] == f"{CATALOG.label(source['purpose'])}|{subtype}|{source['summary']}"
+        parsed = parse_llm_output(shot["content"])
+        assert (parsed.purpose, parsed.subtype, parsed.summary) == (
+            source["purpose"], source["subtype"], source["summary"]
+        )
+        purposes.add(parsed.purpose)
     assert purposes == set(CATALOG.ids)
+
+
+def test_system_prompt_asks_for_the_compact_line():
+    assert "용건|세부 유형|요약" in build_messages("x")[0]["content"]
 
 
 def test_analyze_uses_parsed_output():

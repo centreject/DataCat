@@ -1,5 +1,4 @@
 import copy
-import json
 import threading
 from pathlib import Path
 
@@ -11,16 +10,22 @@ from app.language.rules import rule_analyze
 from app.schemas import Analysis
 
 def _system_prompt() -> str:
-    purposes = "\n".join(f"- {p['id']}: {p['name']}. {p['description']}" for p in CATALOG.purposes)
-    subtypes = "\n".join(f"- {s['id']}: {s['name']}" for s in CATALOG.get("DELIVERY").get("subtypes", []))
+    purposes = "\n".join(f"- {p['label']}: {p['name']}. {p['description']}" for p in CATALOG.purposes)
+    subtypes = "\n".join(
+        f"- {s['label']}: {s['name']}" + (f" (예: {', '.join(s['keywords'][:5])})" if s.get("keywords") else "")
+        for s in CATALOG.get("DELIVERY").get("subtypes", [])
+    )
     rules = "\n".join(f"- {r}" for r in CATALOG.rules)
-    return f"""너는 무인 현관 초인종의 접수 도우미다. 방문객이 말한 내용을 보고 JSON 한 줄만 출력한다.
-형식: {{"summary": "...", "purpose": "...", "subtype": "..." 또는 null}}
+    return f"""너는 무인 현관 초인종의 접수 도우미다. 방문객이 말한 내용을 보고 아래 형식의 한 줄만 출력한다.
+형식: 용건|세부 유형|요약
+- 용건과 세부 유형은 아래 목록의 짧은 이름을 그대로 쓴다
+- 세부 유형은 용건이 배송일 때만 쓰고, 그 외에는 - 를 쓴다
+- 예: 배송|택배|택배 문 앞 보관
 
-purpose는 아래 중 하나 (위에 있을수록 우선):
+용건은 아래 중 하나 (위에 있을수록 우선):
 {purposes}
 
-DELIVERY의 subtype은 아래 중 하나:
+배송의 세부 유형은 아래 중 하나:
 {subtypes}
 
 판단 규칙:
@@ -31,15 +36,20 @@ summary 규칙:
 - 명사형으로 끝낸다 (예: "택배 문 앞 보관", "가스 검침 방문")
 - 방문객이 말하지 않은 내용은 만들지 않는다
 
-JSON 외의 설명은 쓰지 않는다."""
+한 줄 외의 설명은 쓰지 않는다."""
 
 
 # Built from purposes.json, so the classification plan can change without touching this code.
 SYSTEM_PROMPT = _system_prompt()
-FEW_SHOTS = tuple(
-    (s["transcript"], {"summary": s["summary"], "purpose": s["purpose"], "subtype": s["subtype"]})
-    for s in CATALOG.few_shots
-)
+# Answers use the compact line 용건|세부 유형|요약 with short Korean labels: ~12 tokens instead of
+# ~30 for JSON (token generation is the slow part on a 4-bit model), and no long English codes to
+# misspell ("SOLICITAT|ION", 2026-10-04). The parser maps labels back to ids.
+def _answer_line(shot: dict) -> str:
+    subtype = CATALOG.label(shot["purpose"], shot["subtype"]) if shot["subtype"] else "-"
+    return f"{CATALOG.label(shot['purpose'])}|{subtype}|{shot['summary']}"
+
+
+FEW_SHOTS = tuple((s["transcript"], _answer_line(s)) for s in CATALOG.few_shots)
 
 
 # The first part of an utterance carries the purpose; longer input only slows the LLM down and
@@ -51,7 +61,7 @@ def build_messages(transcript: str) -> list[dict]:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for utterance, answer in FEW_SHOTS:
         messages.append({"role": "user", "content": utterance})
-        messages.append({"role": "assistant", "content": json.dumps(answer, ensure_ascii=False)})
+        messages.append({"role": "assistant", "content": answer})
     messages.append({"role": "user", "content": transcript[:MAX_TRANSCRIPT_CHARS]})
     return messages
 

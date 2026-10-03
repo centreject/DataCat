@@ -59,6 +59,43 @@ def test_rules_follow_plan_priority(transcript, purpose, subtype):
     assert (result.purpose, result.subtype) == (purpose, subtype)
 
 
+def test_every_purpose_and_subtype_has_a_unique_short_korean_label():
+    # The LLM writes these labels; long English codes got misspelled ("SOLICITAT|ION", 2026-10-04).
+    purpose_labels = [CATALOG.label(p) for p in CATALOG.ids]
+    assert len(set(purpose_labels)) == len(purpose_labels)
+    subtype_labels = [CATALOG.label("DELIVERY", s) for s in CATALOG.subtypes("DELIVERY")]
+    assert len(set(subtype_labels)) == len(subtype_labels)
+    assert all(1 <= len(label) <= 3 for label in purpose_labels + subtype_labels)
+
+
+def test_parse_korean_labels():
+    parsed = parse_llm_output("배송|음식|피자 문 앞 보관")
+    assert (parsed.purpose, parsed.subtype) == ("DELIVERY", "FOOD")
+    assert parse_llm_output("영업|-|헬스장 홍보").purpose == "SOLICITATION"
+    assert parse_llm_output("긴급|-|화재 대피 안내").purpose == "PUBLIC_EMERGENCY"
+
+
+def test_parse_compact_line():
+    # Compact answer format: ~12 tokens instead of ~30 for JSON (LLM decode is the bottleneck).
+    parsed = parse_llm_output("DELIVERY|PARCEL|쿠팡 택배 문 앞 보관")
+    assert (parsed.purpose, parsed.subtype, parsed.summary) == ("DELIVERY", "PARCEL", "쿠팡 택배 문 앞 보관")
+
+
+def test_parse_compact_line_without_subtype():
+    parsed = parse_llm_output("SERVICE_VISIT|-|가스 검침 방문")
+    assert (parsed.purpose, parsed.subtype, parsed.summary) == ("SERVICE_VISIT", None, "가스 검침 방문")
+
+
+def test_parse_compact_line_tolerates_spaces_and_trailing_text():
+    parsed = parse_llm_output(" safety_review | - | 문 파손 위협 \n설명은 생략")
+    assert (parsed.purpose, parsed.summary) == ("SAFETY_REVIEW", "문 파손 위협")
+
+
+def test_parse_compact_line_with_too_few_parts_is_none():
+    assert parse_llm_output("DELIVERY") is None
+    assert parse_llm_output("DELIVERY|PARCEL|") is None
+
+
 def test_parse_keeps_valid_delivery_subtype():
     parsed = parse_llm_output('{"summary": "치킨 도착", "purpose": "DELIVERY", "subtype": "FOOD"}')
     assert (parsed.purpose, parsed.subtype) == ("DELIVERY", "FOOD")
