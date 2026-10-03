@@ -136,8 +136,10 @@ class QwenLanguage:
     def analyze(self, transcript: str) -> Analysis:
         parsed = parse_llm_output(self.generate(build_messages(transcript)))
         if parsed is None:
-            return rule_analyze(transcript)
+            return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
         if not is_grounded(parsed.summary, transcript):
-            # Keep the LLM's purpose (98% vs 88% for rules) but never show an invented summary.
-            return Analysis(summary=truncate_summary(transcript), purpose=parsed.purpose, subtype=parsed.subtype)
+            # Keep the LLM's purpose (97% vs 81% for rules) but never show an invented summary.
+            return parsed.model_copy(
+                update={"summary": truncate_summary(transcript), "flags": ["SUMMARY_FROM_TRANSCRIPT"]}
+            )
         return parsed

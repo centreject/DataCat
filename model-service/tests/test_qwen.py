@@ -54,7 +54,7 @@ def test_analyze_uses_parsed_output():
 def test_ungrounded_summary_is_replaced_by_transcript_but_purpose_kept():
     # "어 그게" → "근처 약국 문의" leaked from a few-shot example (review 2026-09-27).
     model = ScriptedQwen('{"summary": "근처 약국 문의", "purpose": "UNKNOWN"}')
-    assert model.analyze("어 그게") == Analysis(summary="어 그게", purpose="UNKNOWN")
+    assert model.analyze("어 그게") == Analysis(summary="어 그게", purpose="UNKNOWN", flags=["SUMMARY_FROM_TRANSCRIPT"])
 
 
 def test_grounded_summary_is_kept():
@@ -71,4 +71,6 @@ def test_long_transcript_is_capped_for_the_llm():
 
 def test_analyze_falls_back_to_rules_on_garbage():
     model = ScriptedQwen("죄송하지만 이해하지 못했습니다")
-    assert model.analyze("가스 검침 왔습니다") == Analysis(summary="가스 검침 왔습니다", purpose="SERVICE_VISIT")
+    assert model.analyze("가스 검침 왔습니다") == Analysis(
+        summary="가스 검침 왔습니다", purpose="SERVICE_VISIT", flags=["RULES_FALLBACK"]
+    )

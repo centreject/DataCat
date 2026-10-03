@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from app.config import Settings
-from app.language.normalize import PURPOSES, is_grounded, parse_llm_output, truncate_summary
+from app.language.normalize import PURPOSES
 from app.language.rules import rule_analyze
 from eval.metrics import TARGETS, group_recall, per_class_scores, subtype_accuracy, verdict
 
@@ -33,24 +33,19 @@ def main() -> None:
         name, fallbacks = "rules", 0
         results = [rule_analyze(c["transcript"]) for c in cases]
     else:
-        from app.language.qwen import QwenLanguage, build_messages
+        from app.language.qwen import QwenLanguage
 
         settings = Settings()
         qwen = QwenLanguage(settings)
         name, fallbacks, results = f"{settings.llm_model} ({settings.model_profile})", 0, []
         for c in cases:
+            # The production path; flags say whether rules or the transcript stood in.
             start = time.perf_counter()
-            raw = qwen.generate(build_messages(c["transcript"]))
+            result = qwen.analyze(c["transcript"])
             elapsed_ms.append((time.perf_counter() - start) * 1000)
-            parsed = parse_llm_output(raw)
-            fallbacks += parsed is None
-            if parsed is None:
-                result = rule_analyze(c["transcript"])
-            elif not is_grounded(parsed.summary, c["transcript"]):
-                ungrounded.append(f"{c['id']}: \"{c['transcript']}\" → \"{parsed.summary}\"")
-                result = parsed.model_copy(update={"summary": truncate_summary(c["transcript"])})
-            else:
-                result = parsed
+            fallbacks += "RULES_FALLBACK" in result.flags
+            if "SUMMARY_FROM_TRANSCRIPT" in result.flags:
+                ungrounded.append(f"{c['id']}: \"{c['transcript']}\"")
             results.append(result)
 
     gold = [c["purpose"] for c in cases]
@@ -77,7 +72,7 @@ def main() -> None:
     print(f"LLM 출력 파싱 실패로 규칙 사용: {fallbacks}건")
     if elapsed_ms:
         elapsed_ms.sort()
-        print(f"LLM 생성 시간: 중앙값 {elapsed_ms[len(elapsed_ms) // 2]:.0f}ms, 최대 {elapsed_ms[-1]:.0f}ms")
+        print(f"LLM 처리 시간: 중앙값 {elapsed_ms[len(elapsed_ms) // 2]:.0f}ms, 최대 {elapsed_ms[-1]:.0f}ms")
     print(f"말하지 않은 내용이라 요약을 전사문으로 바꿈: {len(ungrounded)}건")
     for line in ungrounded:
         print(f"- {line}")

@@ -139,13 +139,15 @@ def test_rules_summary_is_truncated_transcript():
 
 def test_empty_transcript_skips_model():
     model = FakeLanguage(error=AssertionError("must not be called"))
-    assert analyze_transcript(model, "  ") == Analysis(summary="", purpose="UNKNOWN")
+    assert analyze_transcript(model, "  ") == Analysis(summary="", purpose="UNKNOWN", flags=["NO_SPEECH"])
     assert model.calls == 0
 
 
 def test_model_exception_falls_back_to_rules():
     model = FakeLanguage(error=RuntimeError("CUDA OOM"))
-    assert analyze_transcript(model, "택배 왔어요") == Analysis(summary="택배 왔어요", purpose="DELIVERY", subtype="PARCEL")
+    assert analyze_transcript(model, "택배 왔어요") == Analysis(
+        summary="택배 왔어요", purpose="DELIVERY", subtype="PARCEL", flags=["RULES_FALLBACK"]
+    )
 
 
 def test_model_result_is_used():
@@ -160,17 +162,19 @@ def test_analyze_route_contract():
     with ready_client(language=model) as client:
         response = client.post(URL, json={"transcript": "택배 문 앞에 두고 갑니다"})
     assert response.status_code == 200
-    assert response.json() == {"summary": "택배 문 앞 보관", "purpose": "DELIVERY", "subtype": "PARCEL"}
+    assert response.json() == {"summary": "택배 문 앞 보관", "purpose": "DELIVERY", "subtype": "PARCEL", "flags": []}
 
 
 def test_analyze_route_uses_rules_when_llm_failed_to_load():
     with ready_client(language=None) as client:
         response = client.post(URL, json={"transcript": "택배 왔어요"})
     assert response.status_code == 200
-    assert response.json() == {"summary": "택배 왔어요", "purpose": "DELIVERY", "subtype": "PARCEL"}
+    assert response.json() == {
+        "summary": "택배 왔어요", "purpose": "DELIVERY", "subtype": "PARCEL", "flags": ["RULES_FALLBACK"]
+    }
 
 
 def test_analyze_route_empty_transcript():
     with ready_client(language=FakeLanguage(error=AssertionError())) as client:
         response = client.post(URL, json={"transcript": ""})
-    assert response.json() == {"summary": "", "purpose": "UNKNOWN", "subtype": None}
+    assert response.json() == {"summary": "", "purpose": "UNKNOWN", "subtype": None, "flags": ["NO_SPEECH"]}

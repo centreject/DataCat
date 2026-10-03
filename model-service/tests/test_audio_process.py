@@ -43,6 +43,7 @@ def test_process_audio_contract():
         "purpose": "DELIVERY",
         "subtype": "PARCEL",
         "summary": "택배 문 앞 보관",
+        "flags": [],
     }
 
 
@@ -59,7 +60,9 @@ def test_process_audio_silence():
     lm = FakeLanguage(Analysis(summary="should not be used", purpose="PERSONAL_VISIT"))
     with ready_client(stt=FakeSpeech(""), language=lm) as client:
         response = post_audio(client, tone_wav(1))
-    assert response.json() == {"transcript": "", "purpose": "UNKNOWN", "subtype": None, "summary": ""}
+    assert response.json() == {
+        "transcript": "", "purpose": "UNKNOWN", "subtype": None, "summary": "", "flags": ["NO_SPEECH"]
+    }
 
 
 @pytest.fixture
@@ -145,7 +148,11 @@ def test_process_audio_uses_rules_when_llm_failed_to_load():
         response = post_audio(client, tone_wav(1))
     assert response.status_code == 200
     assert response.json() == {
-        "transcript": "택배 왔습니다", "purpose": "DELIVERY", "subtype": "PARCEL", "summary": "택배 왔습니다"
+        "transcript": "택배 왔습니다",
+        "purpose": "DELIVERY",
+        "subtype": "PARCEL",
+        "summary": "택배 왔습니다",
+        "flags": ["RULES_FALLBACK"],
     }
 
 

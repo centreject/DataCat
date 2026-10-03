@@ -120,7 +120,9 @@ def test_empty_transcript_is_unknown():
         def analyze(self, transcript):
             raise AssertionError
 
-    assert analyze_transcript(NeverCalled(), " ") == Analysis(summary="", purpose="UNKNOWN", subtype=None)
+    assert analyze_transcript(NeverCalled(), " ") == Analysis(
+        summary="", purpose="UNKNOWN", subtype=None, flags=["NO_SPEECH"]
+    )
 
 
 def test_analysis_rejects_values_outside_the_catalog():
