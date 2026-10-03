@@ -48,7 +48,9 @@ def test_system_prompt_asks_for_the_compact_line():
 
 def test_analyze_uses_parsed_output():
     model = ScriptedQwen('{"summary": "택배 문 앞 보관", "purpose": "DELIVERY", "subtype": "PARCEL"}')
-    assert model.analyze("택배 두고 가요") == Analysis(summary="택배 문 앞 보관", purpose="DELIVERY", subtype="PARCEL")
+    assert model.analyze("택배 왔어요, 문 앞에 두고 가요") == Analysis(
+        summary="택배 문 앞 보관", purpose="DELIVERY", subtype="PARCEL"
+    )
 
 
 def test_ungrounded_summary_is_replaced_by_transcript_but_purpose_kept():

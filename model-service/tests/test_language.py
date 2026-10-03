@@ -59,8 +59,9 @@ def test_parse_empty_summary_none():
     assert parse_llm_output('{"summary": " ", "purpose": "PERSONAL_VISIT"}') is None
 
 
-def test_parse_unknown_purpose_is_etc():
-    assert parse_llm_output('{"summary": "음식 배달", "purpose": "FOOD"}').purpose == "UNKNOWN"
+def test_parse_unknown_purpose_is_none():
+    # R3: an unrecognised purpose goes to the keyword rules (with RULES_FALLBACK), not silently UNKNOWN.
+    assert parse_llm_output('{"summary": "음식 배달", "purpose": "FOOD"}') is None
 
 
 def test_parse_lowercase_purpose():

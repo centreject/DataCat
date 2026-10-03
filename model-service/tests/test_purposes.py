@@ -10,7 +10,7 @@ from app.pipeline import analyze_transcript
 from app.schemas import Analysis
 
 PLAN_ORDER = [
-    "PUBLIC_EMERGENCY", "SAFETY_REVIEW", "WRONG_VISIT", "PICKUP", "DELIVERY",
+    "PUBLIC_EMERGENCY", "SAFETY_REVIEW", "PICKUP", "WRONG_VISIT", "DELIVERY",
     "SERVICE_VISIT", "PERSONAL_VISIT", "SOLICITATION", "UNKNOWN",
 ]
 
@@ -111,8 +111,8 @@ def test_parse_drops_subtype_for_other_purposes():
     assert parsed.subtype is None
 
 
-def test_parse_unknown_purpose_is_default():
-    assert parse_llm_output('{"summary": "음식", "purpose": "ETC"}').purpose == "UNKNOWN"
+def test_parse_old_purpose_code_is_not_accepted():
+    assert parse_llm_output('{"summary": "음식", "purpose": "ETC"}') is None
 
 
 def test_empty_transcript_is_unknown():

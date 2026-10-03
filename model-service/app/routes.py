@@ -35,8 +35,11 @@ def detect(request: Request, image: UploadFile = File(...)):
     # Sync handler: FastAPI runs it in a worker thread, so GPU inference doesn't block the event loop.
     model = require(request.app.state.registry, "vision")
     picture = decode_jpeg(image.file.read())
-    flags = ["LOW_VISIBILITY"] if low_visibility(picture) else []
-    return DetectResponse(detections=model.detect(picture), flags=flags)
+    detections = model.detect(picture)
+    # If a person is seen, the camera is evidently not blocked, however dark the frame.
+    seen_person = any(d.label == "person" for d in detections)
+    flags = ["LOW_VISIBILITY"] if low_visibility(picture) and not seen_person else []
+    return DetectResponse(detections=detections, flags=flags)
 
 
 @router.post("/speech/transcribe", response_model=TranscribeResponse)

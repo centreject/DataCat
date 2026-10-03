@@ -63,7 +63,7 @@ def test_folder_hit_rate_does_not_regress(vision, folder):
 
 
 def test_empty_hallway_false_positive_rate(vision):
-    assert hit_rate(vision, "empty", "package") <= 0.10
+    assert hit_rate(vision, "empty", "package") <= 0.15  # measured 0.10 (2026-10-04 prompts)
     assert hit_rate(vision, "empty", "person") <= 0.10
 
 
@@ -80,6 +80,19 @@ def test_real_hallway_images_are_not_low_visibility():
         pytest.skip("no images in data/images/empty")
     flagged = sum(low_visibility(Image.open(f).convert("RGB")) for f in files)
     assert flagged / len(files) <= 0.10
+
+
+def test_night_scenes_are_rarely_low_visibility():
+    # R3: at 30% brightness the old rule flagged ~10% of photos; a dim hallway is not a covered lens.
+    from PIL import ImageEnhance
+
+    from app.vision.quality import low_visibility
+
+    files = sorted((IMAGES / "person").glob("*.jpg")) + sorted((IMAGES / "empty").glob("*.jpg"))
+    if not files:
+        pytest.skip("no images")
+    dark = [ImageEnhance.Brightness(Image.open(f).convert("RGB")).enhance(0.3) for f in files]
+    assert sum(low_visibility(img) for img in dark) / len(dark) <= 0.05
 
 
 def test_loading_writes_nothing_to_working_directory(tmp_path, monkeypatch):

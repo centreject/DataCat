@@ -75,8 +75,19 @@ def test_qwen_plan_rules_on_held_out_sentences(qwen, transcript, purpose, subtyp
 def test_prefix_cache_gives_the_same_answer(qwen, transcript):
     from app.language.qwen import build_messages
 
+    from app.language.normalize import parse_llm_output
+
+    # Compare the decision, not the exact wording: 4-bit kernels can drift by a word between
+    # input lengths (R3 review saw "문의 내용 없음" vs "문의 없음").
     messages = build_messages(transcript)
-    assert qwen.generate(messages) == qwen.generate(messages, use_prefix_cache=False)
+    cached = parse_llm_output(qwen.generate(messages))
+    uncached = parse_llm_output(qwen.generate(messages, use_prefix_cache=False))
+    assert (cached.purpose, cached.subtype) == (uncached.purpose, uncached.subtype)
+
+
+def test_summary_does_not_invent_a_place(qwen):
+    # R3: "법원 등기 우편 왔습니다" was summarised as "...문 앞 보관" — never said.
+    assert "문 앞" not in qwen.analyze("법원 등기 우편 왔습니다").summary
 
 
 def test_qwen_visit(qwen):
