@@ -12,6 +12,11 @@
 - [ ] 팀원들께 사진 요청: 배달 음식 봉지·용기, 보냉백(프레시백) — 문 앞 바닥에 놓인 모습, 얼굴 없이
 - [ ] 시연 PC(3090) 관리자: Task 9·10 끝나면 `bench/benchmark.py --profile full`, `eval/*` 실행 요청
 - [ ] Phase 2 초반: 인태님·덕민님께 `facingCamera`/`bbox` 선택 필드 제안 (떠나는 택배 기사 대응)
+- [ ] **덕민님 — compose의 모델 서비스 블록 (app-design 브랜치 `datacat-stack/docker-compose.yml`, 2026-10-04 확인)**
+  - 서비스 이름이 `model`(Spring 주소 `http://model:8000`)인데 모델 README는 `model-service`로 안내 → 하나로 합의 (모델 쪽은 어느 이름이든 동작, 문서만 맞추면 됨)
+  - 주석 처리된 healthcheck가 `curl`을 쓰는데 모델 이미지에는 curl이 없어 항상 실패 → healthcheck 줄을 빼면 이미지에 들어 있는 healthcheck(`/health`가 ok·degraded면 정상)가 쓰임
+  - 첫 실행은 가중치 약 10GB 다운로드 → `start_period`를 길게(3600s)
+- [ ] **앱 분류 필드와 모델 출력 연결 (G6 명세 v1.5에 반영)**: 앱은 `mainCategory`/`subCategory`를 우선 표시하고 코드(`DELIVERY` 등)도 받음 → 모델 `purpose` 9개 코드가 그대로 `mainCategory` 코드로 쓰일 수 있음. 목업 API는 아직 옛 값(`INSPECTION`/`VISIT`/`ETC`)
 - [ ] **Phase 1+2 PR** (`feature/ai-model` → main) — C2(택배 대체 규칙) 합의 후. 본문은 [초안 3](#초안-3-phase-12-pr)
 
 ---
