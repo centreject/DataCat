@@ -4,6 +4,7 @@ on eval/purpose_cases.jsonl (labels follow app/language/purposes.json).
 Usage (from model-service/):
   python -m eval.eval_language --rules-only     # keyword fallback only, no GPU
   python -m eval.eval_language                  # real LLM (MODEL_PROFILE picks lite/full)
+  python -m eval.eval_language --audio tts_snr10   # end to end: data/audio/<folder>/<id>.wav → STT → LLM
 """
 
 import argparse
@@ -24,9 +25,19 @@ CASES = Path(__file__).resolve().parent / "purpose_cases.jsonl"
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--rules-only", action="store_true")
+    parser.add_argument("--audio", help="transcribe data/audio/<folder>/<id>.wav first (end-to-end)")
     args = parser.parse_args()
 
     cases = [json.loads(line) for line in CASES.read_text().splitlines() if line.strip()]
+    if args.audio:
+        from app.config import DATA_DIR
+        from app.media import decode_wav
+        from app.speech.whisper import WhisperSpeech
+
+        stt = WhisperSpeech(Settings())
+        folder = DATA_DIR / "audio" / args.audio
+        for c in cases:
+            c["transcript"] = stt.transcribe(decode_wav((folder / f"{c['id']}.wav").read_bytes()))
     ungrounded: list[str] = []
     elapsed_ms: list[float] = []
     if args.rules_only:
@@ -55,7 +66,8 @@ def main() -> None:
     critical = group_recall(gold, pred, CRITICAL)
     subtypes = subtype_accuracy([(c["purpose"], c.get("subtype")) for c in cases], [(r.purpose, r.subtype) for r in results])
 
-    print(f"## 용건 분류 — {name}, {len(cases)}건\n")
+    source = f"음성 {args.audio} → STT → " if args.audio else ""
+    print(f"## 용건 분류 — {source}{name}, {len(cases)}건\n")
     print("| 용건 | 정밀도 | 재현율 |\n|---|---:|---:|")
     for label, (p, r) in per_class_scores(gold, pred, list(PURPOSES)).items():
         print(f"| {label} | {p:.0%} | {r:.0%} |")
