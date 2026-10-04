@@ -1,5 +1,7 @@
 """Metrics shared by the eval scripts, plus the plan's accuracy targets (full profile, provisional)."""
 
+import re
+
 TARGETS = {
     "person_recall": 0.95,
     "package_recall": 0.85,
@@ -10,7 +12,16 @@ TARGETS = {
     "critical_recall": 0.95,
     "subtype_accuracy": 0.80,
     "summary_over_20_max": 0.0,
+    # Summaries read as a noun phrase ("택배 문 앞 보관"), not a copied sentence (decided 2026-10-04).
+    "summary_noun_style_min": 0.90,
 }
+
+# Sentence endings that mark a copied utterance rather than a noun phrase ("놓고 갈게요", "왔습니다").
+_SENTENCE_END = re.compile(r"(요|니다|다|까|죠|네)[.!?…~]*$")
+
+
+def noun_style(summary: str) -> bool:
+    return bool(summary.strip()) and not _SENTENCE_END.search(summary.strip())
 
 
 def _edit_distance(a: str, b: str) -> int:

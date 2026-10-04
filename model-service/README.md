@@ -27,12 +27,14 @@ docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model
 
 8GB(RTX 3060 Ti)에서 VRAM을 약 6.2GB 쓰고, 음성 처리 전체 p95는 1.49초다(2026-10-04). `full`은 3090에서 아직 재지 않았으므로 시연도 측정 전까지 `lite`로 돌린다.
 
-### docker-compose 예시 (인태님 루트 compose에 넣을 블록)
+### docker-compose 예시 (덕민님 `datacat-stack/docker-compose.yml`의 `model` 블록 자리)
+
+서비스 이름은 그 compose에 맞춰 `model`. healthcheck는 이미지에 들어 있으니 따로 쓰지 않는다(이미지에 `curl` 없음).
 
 ```yaml
 services:
-  model-service:
-    build: ./model-service
+  model:
+    build: ../model-service      # GPU 없는 PC: build: {context: ../model-service, dockerfile: Dockerfile.mock}
     environment:
       MODEL_PROFILE: lite        # 시연 PC는 full
     volumes:
@@ -50,7 +52,7 @@ volumes:
   datacat-models:
 ```
 
-Spring에서는 `http://model-service:8000/internal/v1/...`로 부른다. Spring 컨테이너는 `depends_on: model-service: condition: service_healthy`로 모델 준비를 기다릴 수 있다.
+Spring에서는 `http://model:8000/internal/v1/...`로 부른다(compose의 `MODEL_SERVICE_URL`). Spring 컨테이너는 `depends_on: model: condition: service_healthy`로 모델 준비를 기다릴 수 있다.
 
 ## 가짜 모델 서버 (GPU 없이 연동 테스트)
 

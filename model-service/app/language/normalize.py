@@ -13,7 +13,38 @@ _WORD = re.compile(r"[가-힣A-Za-z0-9]+")
 GENERIC_WORDS = {
     "보관", "방문", "문의", "요청", "확인", "전달", "안내", "도착", "접수", "권유", "수거", "배송",
     "배달", "위협", "물품", "물건", "반납", "착오", "홍보", "예약", "알림",
+    # 2026-10-04: noun endings the prompt asks for ("설문조사 진행", "엘리베이터 위치 문의").
+    "진행", "위치", "예정",
 }
+
+
+_HANGUL_BASE, _JONG_COUNT, _MIEUM = 0xAC00, 28, 16
+_PREDICATE_ENDINGS = ("하기", "세요", "기", "음", "다", "요")
+# Contracted vowels: 주어→줘, 놓아→놨, 두어→둬 (medial indices: ㅗ→ㅘ, ㅜ→ㅝ, ㅣ→ㅕ, ㅡ→ㅓ).
+_VOWEL_CONTRACTIONS = {8: 9, 13: 14, 20: 6, 18: 4}
+
+
+def _any_final(ch: str) -> str:
+    """Regex class: the syllable with any final consonant, also in its contracted-vowel form."""
+    code = ord(ch) - _HANGUL_BASE
+    if not 0 <= code < 11172:
+        return re.escape(ch)
+    initial, medial = divmod(code // _JONG_COUNT, 21)
+    bases = [medial] + ([_VOWEL_CONTRACTIONS[medial]] if medial in _VOWEL_CONTRACTIONS else [])
+    starts = [_HANGUL_BASE + (initial * 21 + m) * _JONG_COUNT for m in bases]
+    return "[" + "".join(f"{chr(s)}-{chr(s + _JONG_COUNT - 1)}" for s in starts) + "]"
+
+
+def _predicate_said(word: str, spoken: str) -> bool:
+    """The summary's closing predicate was said in another inflection: 둠←둘게요, 놓음←놨어요,
+    주기←줘, 간다←갈게요. Only the stem is compared, its last syllable ignoring the final consonant."""
+    stem = next((word[: -len(e)] for e in _PREDICATE_ENDINGS if word.endswith(e) and len(word) > len(e)), None)
+    if stem is None:
+        code = ord(word[-1]) - _HANGUL_BASE
+        if not (0 <= code < 11172 and code % _JONG_COUNT == _MIEUM):
+            return False
+        stem = word[:-1] + chr(ord(word[-1]) - _MIEUM)  # nominal -ㅁ: 둠 → 두
+    return re.search(re.escape(stem[:-1]) + _any_final(stem[-1]), spoken) is not None
 
 
 def is_grounded(summary: str, transcript: str) -> bool:
@@ -22,12 +53,20 @@ def is_grounded(summary: str, transcript: str) -> bool:
 
     Catches few-shot copies and inventions: "어 그게" → "근처 약국 문의", and "1192호 택배요" →
     "택배 문 앞 보관" (R3 review: "문 앞" was never said). A word also counts when its stem without
-    the last syllable was said (맡김 ← 맡겨, 눌렀음 ← 눌렀어요).
+    the last syllable was said (맡김 ← 맡겨, 눌렀음 ← 눌렀어요). The last word, where a noun-style
+    summary puts its predicate, may differ in inflection (_predicate_said); places and objects come
+    earlier and must match as said.
     """
     spoken = re.sub(r"\s+", "", transcript)
-    specific = [w for w in _WORD.findall(summary) if w not in GENERIC_WORDS]
-    said = lambda w: w in spoken or (len(w) >= 2 and w[:-1] in spoken)  # noqa: E731
-    return bool(specific) and all(said(w) for w in specific)
+    words = _WORD.findall(summary)
+    specific = [(i, w) for i, w in enumerate(words) if w not in GENERIC_WORDS]
+
+    def said(i: int, w: str) -> bool:
+        if w in spoken or (len(w) >= 2 and w[:-1] in spoken):
+            return True
+        return i == len(words) - 1 and _predicate_said(w, spoken)
+
+    return bool(specific) and all(said(i, w) for i, w in specific)
 
 
 def truncate_summary(s: str, limit: int = SUMMARY_LIMIT) -> str:

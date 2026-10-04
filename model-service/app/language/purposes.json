@@ -325,6 +325,12 @@
       "subtype": "FOOD"
     },
     {
+      "transcript": "생수 주문하신 거 왔어요.",
+      "summary": "생수 도착",
+      "purpose": "DELIVERY",
+      "subtype": "GROCERY"
+    },
+    {
       "transcript": "수도 검침 나왔습니다.",
       "summary": "수도 검침 방문",
       "purpose": "SERVICE_VISIT",

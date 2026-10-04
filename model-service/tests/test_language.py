@@ -90,6 +90,18 @@ def test_parse_summary_only_cjk_is_none():
         ("가스 검침 방문", "가스 검침하러 왔습니다.", True),
         ("근처 약국 문의", "어 그게", False),
         ("이웃 방문", "누나", False),
+        # The closing predicate may differ in inflection (2026-10-04, noun-style summaries).
+        ("대한통운 박스 문 옆 세워 둠", "대한통운이에요, 박스가 커서 문 옆에 세워 둘게요.", True),
+        ("한진택배 박스 문 옆 놓음", "한진택배입니다. 박스 두 개 문 옆에 놨어요.", True),
+        ("민수 전화 주기", "나 민수야, 근처 왔다가 들렀어. 전화 좀 줘.", True),
+        ("교회 말씀 나누기", "교회에서 나왔는데 잠깐 말씀 좀 나눌 수 있을까요?", True),
+        ("전단지 붙이고 간다", "전단지 좀 붙이고 갈게요.", True),
+        ("연락 안 돼서 왔음", "연락이 안 돼서 걱정돼서 와 봤어.", True),
+        # ...but places and objects still have to be said, and only the last word is loosened.
+        ("소포 문 앞 보관", "소포 하나 왔습니다.", False),
+        ("문 부숴버리겠다는 위협", "빨리 나와. 박살 내기 전에.", False),
+        ("여기요 문의", "음… 저기요.", False),
+        ("전기 점검", "저기요, 점검 나왔어요.", False),
     ],
 )
 def test_is_grounded(summary, transcript, grounded):

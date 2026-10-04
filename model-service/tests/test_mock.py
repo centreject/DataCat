@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -80,7 +81,7 @@ def test_mock_starts_without_ml_libraries():
         "app = create_app()\nwith TestClient(app) as c:\n    app.state.loader.join(5)\n"
         "assert not {'torch', 'ultralytics', 'transformers', 'faster_whisper'} & set(sys.modules)\n"
     )
-    subprocess.run([sys.executable, "-c", code], check=True)
+    subprocess.run([sys.executable, "-c", code], check=True, cwd=Path(__file__).resolve().parent.parent)
 
 
 def test_api_docs_are_up_to_date():

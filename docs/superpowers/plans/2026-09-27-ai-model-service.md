@@ -1,5 +1,7 @@
 # AI 모델 서비스 Implementation Plan
 
+> **보관됨 (2026-10-04):** 이 계획의 태스크는 모두 끝났다. 이후 진행 현황은 [`model-service/PROGRESS.md`](../../../model-service/PROGRESS.md), 정확도 기록은 [`model-service/eval/README.md`](../../../model-service/eval/README.md), 팀 협의는 [`model-service/docs/team-coordination.md`](../../../model-service/docs/team-coordination.md)만 갱신한다. 아래는 당시 기록으로 남겨 둔다(API v1.3·용건 4개 기준).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Spring이 호출하는 내부 모델 서비스(이미지 인식 · STT · 요약/용건 분류)를 API v1.3 계약대로 구현하고, 8GB VRAM(lite)과 24GB(full) 양쪽에서 돌아가게 한다.

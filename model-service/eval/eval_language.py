@@ -5,6 +5,7 @@ Usage (from model-service/):
   python -m eval.eval_language --rules-only     # keyword fallback only, no GPU
   python -m eval.eval_language                  # real LLM (MODEL_PROFILE picks lite/full)
   python -m eval.eval_language --audio tts_snr10   # end to end: data/audio/<folder>/<id>.wav → STT → LLM
+  python -m eval.eval_language --cases heldout     # held-out set: milestones only, never tune on it
 """
 
 import argparse
@@ -15,20 +16,24 @@ from pathlib import Path
 from app.config import Settings
 from app.language.normalize import PURPOSES
 from app.language.rules import rule_analyze
-from eval.metrics import TARGETS, group_recall, per_class_scores, subtype_accuracy, verdict
+from eval.metrics import TARGETS, group_recall, noun_style, per_class_scores, subtype_accuracy, verdict
 
 CRITICAL = {"PUBLIC_EMERGENCY", "SAFETY_REVIEW"}
 
-CASES = Path(__file__).resolve().parent / "purpose_cases.jsonl"
+EVAL = Path(__file__).resolve().parent
+# dev: tune prompts and rules on it. heldout: sentences from the classification plan and the app
+# mock data, measured only at milestones so the numbers stay honest (decided 2026-10-04).
+CASE_FILES = {"dev": EVAL / "purpose_cases.jsonl", "heldout": EVAL / "heldout_cases.jsonl"}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--rules-only", action="store_true")
     parser.add_argument("--audio", help="transcribe data/audio/<folder>/<id>.wav first (end-to-end)")
+    parser.add_argument("--cases", choices=CASE_FILES, default="dev")
     args = parser.parse_args()
 
-    cases = [json.loads(line) for line in CASES.read_text().splitlines() if line.strip()]
+    cases = [json.loads(line) for line in CASE_FILES[args.cases].read_text("utf-8").splitlines() if line.strip()]
     if args.audio:
         from app.config import DATA_DIR
         from app.media import decode_wav
@@ -63,11 +68,13 @@ def main() -> None:
     pred = [r.purpose for r in results]
     accuracy = sum(g == p for g, p in zip(gold, pred)) / len(cases)
     over_20 = sum(len(r.summary) > 20 for r in results) / len(cases)
+    spoken = [r for r in results if r.summary]
+    nouns = sum(noun_style(r.summary) for r in spoken) / max(len(spoken), 1)
     critical = group_recall(gold, pred, CRITICAL)
     subtypes = subtype_accuracy([(c["purpose"], c.get("subtype")) for c in cases], [(r.purpose, r.subtype) for r in results])
 
     source = f"음성 {args.audio} → STT → " if args.audio else ""
-    print(f"## 용건 분류 — {source}{name}, {len(cases)}건\n")
+    print(f"## 용건 분류 — {source}{name}, {args.cases} {len(cases)}건\n")
     print("| 용건 | 정밀도 | 재현율 |\n|---|---:|---:|")
     for label, (p, r) in per_class_scores(gold, pred, list(PURPOSES)).items():
         print(f"| {label} | {p:.0%} | {r:.0%} |")
@@ -81,6 +88,10 @@ def main() -> None:
     print(f"긴급·위협 재현율 {critical:.0%} (목표 ≥ {TARGETS['critical_recall']:.0%}) → {verdict(critical >= TARGETS['critical_recall'])}")
     print(f"배송 세부 유형 정확도 {subtypes:.0%} (목표 ≥ {TARGETS['subtype_accuracy']:.0%}) → {verdict(subtypes >= TARGETS['subtype_accuracy'])}")
     print(f"요약 20자 초과 {over_20:.0%} (목표 0%) → {verdict(over_20 <= TARGETS['summary_over_20_max'])}")
+    print(f"요약 명사형 {nouns:.0%} (목표 ≥ {TARGETS['summary_noun_style_min']:.0%}) → {verdict(nouns >= TARGETS['summary_noun_style_min'])}")
+    for c, r in zip(cases, results):
+        if r.summary and not noun_style(r.summary):
+            print(f"  - {c['id']}: \"{r.summary}\"")
     print(f"LLM 출력 파싱 실패로 규칙 사용: {fallbacks}건")
     if elapsed_ms:
         elapsed_ms.sort()

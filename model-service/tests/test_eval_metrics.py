@@ -1,6 +1,29 @@
 import pytest
 
-from eval.metrics import cer, group_recall, per_class_scores, subtype_accuracy
+import json
+from pathlib import Path
+
+from eval.metrics import cer, group_recall, noun_style, per_class_scores, subtype_accuracy
+
+EVAL = Path(__file__).resolve().parent.parent / "eval"
+
+
+def test_noun_style_rejects_copied_sentences():
+    assert noun_style("택배 문 앞 보관") and noun_style("윗집 잘못 눌렀음") and noun_style("문 부순다는 위협")
+    assert not noun_style("택배 문 앞 놓고 갈게요") and not noun_style("가스 점검 나왔습니다.")
+    assert not noun_style("")
+
+
+def test_heldout_set_does_not_overlap_dev_set_or_few_shots():
+    from app.language.purposes import CATALOG
+
+    def transcripts(name):
+        return [json.loads(line)["transcript"] for line in (EVAL / name).read_text("utf-8").splitlines() if line.strip()]
+
+    heldout = transcripts("heldout_cases.jsonl")
+    assert len(heldout) == len(set(heldout))
+    taken = set(transcripts("purpose_cases.jsonl")) | {s["transcript"] for s in CATALOG.few_shots}
+    assert not taken & set(heldout)
 
 
 def test_cer_identical_is_zero():
