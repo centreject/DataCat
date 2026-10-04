@@ -32,6 +32,8 @@ services:
   api:
     build: ./mock-api
     image: datacat/mock-api:local
+    environment:
+      MOCK_AUTO_VISIT_SECONDS: ${MOCK_AUTO_VISIT_SECONDS:-180}   # 시연용 새 방문 간격(초). 0 이면 끔
     ports:
       - "${API_PORT:-8080}:8080"      # Pi 가 직접 붙을 수 있게 열어 둔다
     healthcheck:

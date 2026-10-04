@@ -9,9 +9,14 @@
   GET  /api/v1/presets                   프리셋 (10.1)
   POST /api/v1/push-tokens               푸시 토큰 등록 (11.1) — 받기만 함
   GET  /health                           상태 확인
+  POST /api/v1/_mock/visits              (시연용) 방금 새 방문이 온 것처럼 하나 추가
+
+환경변수 MOCK_AUTO_VISIT_SECONDS (기본 180): 이 간격마다 새 방문이 저절로 하나씩 생긴다.
+앱의 자동 새로고침(15초)과 "새 방문" 알림을 시연하기 위한 것. 0 이면 끈다.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
@@ -76,9 +81,59 @@ _SEED: list[tuple[int, object, int, dict]] = [
 ]
 
 
+# ── 시연용 새 방문 ──────────────────────────────────────────
+_ARRIVALS: list[dict] = [
+    dict(triggerType="BUTTON", eventType="VISITOR_ACCEPTED", purpose="DELIVERY", summary="택배 문 앞 보관",
+         transcript="CJ대한통운입니다. 택배 문 앞에 두고 갈게요.", mainCategory="배송", subCategory="택배",
+         responsePolicy="일반 접수", reason="택배사 이름과 문 앞 보관 표현", _stay=19),
+    dict(triggerType="TOF", eventType="UNATTENDED_DELIVERY", mainCategory="물품만 있음", subCategory="음식 배달",
+         responsePolicy="무응답", reason="사람 없음 + 음식 봉투 감지", _stay=3),
+    dict(triggerType="BUTTON", eventType="VISITOR_ACCEPTED", purpose="VISIT", summary="이웃 302호, 소음 문의",
+         transcript="302호인데요, 저녁에 공사 소리가 나서 언제까지인지 여쭤보려고 왔어요.",
+         mainCategory="개인 방문", subCategory="이웃", responsePolicy="일반 접수", reason="같은 동 주민임을 밝힘", _stay=24),
+    dict(triggerType="BUTTON", eventType="VISITOR_ACCEPTED", purpose="INSPECTION", summary="아래층 누수, 긴급 점검 요청",
+         transcript="관리사무소입니다. 아래층 천장에서 물이 새서 급하게 확인이 필요합니다. 연락 부탁드려요.",
+         mainCategory="공공·긴급 방문", subCategory="긴급 상황", responsePolicy="긴급 알림",
+         reason="누수와 긴급 확인 요청을 명확히 언급", needsReview=True, _stay=31),
+]
+_AUTO_SECONDS = int(os.environ.get("MOCK_AUTO_VISIT_SECONDS", "180"))
+_extra: list[dict] = []
+_next_id = 200
+_next_auto = datetime.now(KST) + timedelta(seconds=_AUTO_SECONDS) if _AUTO_SECONDS > 0 else None
+
+
+def _add_visit(at: datetime) -> dict:
+    global _next_id
+    tpl = dict(_ARRIVALS[(_next_id - 200) % len(_ARRIVALS)])
+    stay = tpl.pop("_stay")
+    at = at.replace(microsecond=0)
+    e = {
+        "eventId": _next_id, "deviceId": "door-01", "triggerType": "TOF", "eventType": None, "purpose": None,
+        "summary": None, "transcript": None, "status": "COMPLETED", "snapshotUrl": None,
+        "occurredAt": at.isoformat(), "endedAt": (at + timedelta(seconds=stay)).isoformat(), "needsReview": False,
+    }
+    e.update(tpl)
+    _next_id += 1
+    _extra.append(e)
+    del _extra[:-50]  # 메모리에 최대 50건만
+    return e
+
+
+def _catch_up_auto_visits() -> None:
+    """요청이 올 때 지나간 주기만큼 새 방문을 만들어 둔다 (별도 스레드 없이)."""
+    global _next_auto
+    if _next_auto is None:
+        return
+    now = datetime.now(KST)
+    while _next_auto <= now:
+        _add_visit(_next_auto)
+        _next_auto += timedelta(seconds=_AUTO_SECONDS)
+
+
 def _events() -> list[dict]:
+    _catch_up_auto_visits()
     now = datetime.now(KST).replace(microsecond=0)
-    out = []
+    out = [dict(e) for e in _extra]
     for event_id, when, stay, fields in _SEED:
         if isinstance(when, tuple):
             days, hour, minute = when
@@ -148,6 +203,11 @@ def presets():
 @app.post("/api/v1/push-tokens", status_code=201)
 def register_push_token(body: dict):
     return {"registered": True, "platform": body.get("platform")}
+
+
+@app.post("/api/v1/_mock/visits", status_code=201)
+def mock_new_visit():
+    return _add_visit(datetime.now(KST))
 
 
 @app.get("/health")
