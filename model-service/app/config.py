@@ -9,7 +9,9 @@ DATA_DIR = SERVICE_ROOT / "data"
 
 
 class Settings(BaseSettings):
-    model_profile: Literal["full", "lite"] = "lite"
+    # mock: canned answers without GPU or weights, for teammates' integration tests (app/mock.py).
+    model_profile: Literal["full", "lite", "mock"] = "lite"
+    mock_delay_ms: int = 0
     person_conf: float = 0.4
     # Tuned on the Open Images val/test subset from eval/prepare_images.py (2026-09-27),
     # measured per whole folder (prompts below): person 93%, box 83%, plastic bag 80%,

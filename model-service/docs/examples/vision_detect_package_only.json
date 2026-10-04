@@ -1,0 +1,9 @@
+{
+  "detections": [
+    {
+      "label": "package",
+      "confidence": 0.78
+    }
+  ],
+  "flags": []
+}

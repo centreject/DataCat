@@ -74,9 +74,15 @@ class UploadLimit:
 
 
 def create_app(
-    registry_factory: Callable[[Settings], ModelRegistry] = load_registry,
+    registry_factory: Callable[[Settings], ModelRegistry] | None = None,
 ) -> FastAPI:
     settings = Settings()
+    mock = settings.model_profile == "mock"
+    if registry_factory is None:
+        if mock:
+            from app.mock import load_mock_registry as registry_factory
+        else:
+            registry_factory = load_registry
 
     def load() -> None:
         try:
@@ -97,6 +103,10 @@ def create_app(
     app.state.registry = None
     app.state.load_failed = False
     install_error_handlers(app)
+    if mock:  # registered first, so its endpoints win over the real ones with the same path
+        from app.mock import mock_router
+
+        app.include_router(mock_router)
     app.include_router(router)
 
     app.add_middleware(UploadLimit)

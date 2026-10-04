@@ -1,0 +1,7 @@
+{
+  "transcript": "화재 신고 들어와서 소방서에서 나왔습니다.",
+  "purpose": "PUBLIC_EMERGENCY",
+  "subtype": null,
+  "summary": "소방서 화재 확인",
+  "flags": []
+}

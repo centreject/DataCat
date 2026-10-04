@@ -2,4 +2,5 @@
 *
 !app
 !requirements.txt
+!requirements-mock.txt
 **/__pycache__
