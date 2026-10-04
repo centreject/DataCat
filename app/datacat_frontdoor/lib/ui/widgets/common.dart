@@ -70,7 +70,7 @@ class ConnectionPill extends StatelessWidget {
                 PulseDot(color: color, animate: alive, size: 7),
                 const SizedBox(width: 2),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 170),
+                  constraints: const BoxConstraints(maxWidth: 150),
                   child: Text(
                     text,
                     maxLines: 1,

@@ -2,6 +2,8 @@ import 'package:datacat_frontdoor/app.dart';
 import 'package:datacat_frontdoor/data/demo_api.dart';
 import 'package:datacat_frontdoor/state/event_store.dart';
 import 'package:datacat_frontdoor/state/settings.dart';
+import 'package:datacat_frontdoor/ui/home_screen.dart';
+import 'package:datacat_frontdoor/ui/widgets/theme_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,7 +17,7 @@ Future<EventStore> _pumpApp(WidgetTester tester) async {
   final settings = AppSettings();
   await settings.load();
   final store = EventStore(DemoDataCatApi(latency: const Duration(milliseconds: 100)));
-  await tester.pumpWidget(DataCatApp(settings: settings, store: store));
+  await tester.pumpWidget(DataCatApp(settings: settings, store: store, autoRefresh: false));
   await tester.pump(_afterLoad);
   return store;
 }
@@ -76,5 +78,37 @@ void main() {
     // 테스트 환경에는 서버가 없으니 요청 타임아웃까지 흘려보내 타이머를 정리한다.
     await tester.pump(const Duration(seconds: 9));
     expect(store.error, isNotNull);
+  });
+
+  testWidgets('해/달 버튼: 누르면 다크로, 다시 누르면 라이트로', (tester) async {
+    await _pumpApp(tester);
+    final context = tester.element(find.byType(HomeScreen));
+    expect(Theme.of(context).brightness, Brightness.light);
+
+    await tester.tap(find.byType(ThemeToggle).first);
+    await tester.pump(); // 테마 애니메이션 시작
+    await tester.pump(const Duration(milliseconds: 600)); // 끝까지
+    expect(Theme.of(tester.element(find.byType(HomeScreen))).brightness, Brightness.dark);
+
+    await tester.tap(find.byType(ThemeToggle).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(Theme.of(tester.element(find.byType(HomeScreen))).brightness, Brightness.light);
+  });
+
+  testWidgets('새 방문이 들어오면 알림 띠가 뜨고, 닫으면 사라진다', (tester) async {
+    final store = await _pumpApp(tester);
+    final demo = store.api as DemoDataCatApi;
+
+    demo.simulateVisit();
+    store.checkForNew();
+    await tester.pump(const Duration(milliseconds: 200)); // 데모 지연(100ms) 지나기
+    await tester.pump(const Duration(milliseconds: 600)); // 알림 띠 애니메이션
+    expect(find.text('보기'), findsOneWidget);
+    expect(store.unseenIds, isNotEmpty);
+
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(store.unseenIds, isEmpty);
   });
 }
