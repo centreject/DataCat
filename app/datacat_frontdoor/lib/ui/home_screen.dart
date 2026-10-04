@@ -10,6 +10,7 @@ import 'widgets/badges.dart';
 import 'widgets/common.dart';
 import 'widgets/event_tile.dart';
 import 'widgets/snapshot_view.dart';
+import 'widgets/theme_toggle.dart';
 
 /// 첫 화면: 가장 최근 방문 한 건을 크게, 오늘 요약, 확인할 것, 최근 기록.
 class HomeScreen extends StatelessWidget {
@@ -30,7 +31,16 @@ class HomeScreen extends StatelessWidget {
           SliverSafeArea(
             bottom: false,
             sliver: SliverToBoxAdapter(
-              child: _Header(trailing: ConnectionPill(store: store, onTap: onOpenSettings)),
+              child: _Header(
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ConnectionPill(store: store, onTap: onOpenSettings),
+                    const SizedBox(width: Gap.sm),
+                    const ThemeToggle(),
+                  ],
+                ),
+              ),
             ),
           ),
         ];
@@ -134,6 +144,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   static void _open(BuildContext context, VisitEvent e) {
+    AppScope.of(context).store.markSeen(e.eventId);
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => EventDetailScreen(initial: e)),
     );

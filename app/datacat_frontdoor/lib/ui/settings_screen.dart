@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 import '../data/api.dart';
+import '../data/demo_api.dart';
 import '../data/models.dart';
 import '../state/app_scope.dart';
+import '../state/policy.dart';
+import 'policy_screen.dart';
+import 'widgets/theme_toggle.dart';
 
 /// 서버 연결, 현관 안내 문구, 개인정보 원칙.
 class SettingsScreen extends StatefulWidget {
@@ -118,10 +122,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(Gap.page, 0, Gap.page, Gap.sm),
-              child: Semantics(
-                header: true,
-                child: Text('설정', style: context.text.headlineMedium),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      header: true,
+                      child: Text('설정', style: context.text.headlineMedium),
+                    ),
+                  ),
+                  const ThemeToggle(),
+                ],
               ),
+            ),
+
+            // ── 화면 ──
+            const _GroupTitle('화면 테마'),
+            _Group(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(Gap.md),
+                  child: SegmentedButton<ThemeMode>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto_outlined, size: 18), label: Text('시스템')),
+                      ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined, size: 18), label: Text('라이트')),
+                      ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined, size: 18), label: Text('다크')),
+                    ],
+                    selected: {settings.themeMode},
+                    onSelectionChanged: (s) => settings.setThemeMode(s.first),
+                  ),
+                ),
+              ],
+            ),
+
+            // ── 정책 ──
+            const _GroupTitle('알림·응대 정책'),
+            _Group(
+              children: [
+                ListenableBuilder(
+                  listenable: scope.policy,
+                  builder: (context, _) => ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: 4),
+                    leading: Icon(Icons.rule_rounded, color: p.ink),
+                    title: const Text('부재 중 응대와 알림 받을 방문'),
+                    subtitle: Text(_policySummary(scope.policy)),
+                    trailing: Icon(Icons.chevron_right_rounded, color: p.inkFaint),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const PolicyScreen()),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             // ── 연결 ──
@@ -135,6 +186,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text('서버 없이 예시 기록으로 화면을 둘러봐요'),
                   contentPadding: const EdgeInsets.symmetric(horizontal: Gap.lg),
                 ),
+                if (api is DemoDataCatApi)
+                  ListTile(
+                    contentPadding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.md, 0),
+                    title: const Text('새 방문 시뮬레이션'),
+                    subtitle: const Text('시연용 — 방금 누가 다녀간 것처럼 기록을 하나 추가해요'),
+                    trailing: OutlinedButton(
+                      onPressed: () {
+                        api.simulateVisit();
+                        scope.store.checkForNew();
+                      },
+                      child: const Text('추가'),
+                    ),
+                  ),
                 Divider(indent: Gap.lg, endIndent: Gap.lg, color: p.line),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.md, Gap.lg, Gap.lg),
@@ -428,4 +492,18 @@ class _Footnote extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(text, style: TextStyle(fontSize: 12.5, height: 1.5, color: context.palette.inkFaint));
   }
+}
+
+
+String _policySummary(VisitPolicy p) {
+  final parts = <String>[p.reception.label];
+  final off = [
+    if (!p.notifyPackages) '물품',
+    if (!p.notifyDeliveries) '배송',
+    if (!p.notifyVisitors) '방문',
+    if (!p.notifySales) '영업',
+  ];
+  parts.add(off.isEmpty ? '모든 방문 알림' : '${off.join('·')} 알림 끔');
+  if (p.quietHoursEnabled) parts.add('방해 금지 ${p.quietStart}시~${p.quietEnd}시');
+  return parts.join('  ·  ');
 }

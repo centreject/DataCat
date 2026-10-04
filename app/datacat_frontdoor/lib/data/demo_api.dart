@@ -13,6 +13,53 @@ class DemoDataCatApi implements DataCatApi {
 
   final Duration latency;
   final List<VisitEvent> _events;
+  int _nextId = 200;
+  int _simulated = 0;
+
+  /// 시연용: 방금 새 방문이 들어온 것처럼 목록 맨 앞에 하나 추가한다.
+  /// 자동 새로고침(15초) 또는 당겨서 새로고침하면 앱에 "새 방문" 배너가 뜬다.
+  VisitEvent simulateVisit({DateTime? now}) {
+    final t = now ?? DateTime.now();
+    final make = _arrivals[_simulated++ % _arrivals.length];
+    final e = make(_nextId++, t);
+    _events.insert(0, e);
+    return e;
+  }
+
+  static final List<VisitEvent Function(int id, DateTime at)> _arrivals = [
+    (id, at) => VisitEvent(
+          eventId: id, deviceId: 'door-01', occurredAt: at, endedAt: at.add(const Duration(seconds: 19)),
+          trigger: TriggerType.button, status: EventStatus.completed,
+          eventType: 'VISITOR_ACCEPTED', purpose: 'DELIVERY',
+          summary: '택배 문 앞 보관', transcript: 'CJ대한통운입니다. 택배 문 앞에 두고 갈게요.',
+          mainCategory: '배송', subCategory: '택배', responsePolicy: '일반 접수', processingStatus: '정상',
+          reason: '택배사 이름과 문 앞 보관 표현',
+        ),
+    (id, at) => VisitEvent(
+          eventId: id, deviceId: 'door-01', occurredAt: at, endedAt: at.add(const Duration(seconds: 3)),
+          trigger: TriggerType.tof, status: EventStatus.completed,
+          eventType: 'UNATTENDED_DELIVERY',
+          mainCategory: '물품만 있음', subCategory: '음식 배달', responsePolicy: '무응답', processingStatus: '무응답',
+          reason: '사람 없음 + 음식 봉투 감지',
+        ),
+    (id, at) => VisitEvent(
+          eventId: id, deviceId: 'door-01', occurredAt: at, endedAt: at.add(const Duration(seconds: 24)),
+          trigger: TriggerType.button, status: EventStatus.completed,
+          eventType: 'VISITOR_ACCEPTED', purpose: 'VISIT',
+          summary: '이웃 302호, 소음 문의', transcript: '302호인데요, 저녁에 공사 소리가 나서 언제까지인지 여쭤보려고 왔어요.',
+          mainCategory: '개인 방문', subCategory: '이웃', responsePolicy: '일반 접수', processingStatus: '정상',
+          reason: '같은 동 주민임을 밝힘',
+        ),
+    (id, at) => VisitEvent(
+          eventId: id, deviceId: 'door-01', occurredAt: at, endedAt: at.add(const Duration(seconds: 31)),
+          trigger: TriggerType.button, status: EventStatus.completed,
+          eventType: 'VISITOR_ACCEPTED', purpose: 'INSPECTION',
+          summary: '아래층 누수, 긴급 점검 요청',
+          transcript: '관리사무소입니다. 아래층 천장에서 물이 새서 급하게 확인이 필요합니다. 연락 부탁드려요.',
+          mainCategory: '공공·긴급 방문', subCategory: '긴급 상황', responsePolicy: '긴급 알림', processingStatus: '정상',
+          reason: '누수와 긴급 확인 요청을 명확히 언급', needsReview: true,
+        ),
+  ];
 
   @override
   String get label => '데모';

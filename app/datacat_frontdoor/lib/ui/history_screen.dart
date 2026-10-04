@@ -9,6 +9,7 @@ import '../state/event_store.dart';
 import 'event_detail_screen.dart';
 import 'widgets/common.dart';
 import 'widgets/event_tile.dart';
+import 'widgets/theme_toggle.dart';
 
 enum HistoryFilter {
   all('전체'),
@@ -107,6 +108,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 toolbarHeight: 64,
                 titleSpacing: Gap.page,
                 title: Text('방문 기록', style: context.text.headlineSmall),
+                actions: const [
+                  Padding(padding: EdgeInsets.only(right: Gap.page - 4), child: ThemeToggle()),
+                ],
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(56),
                   child: _FilterBar(
@@ -158,9 +162,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     final e = item as VisitEvent;
                     return EventTile(
                       event: e,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => EventDetailScreen(initial: e)),
-                      ),
+                      onTap: () {
+                        store.markSeen(e.eventId);
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => EventDetailScreen(initial: e)),
+                        );
+                      },
                     );
                   },
                 ),

@@ -4,6 +4,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/category.dart';
 import '../../data/models.dart';
+import '../../state/app_scope.dart';
 import 'badges.dart';
 import 'snapshot_view.dart';
 
@@ -19,10 +20,11 @@ class EventTile extends StatelessWidget {
     final p = context.palette;
     final t = event.occurredAt;
     final attention = event.needsAttention;
+    final isNew = AppScope.of(context).store.isUnseen(event.eventId);
 
     return Semantics(
       button: true,
-      label: '${KFormat.clock(t)}, ${event.category.label}, ${event.headline}'
+      label: '${isNew ? '새 방문, ' : ''}${KFormat.clock(t)}, ${event.category.label}, ${event.headline}'
           '${attention ? ', 확인 필요' : ''}',
       excludeSemantics: true,
       child: InkWell(
@@ -52,6 +54,17 @@ class EventTile extends StatelessWidget {
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
+                    if (isNew) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: p.accent, borderRadius: Corner.pill),
+                        child: Text(
+                          'NEW',
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: p.card, letterSpacing: 0.4),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

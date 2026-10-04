@@ -9,7 +9,7 @@ import '../data/category.dart';
 @immutable
 class Palette extends ThemeExtension<Palette> {
   const Palette({
-    required this.isDark,
+    required this.darkness,
     required this.paper,
     required this.card,
     required this.sunken,
@@ -23,7 +23,10 @@ class Palette extends ThemeExtension<Palette> {
     required this.danger,
   });
 
-  final bool isDark;
+  /// 0 = 라이트, 1 = 다크. 테마가 바뀌는 동안 0~1 사이로 부드럽게 변한다.
+  final double darkness;
+
+  bool get isDark => darkness >= 0.5;
 
   /// 화면 바탕
   final Color paper;
@@ -52,7 +55,7 @@ class Palette extends ThemeExtension<Palette> {
   final Color danger;
 
   static const light = Palette(
-    isDark: false,
+    darkness: 0,
     paper: Color(0xFFF4F1EA),
     card: Color(0xFFFFFFFF),
     sunken: Color(0xFFEAE6DD),
@@ -67,7 +70,7 @@ class Palette extends ThemeExtension<Palette> {
   );
 
   static const dark = Palette(
-    isDark: true,
+    darkness: 1,
     paper: Color(0xFF121413),
     card: Color(0xFF1B1E1D),
     sunken: Color(0xFF242826),
@@ -82,15 +85,17 @@ class Palette extends ThemeExtension<Palette> {
   );
 
   /// 분류 색. 다크 테마에서는 바탕과 대비가 나도록 밝게 올린다.
+  /// 테마 전환 중에는 두 색 사이를 이어서 칩 색도 부드럽게 바뀐다.
   Color tone(VisitCategory category) {
-    if (!isDark) return category.tone;
+    if (darkness <= 0) return category.tone;
     final hsl = HSLColor.fromColor(category.tone);
-    return hsl.withLightness(0.70).withSaturation(hsl.saturation * 0.85).toColor();
+    final darkTone = hsl.withLightness(0.70).withSaturation(hsl.saturation * 0.85).toColor();
+    return darkness >= 1 ? darkTone : Color.lerp(category.tone, darkTone, darkness)!;
   }
 
   @override
   Palette copyWith({
-    bool? isDark,
+    double? darkness,
     Color? paper,
     Color? card,
     Color? sunken,
@@ -104,7 +109,7 @@ class Palette extends ThemeExtension<Palette> {
     Color? danger,
   }) =>
       Palette(
-        isDark: isDark ?? this.isDark,
+        darkness: darkness ?? this.darkness,
         paper: paper ?? this.paper,
         card: card ?? this.card,
         sunken: sunken ?? this.sunken,
@@ -123,7 +128,7 @@ class Palette extends ThemeExtension<Palette> {
     if (other is! Palette) return this;
     Color c(Color a, Color b) => Color.lerp(a, b, t)!;
     return Palette(
-      isDark: t < 0.5 ? isDark : other.isDark,
+      darkness: darkness + (other.darkness - darkness) * t,
       paper: c(paper, other.paper),
       card: c(card, other.card),
       sunken: c(sunken, other.sunken),

@@ -8,6 +8,7 @@ import '../data/models.dart';
 import '../state/app_scope.dart';
 import 'widgets/badges.dart';
 import 'widgets/snapshot_view.dart';
+import 'widgets/theme_toggle.dart';
 
 /// 방문 한 건의 전체 기록.
 ///
@@ -32,6 +33,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     super.didChangeDependencies();
     if (!_started) {
       _started = true;
+      // 열어 본 방문은 "새 방문" 표시를 지운다 (다음 프레임에 — 빌드 중 알림 방지)
+      final store = AppScope.of(context).store;
+      WidgetsBinding.instance.addPostFrameCallback((_) => store.markSeen(widget.initial.eventId));
       _loading = true; // 첫 빌드 전이라 setState 없이 표시만 켠다
       _load(initial: true);
     }
@@ -85,6 +89,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   onTap: () => Navigator.of(context).maybePop(),
                 ),
               ),
+              actions: const [
+                Padding(padding: EdgeInsets.only(right: 8), child: ThemeToggle(size: 40)),
+              ],
               flexibleSpace: FlexibleSpaceBar(
                 stretchModes: const [StretchMode.zoomBackground],
                 background: SnapshotView(event: e),

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'event_store.dart';
+import 'policy.dart';
 import 'settings.dart';
 
 /// 앱 전역 상태를 위젯 트리에 내려준다.
@@ -10,11 +11,13 @@ class AppScope extends InheritedWidget {
     super.key,
     required this.settings,
     required this.store,
+    required this.policy,
     required super.child,
   });
 
   final AppSettings settings;
   final EventStore store;
+  final VisitPolicy policy;
 
   static AppScope of(BuildContext context) {
     final scope = context.getInheritedWidgetOfExactType<AppScope>();
@@ -24,5 +27,5 @@ class AppScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(AppScope oldWidget) =>
-      settings != oldWidget.settings || store != oldWidget.store;
+      settings != oldWidget.settings || store != oldWidget.store || policy != oldWidget.policy;
 }

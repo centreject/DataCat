@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'package:datacat_frontdoor/core/format.dart';
 import 'package:datacat_frontdoor/data/api.dart';
 import 'package:datacat_frontdoor/data/category.dart';
+import 'package:datacat_frontdoor/data/demo_api.dart';
 import 'package:datacat_frontdoor/data/models.dart';
+import 'package:datacat_frontdoor/state/event_store.dart';
+import 'package:datacat_frontdoor/state/policy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -209,6 +212,64 @@ void main() {
     test('머문 시간', () {
       expect(KFormat.duration(const Duration(seconds: 22)), '22초');
       expect(KFormat.duration(const Duration(minutes: 3, seconds: 10)), '3분 10초');
+    });
+  });
+
+  group('VisitPolicy', () {
+    VisitEvent ev(String main, {String? policy}) =>
+        VisitEvent(eventId: 1, occurredAt: DateTime(2026), mainCategory: main, responsePolicy: policy);
+
+    test('분류별 알림 켜고 끄기', () {
+      final p = VisitPolicy()..notifyPackages = false;
+      expect(p.shouldNotify(ev('물품만 있음')), isFalse);
+      expect(p.shouldNotify(ev('배송')), isTrue);
+      expect(p.shouldNotify(ev('영업·홍보 방문')), isFalse); // 기본값 꺼짐
+    });
+
+    test('방해 금지 시간에는 긴급만 알린다 (자정 넘김)', () {
+      final p = VisitPolicy()
+        ..quietHoursEnabled = true
+        ..quietStart = 23
+        ..quietEnd = 7;
+      final night = DateTime(2026, 10, 4, 2);
+      final noon = DateTime(2026, 10, 4, 12);
+      expect(p.inQuietHours(night), isTrue);
+      expect(p.inQuietHours(noon), isFalse);
+      expect(p.shouldNotify(ev('배송'), now: night), isFalse);
+      expect(p.shouldNotify(ev('공공·긴급 방문', policy: '긴급 알림'), now: night), isTrue);
+      expect(p.shouldNotify(ev('안전 확인 필요'), now: night), isTrue);
+    });
+  });
+
+  group('EventStore 자동 새로고침', () {
+    test('새로 생긴 방문만 새 방문으로 표시한다', () async {
+      final demo = DemoDataCatApi(latency: Duration.zero);
+      final store = EventStore(demo);
+      await store.refresh();
+      final before = store.events.length;
+      expect(store.unseenIds, isEmpty);
+
+      final e = demo.simulateVisit();
+      await store.checkForNew();
+
+      expect(store.events.length, before + 1);
+      expect(store.events.first.eventId, e.eventId);
+      expect(store.unseenIds, {e.eventId});
+
+      store.markSeen(e.eventId);
+      expect(store.unseenIds, isEmpty);
+      store.dispose();
+    });
+
+    test('알림을 끈 분류는 알림 띠에서 빠진다', () async {
+      final demo = DemoDataCatApi(latency: Duration.zero);
+      final store = EventStore(demo)..arrivalFilter = (e) => false;
+      await store.refresh();
+      demo.simulateVisit();
+      await store.checkForNew();
+      expect(store.unseenIds, hasLength(1));
+      expect(store.unseenAlerts, isEmpty);
+      store.dispose();
     });
   });
 }
