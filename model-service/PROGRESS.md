@@ -3,7 +3,7 @@
 > **마지막 업데이트:** 2026-10-04 · **담당:** 김민중(AI 모델) · **브랜치:** `feature/ai-model`
 >
 > **지금 하는 일:** 없음 — 계획 검토 결정(7단계) 반영 끝, 민중님 확인 대기
-> **다음 할 일:** ① 민중님이 팀 공지·메시지 초안([`docs/team-coordination.md`](docs/team-coordination.md) A–D) 확인 후 전달 ② Docker Desktop 켜고 가짜 서버 이미지 확인(H1a) ③ C2 합의되면 Phase PR
+> **다음 할 일:** ① 민중님이 팀 메시지 초안(로컬 `.superpowers/team-coordination.md` A–D) 확인 후 전달 ② PR #3 리뷰·C2 합의 후 병합
 > **막힌 것:** 팀 사진·실제 녹음(C5) · 메시지 전달(C1·C2·C4·C10·C11) · 위협 보강(H7)·프롬프트 점검(H8)은 덕민님 시험 문장(C10) 뒤
 
 | 단계 | 완료 | 전체 |
@@ -19,7 +19,7 @@
 
 **표시:** ✅ 완료 · 🔄 진행 중 · ⬜ 할 일 · ⏳ 다른 사람/외부 조건을 기다림 · ⏭️ 건너뜀(이유 적음)
 
-정확도 기록: [`eval/README.md`](eval/README.md) · 팀 협의 초안: [`docs/team-coordination.md`](docs/team-coordination.md) · 옛 계획(보관): [`docs/superpowers/plans/2026-09-27-ai-model-service.md`](../docs/superpowers/plans/2026-09-27-ai-model-service.md)
+정확도 기록: [`eval/README.md`](eval/README.md) · 통합 시험: [`docs/integration-test.md`](../docs/integration-test.md) · 팀 메시지 초안: 로컬 `.superpowers/team-coordination.md`(git 제외)
 
 ---
 
@@ -97,7 +97,7 @@
 - [ ] **P2** ⏳ Phase 2 PR → main
 
 ### 3. 팀 협의 (보내기 전에 민중님 확인)
-- [x] **C0** 인태님 메시지·명세 PR 초안 작성 — [`docs/team-coordination.md`](docs/team-coordination.md), `fc0838f`
+- [x] **C0** 인태님 메시지·명세 PR 초안 작성 — `fc0838f`
 - [ ] **C1** ⏳ 인태님: 저장소 구조·브랜치 방식 제안 전달
 - [ ] **C2** ⏳ 인태님: 택배 대체 규칙("사람 없음 + ToF 감지 = 물건 도착") 합의
 - [x] **C3** API 명세 PR — PR #1 병합(`API_v1_4.md`), main에서 v1.2·v1.3 삭제(`1af158f`)
@@ -106,7 +106,7 @@
 - [ ] **C6** ⏳ 시연 PC(3090) 관리자: full 프로필 속도·정확도 측정 (T9·T10 이후)
 - [x] **C8** 인태님 PR #2(Spring 초기 설정·프리셋 API) 검토 — 빌드·테스트 통과, 응답이 명세 10.1과 일치. 병합 전 요청: `server/gradlew` 실행 권한. 제안: 응답 검사 테스트
 - [x] **C9** PR #2 — 인태님 gradlew 수정 `9f8feb8` 후 민중님 승인·병합(10-05, `578896c`). 민중님이 main에 `API_v1_5.md` 추가(`ccafdfc`, ai-model 브랜치와 같은 내용)
-- [ ] **C12** ⏳ 덕민님: app-design 기록에 크롬 프로필(`.dart_tool/chrome-device`, Login Data·Cookies)과 build 산출물(약 100MB)이 남음(공개 저장소). 크기로는 빈 디버그 프로필로 보임 — 초안 B 6번으로 안내
+- [ ] **C12** ⏳ 덕민님께 따로 전달할 보안·저장소 정리 건(app-design 브랜치 기록) — 초안 B 6번
 - [ ] **C7** ⏭️ `facingCamera`/`bbox` 필드 제안 — 보류(2026-10-04 계획 검토): Spring이 아직 없고, 택배 대체 규칙(C2)으로 먼저 해결
 - [ ] **C10** ⏳ 덕민님: 분류별 시험 문장 5개씩 — 받으면 `eval/heldout_cases.jsonl`의 기획서 기반 문장을 교체(H2)
 - [ ] **C11** ⏳ 수연님: 녹음 형식 WAV 16-bit·16kHz·모노 안내 — 초안 D
@@ -164,6 +164,7 @@
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-05 | PR #3(feature/ai-model → main) 올림. main에 불필요한 파일 정리: 팀 메시지 초안은 로컬로 옮김(git 제외), 옛 계획 문서 삭제. gh CLI·git 2.55 설치 |
 | 2026-10-05 | 통합 시험 1차(I1): 세 브랜치 병합 상태로 앱·목업 API·모델 가짜 서버·Spring 함께 기동, 11개 항목 통과. 프리셋 목업/명세 불일치 발견 → 초안 B·C에 추가 |
 | 2026-10-05 | PR #2 병합(C9 완료), main에 API v1.5. 세 브랜치(ai-model·app-design·hardware-design)를 main에 차례로 합치는 시험 병합: 충돌 없음(임시 작업 폴더에서만, GitHub 변경 없음) |
 | 2026-10-05 | 팀 브랜치 확인: 인태님 gradlew 실행 권한 수정(PR #2 병합 가능 상태). 덕민님 앱 테마·자동 새로고침·응대 정책 화면, 목업 API 시연용 자동 방문(옛 purpose 값 그대로), 웹 캐시 수정, build·.dart_tool 정리. 공개 기록에 크롬 프로필이 남은 것 발견 → C12. 초안 B·C 갱신 |
@@ -210,7 +211,7 @@
   2. **진행 순서 표**에도 넣는다. 위치는 의존 관계로 정한다: 필요한 작업보다 뒤, 그 결과를 쓰는 작업보다 앞. 팀원이 필요 없는 일은 팀원을 기다리는 일보다 앞에 둔다.
   3. 변경 기록에 한 줄 남긴다.
 - **ID는 바꾸지 않는다.** 취소한 작업은 지우지 말고 ⏭️와 이유를 적는다.
-- **문서는 세 개만 갱신한다**(2026-10-04 계획 검토): 이 파일(현황), [`eval/README.md`](eval/README.md)(정확도 기록), [`docs/team-coordination.md`](docs/team-coordination.md)(팀 협의). 옛 계획 문서와 로컬 기록(`.superpowers/…/progress.md`)은 보관만 하고 더 쓰지 않는다.
+- **남은 작업은 이 파일 하나에만 적는다.** 정확도는 [`eval/README.md`](eval/README.md), 통합 시험은 [`docs/integration-test.md`](../docs/integration-test.md)에 결과만 적는다. 팀 메시지 초안은 로컬 `.superpowers/team-coordination.md`(git 제외, 할 일 목록 없음). 옛 계획 문서는 삭제(10-05, git 기록에 남음).
 - **테스트 주기**(같은 날 결정):
   - 단위 테스트(`pytest`, 약 10초): 커밋마다
   - GPU 테스트(`pytest -m gpu`)와 평가(`eval/*`): 모델·프롬프트·`purposes.json`·요약 규칙을 바꿀 때만
