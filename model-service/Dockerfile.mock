@@ -1,0 +1,25 @@
+# DataCat model service, mock version: same API and request checks, canned answers (app/mock.py).
+# No GPU, no model weights — for Spring/Pi/app integration on any laptop.
+# Build:  docker build -f Dockerfile.mock -t datacat-model-mock model-service
+# Run:    docker run -p 8000:8000 datacat-model-mock
+# Answers are picked by a keyword in the uploaded file name (README "가짜 모델 서버").
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY requirements-mock.txt .
+RUN pip install --no-cache-dir -r requirements-mock.txt
+
+RUN useradd --create-home --uid 1000 app
+COPY --chown=app:app app ./app
+USER app
+
+# MOCK_DELAY_MS adds a wait to every model call, to try timeouts (real lite p95: audio 1.5 s).
+ENV MODEL_PROFILE=mock \
+    MOCK_DELAY_MS=0 \
+    PYTHONUNBUFFERED=1
+EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import json,sys,urllib.request; sys.exit(json.load(urllib.request.urlopen('http://localhost:8000/health'))['status'] != 'ok')"
+
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
