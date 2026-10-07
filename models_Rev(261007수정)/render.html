@@ -1,0 +1,237 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#EFEAE2;overflow:hidden}canvas{display:block}
+#ov{position:absolute;inset:0;pointer-events:none}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<svg id="ov"></svg>
+<script type="module">
+import * as THREE from 'three';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const q = new URLSearchParams(location.search);
+const view = q.get('view') || 'hero';
+const Wpx = +(q.get('w') || 1600), Hpx = +(q.get('h') || 1200);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(Wpx, Hpx);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.localClippingEnabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xEFEAE2);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+
+// ── 조명 ──
+scene.add(new THREE.HemisphereLight(0xfffaf2, 0xb8ad9c, 0.9));
+const key = new THREE.DirectionalLight(0xfff4e6, 2.2);
+key.position.set(-160, 260, 320);
+key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096);
+Object.assign(key.shadow.camera, { left: -260, right: 260, top: 360, bottom: -160, near: 10, far: 1200 });
+key.shadow.bias = -0.0004; key.shadow.normalBias = 0.6; key.shadow.radius = 6;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xe8eefc, 0.55); fill.position.set(260, 80, 200); scene.add(fill);
+
+// ── 재질 ──
+const M = {
+  shell: new THREE.MeshPhysicalMaterial({ color: 0xEDE8DF, roughness: 0.72, sheen: 0.3, sheenRoughness: 0.8 }),
+  visor: new THREE.MeshPhysicalMaterial({ color: 0x0d0e10, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.08 }),
+  pipe: new THREE.MeshStandardMaterial({ color: 0xffb547, emissive: 0xff9a1f, emissiveIntensity: 1.6, roughness: 0.4 }),
+  chassis: new THREE.MeshStandardMaterial({ color: 0x7d838a, roughness: 0.65 }),
+  plate: new THREE.MeshStandardMaterial({ color: 0xD9D3C8, roughness: 0.8 }),
+  pcb: new THREE.MeshStandardMaterial({ color: 0x2f7044, roughness: 0.55 }),
+  pcbBlue: new THREE.MeshStandardMaterial({ color: 0x2b4f9a, roughness: 0.55 }),
+  pcbRed: new THREE.MeshStandardMaterial({ color: 0xb2282e, roughness: 0.55 }),
+  black: new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.5 }),
+  metal: new THREE.MeshStandardMaterial({ color: 0xd2d3d4, metalness: 0.85, roughness: 0.32 }),
+  spk: new THREE.MeshStandardMaterial({ color: 0x2a2a2c, metalness: 0.4, roughness: 0.5 }),
+  keep: new THREE.MeshStandardMaterial({ color: 0xf2a33a, transparent: true, opacity: 0.38, roughness: 0.6, depthWrite: false }),
+  led: new THREE.MeshStandardMaterial({ color: 0xffd08a, emissive: 0xffa040, emissiveIntensity: 1 }),
+};
+
+// LCD 화면: 레퍼런스처럼 종 아이콘 + "방문했어요"
+function screenTexture() {
+  const c = document.createElement('canvas'); c.width = 490; c.height = 734;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0f1012'; g.fillRect(0, 0, c.width, c.height);
+  const grd = g.createRadialGradient(245, 330, 20, 245, 330, 360);
+  grd.addColorStop(0, '#1d1f22'); grd.addColorStop(1, '#0f1012');
+  g.fillStyle = grd; g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = 'rgba(236,233,226,.85)'; g.lineWidth = 3;
+  g.beginPath(); g.arc(245, 300, 95, 0, Math.PI * 2); g.stroke();
+  // 종
+  g.lineWidth = 5; g.lineJoin = 'round'; g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(205, 335); g.lineTo(285, 335);
+  g.moveTo(213, 335); g.quadraticCurveTo(222, 322, 222, 300);
+  g.bezierCurveTo(222, 262, 268, 262, 268, 300);
+  g.quadraticCurveTo(268, 322, 277, 335);
+  g.moveTo(232, 348); g.quadraticCurveTo(245, 362, 258, 348);
+  g.moveTo(245, 262); g.lineTo(245, 254);
+  g.stroke();
+  g.fillStyle = '#ECE9E2'; g.font = '500 44px "Noto Sans CJK KR"'; g.textAlign = 'center';
+  g.fillText('방문했어요', 245, 470);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+const loader = new STLLoader();
+async function load(name, mat) {
+  const geo = await new Promise((res, rej) => loader.load(`/out/render/${name}.stl`, res, undefined, rej));
+  const g2 = toCreasedNormals(geo, THREE.MathUtils.degToRad(28));
+  const mesh = new THREE.Mesh(g2, mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.name = name;
+  return mesh;
+}
+
+const groups = { shell: new THREE.Group(), inner: new THREE.Group(), plate: new THREE.Group() };
+Object.values(groups).forEach(g => scene.add(g));
+
+const shell = await load('01_front_shell', M.shell); groups.shell.add(shell);
+groups.shell.add(await load('04_black_visor', M.visor));
+groups.shell.add(await load('05_led_light_pipe', M.pipe));
+groups.shell.add(await load('c_btn', M.metal));
+const IDX = await (await fetch('/out/render/index.json')).json();
+const SC = IDX._screen;
+for (const [n, m] of [['c_cam_board', M.pcb], ['c_cam_lens', M.black], ['c_tof_board', M.pcbRed], ['c_tof_sensor', M.black], ['c_spk', M.spk], ['c_uboard', M.pcbBlue], ['c_led', M.led]])
+  groups.shell.add(await load(n, m));
+groups.inner.add(await load('02_lcd_pi_chassis', M.chassis));
+groups.inner.add(await load('c_pi', M.pcb));
+groups.inner.add(await load('c_usbc', M.black));
+groups.inner.add(await load('c_lcd', M.black));
+for (const [n, m] of [['c_umic', M.black], ['c_uplug', M.black], ['c_hdmi', M.keep], ['c_gpio_keep', M.keep]])
+  groups.inner.add(await load(n, m));
+// 화면 평면
+{
+  const geo = new THREE.PlaneGeometry(SC.w, SC.h);
+  const mat = new THREE.MeshBasicMaterial({ map: screenTexture(), toneMapped: false });
+  const p = new THREE.Mesh(geo, mat); p.position.set(SC.cx, SC.cy, SC.z); groups.inner.add(p);
+}
+groups.plate.add(await load('03_wall_plate', M.plate));
+
+// 벽과 문틀
+function wallAndDoor(withDoor) {
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400),
+    new THREE.MeshStandardMaterial({ color: 0xE6DFD3, roughness: 0.95 }));
+  wall.position.set(0, 100, -0.05); wall.receiveShadow = true; scene.add(wall);
+  if (!withDoor) return;
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a3b3d, roughness: 0.55, metalness: 0.2 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x2c2d30, roughness: 0.45, metalness: 0.3 });
+  const f = new THREE.Mesh(new THREE.BoxGeometry(24, 1400, 30), frameMat); f.position.set(155, 100, 15); f.castShadow = f.receiveShadow = true; scene.add(f);
+  const d = new THREE.Mesh(new THREE.BoxGeometry(400, 1400, 50), doorMat); d.position.set(367, 100, -10); d.receiveShadow = true; scene.add(d);
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(30, 190, 26), new THREE.MeshStandardMaterial({ color: 0x17181a, roughness: 0.3, metalness: 0.4 }));
+  lock.position.set(215, 90, 28); lock.castShadow = true; scene.add(lock);
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(60, 18, 16), lock.material); handle.position.set(240, 40, 48); handle.castShadow = true; scene.add(handle);
+}
+
+// ── 카메라 ──
+const C = new THREE.Vector3(0, 107.5, 23);
+let cam;
+function persp(fov, pos, target = C) {
+  cam = new THREE.PerspectiveCamera(fov, Wpx / Hpx, 1, 5000);
+  cam.position.copy(pos); cam.lookAt(target);
+}
+function ortho(span, pos, target = C) {
+  const a = Wpx / Hpx;
+  cam = new THREE.OrthographicCamera(-span * a / 2, span * a / 2, span / 2, -span / 2, 1, 5000);
+  cam.position.copy(pos); cam.lookAt(target);
+}
+
+const ov = document.getElementById('ov');
+ov.setAttribute('viewBox', `0 0 ${Wpx} ${Hpx}`); ov.setAttribute('width', Wpx); ov.setAttribute('height', Hpx);
+function px(v) { const p = v.clone().project(cam); return [(p.x + 1) / 2 * Wpx, (1 - p.y) / 2 * Hpx]; }
+function dim(a, b, label, off, dir) {
+  // dir: 'h' 또는 'v'. off: 화면 픽셀 오프셋
+  const [x1, y1] = px(a), [x2, y2] = px(b);
+  const s = 'stroke="#3d3a36" stroke-width="2" fill="none"';
+  let svg = '';
+  if (dir === 'h') {
+    const y = Math.min(y1, y2) + off;
+    svg += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" ${s}/>`;
+    svg += `<line x1="${x1}" y1="${y - 12}" x2="${x1}" y2="${y + 12}" ${s}/><line x1="${x2}" y1="${y - 12}" x2="${x2}" y2="${y + 12}" ${s}/>`;
+    svg += `<text x="${(x1 + x2) / 2}" y="${y - 14}" font-family="Noto Sans CJK KR" font-size="30" fill="#2b2926" text-anchor="middle">${label}</text>`;
+  } else {
+    const x = Math.min(x1, x2) + off;
+    svg += `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" ${s}/>`;
+    svg += `<line x1="${x - 12}" y1="${y1}" x2="${x + 12}" y2="${y1}" ${s}/><line x1="${x - 12}" y1="${y2}" x2="${x + 12}" y2="${y2}" ${s}/>`;
+    svg += `<text x="${x - 16}" y="${(y1 + y2) / 2}" font-family="Noto Sans CJK KR" font-size="30" fill="#2b2926" text-anchor="end" dominant-baseline="middle">${label}</text>`;
+  }
+  ov.innerHTML += svg;
+}
+function label(p, text, dx, dy, anchor = 'start') {
+  const [x, y] = px(p);
+  ov.innerHTML += `<circle cx="${x}" cy="${y}" r="5" fill="#2b2926"/>
+    <line x1="${x}" y1="${y}" x2="${x + dx}" y2="${y + dy}" stroke="#2b2926" stroke-width="1.6"/>
+    <text x="${x + dx + (anchor === 'start' ? 8 : -8)}" y="${y + dy}" font-family="Noto Sans CJK KR" font-size="26" fill="#2b2926" text-anchor="${anchor}" dominant-baseline="middle">${text}</text>`;
+}
+
+if (view === 'hero') {
+  wallAndDoor(true);
+  persp(24, new THREE.Vector3(-330, 210, 560), new THREE.Vector3(25, 100, 20));
+} else if (view === 'front') {
+  wallAndDoor(false);
+  scene.background = new THREE.Color(0xEFEAE2);
+  ortho(300, new THREE.Vector3(0, 107.5, 800));
+  key.position.set(-120, 260, 420);
+} else if (view === 'side') {
+  wallAndDoor(false);
+  scene.children.filter(o => o.geometry && o.geometry.type === 'PlaneGeometry' && o.position.z < 0).forEach(o => o.visible = false);
+  ortho(300, new THREE.Vector3(-800, 107.5, 21), new THREE.Vector3(0, 107.5, 21));
+  key.position.set(-300, 260, 200);
+} else if (view === 'exploded') {
+  groups.plate.position.z = -90;
+  groups.inner.position.z = 0;
+  groups.shell.position.z = 110;
+  const vis = groups.shell.getObjectByName('04_black_visor'); vis.position.z = 45;
+  const lp = groups.shell.getObjectByName('05_led_light_pipe'); lp.position.z = 35;
+  persp(31, new THREE.Vector3(-600, 260, 300), new THREE.Vector3(10, 100, 15));
+  key.position.set(-200, 300, 300);
+} else if (view === 'xray') {
+  M.shell.transparent = true; M.shell.opacity = 0.16; M.shell.depthWrite = false;
+  M.visor.transparent = true; M.visor.opacity = 0.35;
+  shell.castShadow = false;
+  persp(26, new THREE.Vector3(-380, 200, 420), new THREE.Vector3(0, 105, 22));
+} else if (view === 'back') {
+  groups.plate.visible = false;
+  persp(26, new THREE.Vector3(300, 160, -430), new THREE.Vector3(0, 105, 22));
+  key.position.set(200, 300, -300);
+} else if (view === 'section') {
+  const cx = +(q.get('x') || 0);
+  for (const m of Object.values(M)) m.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), -cx)];
+  for (const m of Object.values(M)) m.side = THREE.DoubleSide;
+  wallAndDoor(false);
+  scene.children.filter(o => o.geometry && o.geometry.type === 'PlaneGeometry' && o.position.z < 0).forEach(o => o.visible = false);
+  ortho(250, new THREE.Vector3(-800, 107.5, 21), new THREE.Vector3(0, 107.5, 21));
+  key.position.set(-300, 250, 200);
+}
+
+renderer.render(scene, cam);
+
+if (view === 'front') {
+  dim(new THREE.Vector3(-52.5, 0, SC.D), new THREE.Vector3(52.5, 0, SC.D), '105 mm', 70, 'h');
+  dim(new THREE.Vector3(-52.5, 0, SC.D), new THREE.Vector3(-52.5, 215, SC.D), '215 mm', -40, 'v');
+}
+if (view === 'side') {
+  dim(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, SC.D), SC.D + ' mm', 70, 'h');
+  dim(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 215, 0), '215 mm', -40, 'v');
+}
+if (view === 'section') {
+  const L = JSON.parse(q.get('labels') || '[]');
+  for (const [x, y, z, t, dx, dy, an] of L) label(new THREE.Vector3(x, y, z), t, dx, dy, an || 'start');
+  dim(new THREE.Vector3(0, -2, 0), new THREE.Vector3(0, -2, SC.D), SC.D + ' mm', 60, 'h');
+}
+if (view === 'xray' || view === 'section') window.LABELS = true;
+for (const n of ['c_hdmi', 'c_gpio_keep']) { const o = scene.getObjectByName(n); if (o) o.visible = ['xray', 'section', 'exploded'].includes(view); }
+window.DONE = true;
+</script></body></html>
