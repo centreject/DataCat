@@ -45,7 +45,7 @@ services:
 
 ### 발견한 것
 
-- **프리셋 응답이 목업과 Spring에서 다름:** Spring은 명세 10.1대로 2건(GREETING, COMPLETION "접수되었습니다."), 목업 API는 3건(FALLBACK 추가, COMPLETION 문구가 더 김). 앱이 목업 기준으로 만들어지면 Spring으로 바꿀 때 어긋날 수 있다 → 덕민님·인태님 확인 필요(명세를 바꿀지, 목업을 맞출지).
+- **프리셋 응답이 목업과 Spring에서 다름:** Spring은 명세 10.1대로 2건(GREETING, COMPLETION "접수되었습니다."), 목업 API는 3건(FALLBACK 추가, COMPLETION 문구가 더 김). 앱이 목업 기준으로 만들어지면 Spring으로 바꿀 때 어긋날 수 있다 → **10-08 회의: 오류 안내를 포함한 3건으로 통일, Spring에 반영 예정(인태님).**
 - 목업 API의 `purpose`가 아직 옛 값(`INSPECTION`/`VISIT`/`ETC`) — 명세 v1.5 값으로 맞춰야 함(이미 요청 예정).
 - 앱 컨테이너에 healthcheck가 없어 `Up`으로만 보인다(동작에는 문제 없음).
 - 병합하면 hardware-design 파일(`README_RevH.md`, `models_RevC/`, 사진)이 루트에 놓인다 → `hardware/` 폴더로 모으는 것을 제안.
