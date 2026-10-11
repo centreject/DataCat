@@ -28,6 +28,10 @@ HC-SR04로 거리를 측정하는 기본 코드다. 감지 거리는 아직 정�
 
 **센서 전원은 5V이며, 5V ECHO 신호를 Pi GPIO에 직접 연결하면 안 된다.** 아래처럼 저항으로 전압을 낮춘다. 두 저항 사이에서 GPIO23으로 연결하며, 센서와 Pi는 GND를 공유한다.
 
+![초음파 센서 배선도](https://gpiozero.readthedocs.io/en/stable/_images/distance_sensor_bb.svg)
+
+
+※ 배선 구조 참고용이며, 실제 사용 저항은 ECHO–분기점 사이 330Ω, 분기점–GND 사이 470Ω이다.
 ```text
 HC-SR04 ECHO ── [330Ω] ──┬── GPIO23 (물리 핀 16)
                         │
