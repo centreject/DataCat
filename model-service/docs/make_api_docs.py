@@ -50,11 +50,15 @@ def openapi() -> dict:
 
 def examples() -> dict[str, object]:
     """name → response body, from the mock service."""
+    previous = os.environ.get("MODEL_PROFILE")
     os.environ["MODEL_PROFILE"] = "mock"
     try:
         app = create_app()
-    finally:
-        del os.environ["MODEL_PROFILE"]
+    finally:  # restore, so tests running after this in the same process see the original profile
+        if previous is None:
+            del os.environ["MODEL_PROFILE"]
+        else:
+            os.environ["MODEL_PROFILE"] = previous
     out: dict[str, object] = {}
     with TestClient(app) as client:
         app.state.loader.join(timeout=5)
