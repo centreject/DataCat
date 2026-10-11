@@ -1,0 +1,66 @@
+import os
+import threading
+from pathlib import Path
+
+from PIL import Image
+
+from app.config import DATA_DIR, Settings
+from app.schemas import Detection
+
+# Keep Ultralytics' settings file inside the project instead of ~/.config (must exist before import).
+_CONFIG_DIR = DATA_DIR / "ultralytics"
+_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("YOLO_CONFIG_DIR", str(_CONFIG_DIR))
+# Never pip-install missing packages at runtime (Ultralytics' default); they are pinned in requirements.txt.
+os.environ.setdefault("YOLO_AUTOINSTALL", "false")
+
+from ultralytics import YOLO, YOLOE  # noqa: E402
+from ultralytics.utils import SETTINGS  # noqa: E402
+from ultralytics.utils.downloads import attempt_download_asset  # noqa: E402
+
+PERSON_WEIGHTS = "yolo11s.pt"
+PACKAGE_WEIGHTS = "yoloe-11s-seg.pt"
+TEXT_ENCODER = "mobileclip_blt.ts"  # YOLOE's prompt encoder; fetched by bare name otherwise
+COCO_PERSON = 0
+# COCO bird, cat, dog → "animal" (plan: an animal alone is not a visitor).
+COCO_ANIMALS = (14, 15, 16)
+
+
+class YoloVision:
+    """COCO YOLO11 for people + open-vocabulary YOLOE for anything package-like."""
+
+    def __init__(self, settings: Settings):
+        weights = Path(settings.weights_dir)
+        weights.mkdir(parents=True, exist_ok=True)
+        # Ultralytics resolves bare asset names against SETTINGS["weights_dir"], else downloads to
+        # the working directory. Pre-fetch the text encoder there so nothing lands in the cwd.
+        SETTINGS.update({"weights_dir": str(weights)})
+        attempt_download_asset(weights / TEXT_ENCODER)
+
+        self.settings = settings
+        self.person_model = YOLO(str(weights / PERSON_WEIGHTS))
+        self.package_model = YOLOE(str(weights / PACKAGE_WEIGHTS))
+        prompts = settings.package_prompts
+        self.package_model.set_classes(prompts, self.package_model.get_text_pe(prompts))
+        self.lock = threading.Lock()
+        self.detect(Image.new("RGB", (640, 480)))  # warm-up so the first real request is fast
+
+    def detect(self, image: Image.Image) -> list[Detection]:
+        with self.lock:
+            people = self.person_model.predict(
+                image,
+                classes=[COCO_PERSON, *COCO_ANIMALS],
+                conf=self.settings.person_conf,
+                quantize=16,
+                verbose=False,
+            )[0]
+            # agnostic_nms: overlapping prompts ("box", "cardboard box") on one object count once.
+            packages = self.package_model.predict(
+                image, conf=self.settings.package_conf, agnostic_nms=True, quantize=16, verbose=False
+            )[0]
+        return [
+            Detection(label="person" if int(k) == COCO_PERSON else "animal", confidence=round(float(c), 4))
+            for c, k in zip(people.boxes.conf, people.boxes.cls)
+        ] + [
+            Detection(label="package", confidence=round(float(c), 4)) for c in packages.boxes.conf
+        ]
