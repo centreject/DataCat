@@ -70,6 +70,8 @@ void main() {
 
     await tester.tap(find.text('설정').last);
     await tester.pump(_afterLoad);
+    await tester.ensureVisible(find.byType(Switch)); // 푸시 칸이 생겨 스위치가 화면 아래로 내려갔다
+    await tester.pump();
     await tester.tap(find.byType(Switch));
     await tester.pump();
 
@@ -110,5 +112,20 @@ void main() {
     await tester.tap(find.byTooltip('닫기'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(store.unseenIds, isEmpty);
+  });
+
+  testWidgets('설정: 푸시 알림 상태가 보인다 (웹·테스트에서는 꺼짐)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pumpApp(tester);
+
+    await tester.tap(find.text('설정').last);
+    await tester.pump(_afterLoad);
+    expect(find.text('휴대폰 푸시 알림'), findsOneWidget);
+    expect(find.text('방문 알림 받기'), findsOneWidget);
+    expect(find.textContaining('웹에서는 푸시를 받을 수 없어요'), findsOneWidget);
+    // 데모 모드에는 목업 서버 테스트 버튼이 없다
+    expect(find.text('테스트 방문 보내기'), findsNothing);
   });
 }

@@ -45,6 +45,11 @@ curl -X POST http://localhost:8090/api/v1/_mock/visits      # 포트는 .env 의
 
 끄려면 `.env`에 `MOCK_AUTO_VISIT_SECONDS=0`을 넣어요.
 
+## 휴대폰 푸시 알림
+
+새 방문이 생기면 안드로이드 앱으로 푸시를 보냅니다. Firebase 키를 `secrets/` 에 넣으면 켜지고, 없으면 꺼진 채로 서버만 뜹니다.
+안드로이드 앱은 `build-apk.ps1`(윈도우) / `build-apk.sh` 로 도커에서 빌드합니다. 순서와 Spring 이관 방법은 **[PUSH.md](PUSH.md)**.
+
 ## 프로필
 
 | 명령 | 추가로 뜨는 것 |

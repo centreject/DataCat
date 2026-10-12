@@ -1,1 +1,4 @@
 .env
+# Firebase 서비스 계정 키 — 절대 올리지 않는다
+secrets/*
+!secrets/README.md

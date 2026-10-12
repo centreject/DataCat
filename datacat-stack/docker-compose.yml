@@ -3,6 +3,7 @@
 #   docker compose up -d --build                     앱(웹) + 목업 API
 #   docker compose --profile backend up -d --build   + MySQL (Spring 붙일 때)
 #   docker compose --profile tunnel up -d            + Cloudflare Tunnel (외부 HTTPS 접속)
+#   .\build-apk.ps1                                  안드로이드 앱(APK) 빌드 — 푸시 알림용 (PUSH.md)
 #
 # 접속:  앱  http://localhost:${APP_PORT}      API  http://localhost:${API_PORT}/api/v1/events
 name: datacat
@@ -29,11 +30,20 @@ services:
   #     SPRING_DATASOURCE_USERNAME: ${DB_USER}
   #     SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
   #     MODEL_SERVICE_URL: http://model:8000
+  #     FCM_CREDENTIALS_FILE: /secrets/firebase-service-account.json   # 푸시도 같은 키를 그대로 쓴다
+  #   volumes:
+  #     - ./secrets:/secrets:ro
   api:
     build: ./mock-api
     image: datacat/mock-api:local
     environment:
       MOCK_AUTO_VISIT_SECONDS: ${MOCK_AUTO_VISIT_SECONDS:-180}   # 시연용 새 방문 간격(초). 0 이면 끔
+      # 푸시(FCM): secrets/firebase-service-account.json 이 있으면 켜진다. 없어도 서버는 뜬다 (PUSH.md)
+      FCM_CREDENTIALS_FILE: /secrets/firebase-service-account.json
+      PUSH_TOKEN_FILE: /data/push-tokens.json
+    volumes:
+      - ./secrets:/secrets:ro         # 서비스 계정 키 (git 에 안 올라감)
+      - api-data:/data                # 등록된 휴대폰 토큰 (다시 띄워도 유지)
     ports:
       - "${API_PORT:-8080}:8080"      # Pi 가 직접 붙을 수 있게 열어 둔다
     healthcheck:
@@ -88,3 +98,4 @@ services:
 
 volumes:
   db-data:
+  api-data:

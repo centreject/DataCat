@@ -4,6 +4,7 @@ import '../core/theme.dart';
 import '../data/api.dart';
 import '../data/demo_api.dart';
 import '../data/models.dart';
+import '../push/push_center.dart';
 import '../state/app_scope.dart';
 import '../state/policy.dart';
 import 'policy_screen.dart';
@@ -23,6 +24,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _url;
   _TestState _test = _TestState.idle;
   String _testMessage = '';
+
+  bool _sendingTestVisit = false;
 
   DataCatApi? _presetsFor;
   Future<List<Preset>>? _presets;
@@ -94,6 +97,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     } else {
       messenger.showSnackBar(const SnackBar(content: Text('저장했어요. 새 주소로 기록을 불러와요.')));
+    }
+  }
+
+  /// 목업 서버에 새 방문을 만들어 서버가 푸시를 보내게 한다.
+  Future<void> _sendTestVisit(HttpDataCatApi api) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final store = AppScope.of(context).store;
+    setState(() => _sendingTestVisit = true);
+    try {
+      final e = await api.createMockVisit();
+      store.checkForNew();
+      messenger.showSnackBar(SnackBar(
+        content: Text('서버에 테스트 방문(${e.eventId}번)을 만들었어요. 몇 초 안에 푸시가 와요.'),
+      ));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(e.statusCode == 404
+            ? '이 서버는 테스트 방문을 지원하지 않아요 (목업 서버 전용 기능).'
+            : e.message),
+      ));
+    } finally {
+      if (mounted) setState(() => _sendingTestVisit = false);
     }
   }
 
@@ -175,6 +200,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
 
+            // ── 푸시 ──
+            const _GroupTitle('휴대폰 푸시 알림'),
+            _Group(
+              children: [
+                ListenableBuilder(
+                  listenable: scope.push,
+                  builder: (context, _) {
+                    final push = scope.push;
+                    final s = push.status;
+                    final ok = s == PushStatus.registered;
+                    final bad = s == PushStatus.failed || s == PushStatus.denied;
+                    return ListTile(
+                      contentPadding: const EdgeInsets.fromLTRB(Gap.lg, 4, Gap.md, 4),
+                      leading: Icon(
+                        ok
+                            ? Icons.notifications_active_rounded
+                            : bad
+                                ? Icons.notifications_off_outlined
+                                : Icons.notifications_none_rounded,
+                        color: ok ? p.live : bad ? p.danger : p.ink,
+                      ),
+                      title: const Text('방문 알림 받기'),
+                      subtitle: Text(s.describe(push.detail)),
+                      trailing: push.isAvailable && (bad || s == PushStatus.registered)
+                          ? TextButton(
+                              onPressed: push.retry,
+                              child: Text(bad ? '다시 시도' : '다시 등록'),
+                            )
+                          : null,
+                    );
+                  },
+                ),
+                if (api is HttpDataCatApi) ...[
+                  Divider(indent: Gap.lg, endIndent: Gap.lg, color: p.line),
+                  ListTile(
+                    contentPadding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.md, 0),
+                    title: const Text('테스트 방문 보내기'),
+                    subtitle: const Text('목업 서버에 새 방문을 만들어 푸시가 오는지 확인해요'),
+                    trailing: OutlinedButton(
+                      onPressed: _sendingTestVisit ? null : () => _sendTestVisit(api),
+                      child: _sendingTestVisit
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('보내기'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(Gap.page + 4, Gap.sm, Gap.page, 0),
+              child: _Footnote(
+                '앱을 닫아 두거나 화면이 꺼져 있어도 새 방문이 오면 알림이 떠요. '
+                '위의 분류별 알림·방해 금지 설정은 아직 앱 안 알림에만 적용되고, '
+                '서버 정책 API가 생기면 푸시에도 적용돼요.',
+              ),
+            ),
+
             // ── 연결 ──
             const _GroupTitle('서버 연결'),
             _Group(
@@ -236,7 +321,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '/api/v1 은 앱이 알아서 붙여요. 휴대폰과 서버가 같은 와이파이에 있어야 해요.',
+                        '/api/v1 은 앱이 알아서 붙여요. 집 밖에서는 https://api.teamdatacat.com 처럼 외부 주소를 쓰세요.',
                         style: context.text.bodySmall,
                       ),
                       const SizedBox(height: Gap.md),
@@ -360,7 +445,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: Gap.xxl),
             Center(
               child: Text(
-                'DataCat 무인현관 · 앱 0.2.0 · API v1.4',
+                'DataCat 무인현관 · 앱 0.3.0 · API v1.5',
                 style: TextStyle(fontSize: 12, color: p.inkFaint),
               ),
             ),

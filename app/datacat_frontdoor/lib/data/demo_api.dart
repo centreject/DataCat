@@ -91,6 +91,11 @@ class DemoDataCatApi implements DataCatApi {
   }
 
   @override
+  Future<void> registerPushToken({required String token, required String platform}) async {
+    // 데모 모드는 서버가 없어서 등록하지 않는다
+  }
+
+  @override
   Future<List<Preset>> fetchPresets() async {
     await Future<void>.delayed(latency);
     return const [

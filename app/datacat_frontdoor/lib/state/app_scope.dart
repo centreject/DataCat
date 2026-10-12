@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../push/push_center.dart';
 import 'event_store.dart';
 import 'policy.dart';
 import 'settings.dart';
@@ -12,12 +13,16 @@ class AppScope extends InheritedWidget {
     required this.settings,
     required this.store,
     required this.policy,
+    required this.push,
     required super.child,
   });
 
   final AppSettings settings;
   final EventStore store;
   final VisitPolicy policy;
+
+  /// 휴대폰 푸시 알림 상태
+  final PushCenter push;
 
   static AppScope of(BuildContext context) {
     final scope = context.getInheritedWidgetOfExactType<AppScope>();
@@ -27,5 +32,8 @@ class AppScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(AppScope oldWidget) =>
-      settings != oldWidget.settings || store != oldWidget.store || policy != oldWidget.policy;
+      settings != oldWidget.settings ||
+      store != oldWidget.store ||
+      policy != oldWidget.policy ||
+      push != oldWidget.push;
 }

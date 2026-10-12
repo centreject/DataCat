@@ -51,7 +51,11 @@ lib/
 ├─ state/
 │  ├─ settings.dart       서버 주소·데모 모드 (기기에 저장)
 │  ├─ event_store.dart    방문 목록, 새로고침, 다음 페이지
-│  └─ app_scope.dart      위 두 객체를 화면에 내려주는 InheritedWidget
+│  ├─ policy.dart         알림·응대 정책
+│  └─ app_scope.dart      위 객체들을 화면에 내려주는 InheritedWidget
+├─ push/
+│  ├─ push_center.dart    푸시 토큰 등록·상태·알림 탭 처리 (FCM과 분리돼 있어 테스트 가능)
+│  └─ fcm_backend.dart    Firebase(FCM) 연결. 안드로이드 + Firebase 설정이 있을 때만 켜짐
 └─ ui/
    ├─ shell.dart          아래 탭 (홈 / 기록 / 설정)
    ├─ home_screen.dart    가장 최근 방문, 오늘 요약, 확인할 것, 최근 기록
@@ -61,24 +65,27 @@ lib/
    └─ widgets/            배지, 목록 한 줄, 스냅샷, 현관 그림, 빈 화면/오류
 ```
 
-외부 패키지는 `http`와 `shared_preferences` 두 개뿐입니다. 상태 관리는 Flutter 기본(`ChangeNotifier` + `ListenableBuilder`)으로 했습니다.
+외부 패키지는 `http`, `shared_preferences`, 푸시용 `firebase_core`·`firebase_messaging`입니다. 상태 관리는 Flutter 기본(`ChangeNotifier` + `ListenableBuilder`)으로 했습니다.
 
 ## 화면 기능 요약
 
 - **해/달 버튼(오른쪽 위)**: 라이트·다크를 바꿔요. 색이 0.45초 동안 부드럽게 넘어가고, 선택은 기기에 저장돼요. 설정 → 화면 테마에서 "시스템"을 고르면 기기 설정을 따라가요.
 - **자동 새로고침**: 15초마다 새 방문을 확인해요. 새 방문이 오면 화면 위에 알림 띠가 뜨고, 목록에는 `NEW` 표시가 붙어요. 앱이 화면 뒤로 가면 멈춰요.
 - **알림·응대 정책 (설정 → 알림·응대 정책)**: 부재 중 응대 방식(음성 접수 / 기록만), 알림 받을 방문 종류, 방해 금지 시간을 정해요. 긴급·안전 확인은 항상 알려요. 서버 정책 API가 생기기 전까지는 이 기기에만 저장되고, `VisitPolicy.toJson()` 형태로 바로 보낼 수 있어요.
+- **휴대폰 푸시 알림 (안드로이드)**: 앱을 닫아 둬도 새 방문이 알림으로 와요. 알림을 누르면 그 방문의 상세 화면이 열려요. 설정 → 휴대폰 푸시 알림에서 상태를 보고, "테스트 방문 보내기"로 시험할 수 있어요. 켜는 방법은 `datacat-stack/PUSH.md`.
 - **새 방문 시뮬레이션**: 데모 모드에서 설정 → "새 방문 시뮬레이션 → 추가"를 누르면 방금 누가 다녀간 것처럼 기록이 하나 생겨요(시연용). 도커의 목업 API는 3분마다 저절로 새 방문을 만들어요.
 
 ## 서버 담당에게 전할 것
 
-- 앱은 `GET /api/v1/events`, `GET /api/v1/events/{id}`, `GET /api/v1/events/{id}/snapshot`, `GET /api/v1/presets`만 호출합니다.
+- 앱은 `GET /api/v1/events`, `GET /api/v1/events/{id}`, `GET /api/v1/events/{id}/snapshot`, `GET /api/v1/presets`, `POST /api/v1/push-tokens`를 호출합니다.
+- 푸시는 `datacat-stack/PUSH.md`의 "알림 규칙"대로 보내 주세요 (`data.eventId`, `tag = event_{eventId}`).
 - 목록 응답은 명세의 `{content, page, size, totalElements}`와 Spring Data 기본 형식(`number`, `last`) 둘 다 받습니다.
 - 분류 기획의 `mainCategory`(한글 "배송" 또는 `DELIVERY` 같은 코드 모두 가능), `subCategory`, `responsePolicy`, `reason`, `needsReview`를 이벤트 응답에 넣어 주면 화면이 그 값을 우선 사용합니다. 없으면 `eventType` → `purpose` 순서로 분류를 추정합니다.
 - 오류 응답 `{code, message}`의 `message`는 사용자에게 그대로 보이니 한국어 문장으로 주세요.
 
 ## 아직 안 한 것
 
-- 푸시 알림(FCM, API 11장) — 3단계. `POST /api/v1/push-tokens` 등록과 `event_{id}` 태그 처리가 필요합니다.
+- 아이폰 푸시 — 애플 개발자 계정과 Mac이 필요해 보류. 안드로이드만 지원합니다.
+- 알림·응대 정책을 푸시에도 적용 — 서버 정책 API가 필요합니다.
 - 프리셋 문구 수정 — 기기에 음성 합성이 들어오는 3단계로 미뤄져 있어 앱은 읽기만 합니다.
 - 로그인·기기 인증 — 명세상 미구현.

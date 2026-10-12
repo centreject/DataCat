@@ -18,6 +18,9 @@ abstract interface class DataCatApi {
 
   /// 스냅샷 이미지 주소. null이면 앱이 현관 그림으로 대신 표시한다.
   Uri? snapshotUri(VisitEvent event);
+
+  /// 이 휴대폰의 푸시 토큰을 서버에 등록한다 (API 11.1). 같은 토큰을 여러 번 보내도 된다.
+  Future<void> registerPushToken({required String token, required String platform});
 }
 
 class ApiException implements Exception {
@@ -131,7 +134,30 @@ class HttpDataCatApi implements DataCatApi {
     return uri.hasScheme ? uri : origin.resolveUri(uri);
   }
 
-  Future<Object?> _getJson(String path, {Map<String, String>? query}) async {
+  @override
+  Future<void> registerPushToken({required String token, required String platform}) async {
+    await _send('POST', '/api/v1/push-tokens', body: {'deviceToken': token, 'platform': platform});
+  }
+
+  /// (목업 서버 전용) 방금 새 방문이 온 것처럼 하나 만든다. 푸시가 오는지 확인할 때 쓴다.
+  /// 실제 Spring 서버에는 이 주소가 없어서 404가 난다.
+  Future<VisitEvent> createMockVisit() async {
+    final json = await _send('POST', '/api/v1/_mock/visits');
+    if (json is! Map<String, dynamic>) {
+      throw const ApiException('서버 응답 형식이 올바르지 않아요.', code: 'BAD_RESPONSE');
+    }
+    return VisitEvent.fromJson(json);
+  }
+
+  Future<Object?> _getJson(String path, {Map<String, String>? query}) =>
+      _send('GET', path, query: query);
+
+  Future<Object?> _send(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Map<String, Object?>? body,
+  }) async {
     final uri = origin.replace(
       path: '${origin.path}$path',
       queryParameters: query,
@@ -139,9 +165,17 @@ class HttpDataCatApi implements DataCatApi {
 
     final http.Response res;
     try {
-      res = await _client
-          .get(uri, headers: const {'Accept': 'application/json'})
-          .timeout(timeout);
+      final request = method == 'GET'
+          ? _client.get(uri, headers: const {'Accept': 'application/json'})
+          : _client.post(
+              uri,
+              headers: const {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
+              },
+              body: body == null ? null : jsonEncode(body),
+            );
+      res = await request.timeout(timeout);
     } on TimeoutException {
       throw const ApiException(
         '서버 응답이 늦어요. 주소와 네트워크를 확인해 주세요.',
@@ -154,13 +188,13 @@ class HttpDataCatApi implements DataCatApi {
     }
 
     // 한글이 깨지지 않도록 바이트에서 직접 UTF-8로 읽는다.
-    final body = utf8.decode(res.bodyBytes, allowMalformed: true);
+    final text = utf8.decode(res.bodyBytes, allowMalformed: true);
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ApiException.fromResponse(res.statusCode, body);
+      throw ApiException.fromResponse(res.statusCode, text);
     }
-    if (body.isEmpty) return null;
+    if (text.isEmpty) return null;
     try {
-      return jsonDecode(body);
+      return jsonDecode(text);
     } on FormatException {
       throw const ApiException('서버 응답을 읽을 수 없어요.', code: 'BAD_RESPONSE');
     }

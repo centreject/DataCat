@@ -7,23 +7,53 @@
   GET  /api/v1/events/{eventId}          상세 (9.2)
   GET  /api/v1/events/{eventId}/snapshot 스냅샷 (9.3) — 목업에는 사진이 없어 404
   GET  /api/v1/presets                   프리셋 (10.1)
-  POST /api/v1/push-tokens               푸시 토큰 등록 (11.1) — 받기만 함
+  POST /api/v1/push-tokens               푸시 토큰 등록 (11.1) — 저장하고, 새 방문마다 FCM 으로 보냄
   GET  /health                           상태 확인
-  POST /api/v1/_mock/visits              (시연용) 방금 새 방문이 온 것처럼 하나 추가
+  POST /api/v1/_mock/visits              (시연용) 방금 새 방문이 온 것처럼 하나 추가 (+ 푸시)
+  GET  /api/v1/_mock/push                (시연용) 푸시 설정 상태, 등록된 기기, 마지막 발송 결과
+  POST /api/v1/_mock/push-test           (시연용) 등록된 모든 기기에 테스트 알림
+
+푸시: Firebase 서비스 계정 키를 FCM_CREDENTIALS_FILE(기본 /secrets/firebase-service-account.json)에
+두면 켜진다. 키가 없어도 서버는 뜨고 토큰만 저장한다. 자세한 건 datacat-stack/PUSH.md.
 
 환경변수 MOCK_AUTO_VISIT_SECONDS (기본 180): 이 간격마다 새 방문이 저절로 하나씩 생긴다.
 앱의 자동 새로고침(15초)과 "새 방문" 알림을 시연하기 위한 것. 0 이면 끈다.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
+import threading
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+import push
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
 KST = timezone(timedelta(hours=9))
-app = FastAPI(title="DataCat mock API", version="1.4-mock")
+pusher = push.from_env()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # 자동 방문을 제때 만들어야 푸시도 제때 간다 (요청이 없어도 5초마다 확인)
+    async def ticker():
+        while True:
+            await asyncio.sleep(5)
+            _catch_up_auto_visits()
+
+    task = asyncio.create_task(ticker()) if _AUTO_SECONDS > 0 else None
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="DataCat mock API", version="1.5-mock", lifespan=lifespan)
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
@@ -100,9 +130,18 @@ _AUTO_SECONDS = int(os.environ.get("MOCK_AUTO_VISIT_SECONDS", "180"))
 _extra: list[dict] = []
 _next_id = 200
 _next_auto = datetime.now(KST) + timedelta(seconds=_AUTO_SECONDS) if _AUTO_SECONDS > 0 else None
+_visit_lock = threading.RLock()  # 요청 스레드와 자동 방문 타이머가 동시에 만들지 않게
 
 
-def _add_visit(at: datetime) -> dict:
+def _add_visit(at: datetime, notify: bool = True) -> dict:
+    with _visit_lock:
+        e = _make_visit(at)
+    if notify:
+        pusher.notify_event(e)
+    return e
+
+
+def _make_visit(at: datetime) -> dict:
     global _next_id
     tpl = dict(_ARRIVALS[(_next_id - 200) % len(_ARRIVALS)])
     stay = tpl.pop("_stay")
@@ -124,10 +163,15 @@ def _catch_up_auto_visits() -> None:
     global _next_auto
     if _next_auto is None:
         return
-    now = datetime.now(KST)
-    while _next_auto <= now:
-        _add_visit(_next_auto)
-        _next_auto += timedelta(seconds=_AUTO_SECONDS)
+    with _visit_lock:
+        now = datetime.now(KST)
+        missed = []
+        while _next_auto <= now:
+            missed.append(_add_visit(_next_auto, notify=False))
+            _next_auto += timedelta(seconds=_AUTO_SECONDS)
+    # 서버가 오래 멈춰 있다 깨어나도 알림은 가장 최근 것 하나만
+    if missed:
+        pusher.notify_event(missed[-1])
 
 
 def _events() -> list[dict]:
@@ -202,7 +246,28 @@ def presets():
 
 @app.post("/api/v1/push-tokens", status_code=201)
 def register_push_token(body: dict):
-    return {"registered": True, "platform": body.get("platform")}
+    token = str(body.get("deviceToken") or "").strip()
+    platform = str(body.get("platform") or "").upper()
+    if not token or len(token) > 4096:
+        return _error(400, "INVALID_REQUEST", "deviceToken 이 비어 있거나 너무 깁니다.")
+    if platform not in push.PLATFORMS:
+        return _error(400, "INVALID_REQUEST", "platform 은 ANDROID, IOS, WEB 중 하나여야 합니다.")
+    pusher.register(token, platform)
+    return {"registered": True, "platform": platform, "pushEnabled": pusher.enabled}
+
+
+@app.get("/api/v1/_mock/push")
+def push_status():
+    return pusher.status()
+
+
+@app.post("/api/v1/_mock/push-test")
+def push_test():
+    if pusher.token_count() == 0:
+        return _error(409, "NO_DEVICE", "등록된 휴대폰이 없어요. 앱에서 데모 모드를 끄고 이 서버 주소로 연결해 주세요.")
+    latest = _events()[0]
+    pusher.send_test(str(latest["eventId"]), "테스트 알림", "DataCat 푸시가 잘 도착했어요. 누르면 최근 방문이 열려요.")
+    return {"queued": True, "devices": pusher.token_count(), "pushEnabled": pusher.enabled, "problem": pusher.problem}
 
 
 @app.post("/api/v1/_mock/visits", status_code=201)
@@ -212,4 +277,4 @@ def mock_new_visit():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "profile": "mock"}
+    return {"status": "ok", "profile": "mock", "push": pusher.enabled}
