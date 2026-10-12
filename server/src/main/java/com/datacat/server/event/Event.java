@@ -25,9 +25,14 @@ public class Event {
     @Column(nullable = false, length = 30)
     private String triggerType;
 
+    private Integer distanceMm;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private EventStatus status;
+
+    @Column(columnDefinition = "TEXT")
+    private String visionResult;
 
     @Column(length = 100)
     private String eventType;
@@ -48,6 +53,8 @@ public class Event {
     private Instant occurredAt;
 
     private Instant endedAt;
+
+    private Instant lastImageReceivedAt;
 
     protected Event() {
         // JPA가 DB에서 읽은 데이터로 객체를 만들 때 사용
@@ -77,8 +84,16 @@ public class Event {
         return triggerType;
     }
 
+    public Integer getDistanceMm() {
+        return distanceMm;
+    }
+
     public EventStatus getStatus() {
         return status;
+    }
+
+    public String getVisionResult() {
+        return visionResult;
     }
 
     public String getEventType() {
@@ -107,5 +122,42 @@ public class Event {
 
     public Instant getEndedAt() {
         return endedAt;
+    }
+    public Instant getLastImageReceivedAt() {
+        return lastImageReceivedAt;
+    }
+
+    public void attachSnapshot(String snapshotPath) {
+        if (snapshotPath == null || snapshotPath.isBlank()) {
+            throw new IllegalArgumentException(
+                    "사진 파일 이름은 비어 있을 수 없습니다."
+            );
+        }
+
+        this.snapshotPath = snapshotPath;
+    }
+
+    public void recordImageAnalysis(
+            Integer distanceMm,
+            String visionResult
+    ) {
+        this.distanceMm = distanceMm;
+        this.visionResult = visionResult;
+    }
+
+    public void complete(Instant endedAt) {
+        this.status = EventStatus.COMPLETED;
+        this.endedAt = endedAt;
+    }
+    public void beginImageReception(Instant receivedAt) {
+        if (receivedAt == null) {
+            throw new IllegalArgumentException(
+                    "사진 수신 시각은 비어 있을 수 없습니다."
+            );
+        }
+
+        this.lastImageReceivedAt = receivedAt;
+        this.status = EventStatus.WAITING_AUDIO;
+        this.endedAt = null;
     }
 }

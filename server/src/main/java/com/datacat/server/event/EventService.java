@@ -7,15 +7,22 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.datacat.server.storage.SnapshotStorageService;
+import org.springframework.core.io.Resource;
 
 @Service
 @Transactional(readOnly = true)
 public class EventService {
 
     private final EventRepository eventRepository;
+    private final SnapshotStorageService snapshotStorageService;
 
-    public EventService(EventRepository eventRepository) {
+    public EventService(
+            EventRepository eventRepository,
+            SnapshotStorageService snapshotStorageService
+    ) {
         this.eventRepository = eventRepository;
+        this.snapshotStorageService = snapshotStorageService;
     }
 
     public EventPageResponse getEvents(int page, int size) {
@@ -67,5 +74,21 @@ public class EventService {
                 ));
 
         return EventDetailResponse.from(event);
+    }
+    public Resource getSnapshot(Long eventId) {
+        if (eventId < 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "eventId는 1 이상이어야 합니다."
+            );
+        }
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "해당 이벤트를 찾을 수 없습니다."
+                ));
+
+        return snapshotStorageService.load(event.getSnapshotPath());
     }
 }
