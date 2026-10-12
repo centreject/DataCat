@@ -9,6 +9,7 @@ import time
 TRIG_PIN = 24  # BCM 번호, 물리 핀 18
 ECHO_PIN = 23  # BCM 번호, 물리 핀 16. 분압 회로를 거쳐 연결한다.
 ECHO_TIMEOUT = 0.03
+POLL_INTERVAL = 0.1
 
 
 def measure_distance(gpio):
@@ -38,16 +39,20 @@ def measure_distance(gpio):
 
 
 class ProximityDetector:
-    """연속 측정으로 접근/이탈을 확인하고 같은 접근의 중복 출력을 막는다."""
+    """연속 측정으로 접근/이탈을 확인하고 같은 접근의 중복 출력을 막는다.
 
-    def __init__(self, threshold_cm, release_cm, samples=3):
+    clear_samples를 지정하면 이탈 확인에 그만큼 연속 측정이 필요하다(기획서의 복귀 안정화 시간).
+    """
+
+    def __init__(self, threshold_cm, release_cm, samples=3, clear_samples=None):
         if not (2 <= threshold_cm < release_cm <= 400):
             raise ValueError("2 <= 감지 거리 < 해제 거리 <= 400 조건이 필요합니다.")
-        if samples < 1:
+        if samples < 1 or (clear_samples is not None and clear_samples < 1):
             raise ValueError("연속 측정 횟수는 1 이상이어야 합니다.")
         self.threshold_cm = threshold_cm
         self.release_cm = release_cm
         self.samples = samples
+        self.clear_samples = samples if clear_samples is None else clear_samples
         self.active = False
         self.count = 0
 
@@ -59,7 +64,7 @@ class ProximityDetector:
         crossed = (distance >= self.release_cm if self.active
                    else distance <= self.threshold_cm)
         self.count = self.count + 1 if crossed else 0
-        if self.count < self.samples:
+        if self.count < (self.clear_samples if self.active else self.samples):
             return None
 
         self.active = not self.active
@@ -71,12 +76,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--threshold-cm", type=float, help="접근 감지 거리(cm)")
     parser.add_argument("--release-cm", type=float, help="감지 해제 거리(cm), 감지 거리보다 크게 지정")
-    parser.add_argument("--samples", type=int, default=3, help="상태 변경에 필요한 연속 측정 횟수(기본: 3)")
+    parser.add_argument("--samples", type=int, default=3, help="접근 확인에 필요한 연속 측정 횟수(기본: 3)")
+    parser.add_argument("--clear-s", type=float, default=3.0,
+                        help="이탈 확인에 필요한 해제 거리 유지 시간(초, 기본: 3). 기획서 권장 3~5초")
     args = parser.parse_args()
     if (args.threshold_cm is None) != (args.release_cm is None):
         parser.error("--threshold-cm과 --release-cm을 함께 지정하세요.")
     if args.samples < 1:
         parser.error("--samples는 1 이상이어야 합니다.")
+    if args.clear_s < POLL_INTERVAL:
+        parser.error(f"--clear-s는 {POLL_INTERVAL}초 이상이어야 합니다.")
     if args.threshold_cm is not None:
         if not (2 <= args.threshold_cm < args.release_cm <= 400):
             parser.error("2 <= 감지 거리 < 해제 거리 <= 400 조건이 필요합니다.")
@@ -92,7 +101,8 @@ def main():
         print("Raspberry Pi에서 python3-rpi.gpio 설치와 실행 환경을 확인하세요.")
         return 1
 
-    detector = (ProximityDetector(args.threshold_cm, args.release_cm, args.samples)
+    detector = (ProximityDetector(args.threshold_cm, args.release_cm, args.samples,
+                                  clear_samples=round(args.clear_s / POLL_INTERVAL))
                 if args.threshold_cm is not None else None)
     configured_pins = []
     try:
@@ -103,7 +113,8 @@ def main():
         configured_pins.append(ECHO_PIN)
         time.sleep(0.1)
         if detector:
-            print(f"접근 <= {args.threshold_cm:g}cm / 해제 >= {args.release_cm:g}cm / 연속 {args.samples}회")
+            print(f"접근 <= {args.threshold_cm:g}cm, 연속 {args.samples}회 / "
+                  f"해제 >= {args.release_cm:g}cm, {args.clear_s:g}초 유지")
         else:
             print("거리 측정 모드: 감지 기준이 지정되지 않았습니다.")
         print("종료: Ctrl+C", flush=True)
@@ -118,7 +129,7 @@ def main():
                 event = detector.update(distance)
                 if event:
                     print(f"{event}: {distance:.1f} cm", flush=True)
-            time.sleep(0.1)
+            time.sleep(POLL_INTERVAL)
     except KeyboardInterrupt:
         print("\n측정 종료")
     except (RuntimeError, OSError) as exc:

@@ -32,6 +32,14 @@ class ProximityTests(unittest.TestCase):
                          [None] * 7)
         self.assertTrue(self.detector.active)
 
+    def test_clear_needs_longer_stable_release(self):
+        detector = ProximityDetector(30, 40, samples=3, clear_samples=5)
+        values = [20, 20, 20, 50, 50, 50, 50, 20, 50, 50, 50, 50, 50]
+        events = [detector.update(v) for v in values]
+        self.assertEqual(events[2], "APPROACH")
+        self.assertEqual(events[3:12], [None] * 9)  # 중간에 다시 가까워지면 처음부터 센다.
+        self.assertEqual(events[12], "CLEAR")
+
     def test_invalid_thresholds_are_rejected(self):
         for near, far in [(40, 30), (30, 30), (1, 20), (30, 401), (float("nan"), 40)]:
             with self.subTest(near=near, far=far), self.assertRaises(ValueError):
