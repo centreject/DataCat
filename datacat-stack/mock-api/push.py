@@ -23,6 +23,9 @@ PLATFORMS = {"ANDROID", "IOS", "WEB"}
 
 def visit_message(event: dict) -> tuple[str, str]:
     """방문 기록 → (알림 제목, 본문). 앱의 분류 이름과 같은 말을 쓴다."""
+    if event.get("status") == "WAITING_AUDIO":
+        # 판정표 A1·A2: 음성 결과 전 첫 알림. 결과가 나오면 같은 태그로 덮어쓴다
+        return "방문객이 왔어요", "용건을 듣고 있어요"
     main = event.get("mainCategory") or "새 방문"
     sub = event.get("subCategory")
     policy = event.get("responsePolicy")

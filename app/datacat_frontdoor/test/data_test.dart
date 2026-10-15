@@ -86,6 +86,18 @@ void main() {
       expect(ev(main: '물품만 있음').category, VisitCategory.packageOnly);
     });
 
+    test('명세 v1.5 용건 9종과 판정표 eventType을 읽는다', () {
+      expect(ev(purpose: 'PUBLIC_EMERGENCY').category, VisitCategory.emergency);
+      expect(ev(purpose: 'SAFETY_REVIEW').category, VisitCategory.safety);
+      expect(ev(purpose: 'WRONG_VISIT').category, VisitCategory.wrongVisit);
+      expect(ev(purpose: 'SERVICE_VISIT').category, VisitCategory.service);
+      expect(ev(purpose: 'PERSONAL_VISIT').category, VisitCategory.personal);
+      expect(ev(purpose: 'SOLICITATION').category, VisitCategory.sales);
+      expect(ev(type: 'CAMERA_BLOCKED').category, VisitCategory.safety);
+      expect(ev(type: 'NO_VISITOR', purpose: 'DELIVERY').category, VisitCategory.unknown);
+      expect(ev(main: 'SOLICITATION').category, VisitCategory.sales);
+    });
+
     test('없으면 eventType, 그다음 purpose', () {
       expect(ev(type: 'UNATTENDED_DELIVERY').category, VisitCategory.packageOnly);
       expect(ev(purpose: 'INSPECTION').category, VisitCategory.service);

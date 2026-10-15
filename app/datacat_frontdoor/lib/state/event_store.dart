@@ -162,8 +162,8 @@ class EventStore extends ChangeNotifier {
           _events.add(e);
           _unseen.add(e.eventId);
           added = true;
-        } else if (_events[i].status != e.status || _events[i].summary != e.summary) {
-          // 예: 음성 대기(WAITING_AUDIO) → 접수 완료로 바뀐 경우
+        } else if (_changed(_events[i], e)) {
+          // 예: 음성 대기(WAITING_AUDIO) → 접수 완료로 바뀌어 분류가 정해진 경우
           _events[i] = e;
         }
       }
@@ -220,3 +220,13 @@ class EventStore extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// 목록을 다시 받았을 때 같은 방문의 내용이 바뀌었는지 (진행 상태, 분류, 요약, 사진)
+bool _changed(VisitEvent a, VisitEvent b) =>
+    a.status != b.status ||
+    a.summary != b.summary ||
+    a.mainCategory != b.mainCategory ||
+    a.subCategory != b.subCategory ||
+    a.processingStatus != b.processingStatus ||
+    a.needsReview != b.needsReview ||
+    a.snapshotUrl != b.snapshotUrl;

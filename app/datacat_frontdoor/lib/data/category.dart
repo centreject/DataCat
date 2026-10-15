@@ -37,15 +37,22 @@ enum VisitCategory {
     switch (e.eventType) {
       case 'UNATTENDED_DELIVERY':
         return packageOnly;
-      case 'VISITOR_TIMEOUT':
+      case 'CAMERA_BLOCKED':
+        return safety;
+      case 'VISITOR_TIMEOUT' || 'NO_VISITOR':
         return unknown;
     }
 
+    // 명세 v1.5 7.6의 용건 9종. v1.4 이전 값(INSPECTION, VISIT, ETC)도 그대로 읽는다.
     return switch (e.purpose) {
-      'DELIVERY' => delivery,
-      'INSPECTION' => service,
-      'VISIT' => personal,
+      'PUBLIC_EMERGENCY' => emergency,
+      'SAFETY_REVIEW' => safety,
       'PICKUP' => pickup,
+      'WRONG_VISIT' => wrongVisit,
+      'DELIVERY' => delivery,
+      'SERVICE_VISIT' || 'INSPECTION' => service,
+      'PERSONAL_VISIT' || 'VISIT' => personal,
+      'SOLICITATION' => sales,
       _ => unknown,
     };
   }
@@ -64,9 +71,9 @@ enum VisitCategory {
       personal: ['PERSONAL_VISIT', 'PERSONAL', '개인방문'],
       service: ['SERVICE_VISIT', 'SERVICE', 'WORK_VISIT', '작업방문'],
       emergency: ['PUBLIC_EMERGENCY', 'EMERGENCY', '공공긴급방문', '공공긴급'],
-      sales: ['SALES_PROMOTION', 'SALES', '영업홍보방문', '영업홍보'],
+      sales: ['SOLICITATION', 'SALES_PROMOTION', 'SALES', '영업홍보방문', '영업홍보'],
       wrongVisit: ['WRONG_VISIT', '잘못방문'],
-      safety: ['SAFETY_CHECK', 'SAFETY', '안전확인필요', '안전확인'],
+      safety: ['SAFETY_REVIEW', 'SAFETY_CHECK', 'SAFETY', '안전확인필요', '안전확인'],
       unknown: ['UNKNOWN', 'ETC', '기타판단불가', '기타'],
     }.entries)
       for (final alias in entry.value)

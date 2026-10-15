@@ -45,6 +45,8 @@ curl -X POST http://localhost:8090/api/v1/_mock/visits      # 포트는 .env 의
 
 끄려면 `.env`에 `MOCK_AUTO_VISIT_SECONDS=0`을 넣어요.
 
+사람이 온 방문은 실제 서버처럼 먼저 "응대 중"(WAITING_AUDIO)으로 보였다가, `MOCK_RECEPTION_SECONDS`(기본 20초) 뒤에 음성 결과가 나온 것처럼 분류가 채워져요. 푸시도 같은 알림이 내용만 바뀌어요. 분류 값은 저장소의 `판정표.md`를 따라요.
+
 ## 휴대폰 푸시 알림
 
 새 방문이 생기면 안드로이드 앱으로 푸시를 보냅니다. Firebase 키를 `secrets/` 에 넣으면 켜지고, 없으면 꺼진 채로 서버만 뜹니다.

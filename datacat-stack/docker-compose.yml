@@ -38,6 +38,7 @@ services:
     image: datacat/mock-api:local
     environment:
       MOCK_AUTO_VISIT_SECONDS: ${MOCK_AUTO_VISIT_SECONDS:-180}   # 시연용 새 방문 간격(초). 0 이면 끔
+      MOCK_RECEPTION_SECONDS: ${MOCK_RECEPTION_SECONDS:-20}    # 사람 방문을 "응대 중"으로 두는 시간(초). 0 이면 바로 완료
       # 푸시(FCM): secrets/firebase-service-account.json 이 있으면 켜진다. 없어도 서버는 뜬다 (PUSH.md)
       FCM_CREDENTIALS_FILE: /secrets/firebase-service-account.json
       PUSH_TOKEN_FILE: /data/push-tokens.json
