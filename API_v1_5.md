@@ -770,9 +770,17 @@ GET /api/v1/presets
     "presetId": 2,
     "type": "COMPLETION",
     "text": "접수되었습니다."
+  },
+  {
+    "presetId": 3,
+    "type": "FALLBACK",
+    "text": "일시적인 오류로 접수할 수 없습니다. 잠시 후 다시 시도해 주세요."
   }
 ]
 ```
+인사·접수 완료·오류 안내 3종을 제공한다.
+오류 안내의 presetId 3과 FALLBACK 타입은 기존 앱 목업과 맞춘다.
+Pi는 서버 연결 실패 시에도 오류 안내를 재생할 수 있도록 해당 고정 음원을 로컬에 보관한다.
 
 ---
 

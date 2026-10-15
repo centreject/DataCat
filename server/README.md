@@ -45,9 +45,18 @@ Docker 실행 환경은 추후 추가한다.
     "presetId": 2,
     "type": "COMPLETION",
     "text": "접수되었습니다."
+  },
+  {
+    "presetId": 3,
+    "type": "FALLBACK",
+    "text": "일시적인 오류로 접수할 수 없습니다. 잠시 후 다시 시도해 주세요."
   }
 ]
 ```
+예상 결과: HTTP 200과 프리셋 3개를 포함한 JSON 배열.
+인사·접수 완료·오류 안내 3종을 제공한다.
+오류 안내의 ID 3과 FALLBACK 타입은 기존 앱 목업과 맞췄다.
+실제 음성 재생은 Pi에 저장된 고정 음원을 사용한다.
 
 Windows PowerShell 확인 명령:
 
@@ -55,7 +64,7 @@ Windows PowerShell 확인 명령:
 curl.exe -i http://localhost:8080/api/v1/presets
 ```
 
-예상 결과: HTTP 200과 프리셋 2개를 포함한 JSON 배열.
+예상 결과: HTTP 200과 프리셋 3개를 포함한 JSON 배열.
 
 ## 이벤트 조회 API — 5주차
 
