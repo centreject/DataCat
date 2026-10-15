@@ -47,6 +47,43 @@ curl -X POST http://localhost:8090/api/v1/_mock/visits      # 포트는 .env 의
 
 사람이 온 방문은 실제 서버처럼 먼저 "응대 중"(WAITING_AUDIO)으로 보였다가, `MOCK_RECEPTION_SECONDS`(기본 20초) 뒤에 음성 결과가 나온 것처럼 분류가 채워져요. 푸시도 같은 알림이 내용만 바뀌어요. 분류 값은 저장소의 `판정표.md`를 따라요.
 
+## Spring 서버로 테스트
+
+목업 API 대신 서버 담당이 만든 Spring 서버를 띄워서 앱을 붙여 볼 수 있어요. 앱은 고칠 필요 없어요.
+
+Spring 코드와 모델 서비스가 아직 다른 브랜치에 있어서, 처음 한 번은 따로 받아 둬야 해요.
+
+```powershell
+git clone -b feature/image-upload https://github.com/centreject/DataCat.git C:\DataCat-spring
+git clone -b main https://github.com/centreject/DataCat.git C:\DataCat-main
+```
+
+`.env`에 두 경로를 적어요.
+
+```
+SPRING_DIR=C:/DataCat-spring/server
+MODEL_DIR=C:/DataCat-main/model-service
+```
+
+실행 (MySQL과 모의 모델 서비스가 같이 떠요. 처음엔 Gradle 빌드 때문에 몇 분 걸려요)
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.spring.yml --profile backend --profile tunnel up -d --build
+```
+
+- 앱 화면은 그대로 `app.teamdatacat.com`(또는 `localhost:APP_PORT`)에서 봐요. dev 프로필이라 처음엔 예시 방문 3건이 보여요.
+- 라즈베리파이 대신 사진을 올려 보려면 `.\pi-sim.ps1`을 실행해요. `-Kind package`, `-Kind empty`, `-Trigger BUTTON`으로 경우를 바꿀 수 있어요.
+- Spring에는 아직 푸시 토큰 등록과 목업 전용 기능이 없어서, 앱 설정의 푸시 칸은 "등록하지 못했어요", 테스트 방문 보내기는 "지원하지 않아요"로 나와요.
+- 팀원 코드가 바뀌면 `git -C C:\DataCat-spring pull`, `git -C C:\DataCat-main pull` 후 같은 명령으로 다시 띄워요.
+
+목업으로 돌아갈 때
+
+```powershell
+docker compose --profile tunnel up -d --build --remove-orphans
+```
+
+나중에 Spring과 모델 서비스가 main에 합쳐지고 이 브랜치도 main을 따라가면, 따로 받은 폴더 없이 `git pull` 후 위 실행 명령만 쓰면 돼요.
+
 ## 휴대폰 푸시 알림
 
 새 방문이 생기면 안드로이드 앱으로 푸시를 보냅니다. Firebase 키를 `secrets/` 에 넣으면 켜지고, 없으면 꺼진 채로 서버만 뜹니다.

@@ -1,4 +1,4 @@
-# 안드로이드 앱(APK) 빌드 — Flutter 를 설치하지 않아도 도커로 만든다.
+﻿# 안드로이드 앱(APK) 빌드 — Flutter 를 설치하지 않아도 도커로 만든다.
 #
 #   .\build-apk.ps1                                   기본 서버 https://api.teamdatacat.com
 #   .\build-apk.ps1 -Api http://192.168.0.12:8090     집 와이파이의 서버로 시험할 때
