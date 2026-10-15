@@ -57,7 +57,7 @@ curl.exe -i http://localhost:8080/api/v1/presets
 
 예상 결과: HTTP 200과 프리셋 2개를 포함한 JSON 배열.
 
-## 이벤트 조회 API — 2주차
+## 이벤트 조회 API — 5주차
 
 ### 구현 내용
 
@@ -156,10 +156,10 @@ PowerShell의 curl.exe로 다음 결과를 확인했습니다.
 eventType은 최종 분류 정책 확정 전까지 null을 허용합니다.
 샘플의 음성 분석 결과와 사진 정보는 null입니다.
 
-2주차에서는 이벤트 조회 기능을 구현했습니다.
-사진 업로드·조회와 Vision 호출은 아래 3주차 항목에서 추가했습니다.
+5주차에서는 이벤트 조회 기능을 구현했습니다.
+사진 업로드·조회와 Vision 호출은 아래 6주차 항목에서 추가했습니다.
 
-## 사진 접수·조회 및 Vision 연동 — 3주차
+## 사진 접수·조회 및 Vision 연동 — 6주차
 
 ### 구현 내용
 
@@ -339,7 +339,9 @@ JSON 오류 응답은 code와 message 형식을 사용합니다.
 
 모의 모델은 파일 이름으로 감지 결과를 선택합니다.
 이번 결과는 통신·저장·분기 검증이며 실제 이미지 인식 정확도 검증은 아닙니다.
-빌드는 성공했으며, 자동화 테스트 실행 결과는 포함하지 않았습니다.
+최초 구현 시 빌드와 수동 연동 테스트를 확인했습니다.
+PR 리뷰 반영 과정에서 H2 기반 test 프로필을 추가했으며,
+gradlew.bat test로 contextLoads 테스트가 통과했습니다.
 
 ### 후속 작업
 
@@ -348,3 +350,21 @@ JSON 오류 응답은 code와 message 형식을 사용합니다.
 - 앱 알림
 - 전체 Docker 실행 구성
 - 음성 접수와 후속 프리셋 응대
+
+## 자동 테스트
+
+테스트 실행에는 Java 21이 필요합니다.
+
+```powershell
+cd server
+.\gradlew.bat test
+```
+
+ServerApplicationTests는 test 프로필을 사용합니다.
+src/test/resources/application-test.properties에서 H2 메모리 DB를 설정하므로,
+기본 contextLoads 테스트에 외부 MySQL이나 실행 중인 모델 서비스가 필요하지 않습니다.
+
+실제 서버 실행은 기존 MySQL 설정을 사용합니다.
+H2 테스트는 애플리케이션 시작을 검증하며, 실제 MySQL·모델 연동 검증을 대체하지 않습니다.
+
+검증 결과: gradlew.bat test 성공.
