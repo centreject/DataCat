@@ -816,7 +816,22 @@ PUT /api/v1/presets/{presetId}
 
 # 11. Push 알림
 
-방문 이벤트 알림이 필요할 경우 Push 서비스를 사용한다.
+FCM 푸시 알림은 1단계 MVP에 포함한다.
+
+**발송 기준 — 2026-10-15 앱·서버 담당 협의**
+
+- 1단계 MVP에서는 사진 분석 결과를 DB에 저장한 직후 방문 알림 발송을 요청한다.
+- 2단계 MVP에서는 음성 분석 결과를 DB에 반영한 뒤 같은 방문의 알림 내용을 갱신한다.
+- FCM 발송은 DB 저장이 커밋된 이후 별도 비동기 작업으로 실행한다. Pi에 대한 HTTP 응답은 FCM 발송 완료를 기다리지 않는다.
+- 같은 방문은 `event_{eventId}` 태그를 고정하여 기존 알림 표시를 갱신한다. Android에서는 `android.notification.tag`에 지정한다.
+- FCM `data.eventId`는 문자열로 전달한다. 앱은 해당 값으로 방문 상세 API를 호출한다.
+- 토큰 등록과 나머지 메시지 형식은 앱 브랜치의 [PUSH.md](https://github.com/centreject/DataCat/blob/feature/app-design/datacat-stack/PUSH.md)를 따른다.
+
+발송 시점은 이번 협의 내용을 기준으로 한다. PUSH.md에 남아 있는 기존 "방문 처리 종료 후 발송" 설명은 이번 합의에 맞춰 갱신할 대상이다.
+
+아래 Push Payload 예시는 알림 필드의 요약이다. 실제 FCM 요청 본문은 PUSH.md의 `message.notification`, `message.data`, `message.android` 구조를 따른다.
+
+현재 Spring의 푸시 토큰 등록·FCM 발송 기능은 구현 예정이며, 이 절은 구현할 동작을 정의한다.
 
 ## 11.1 Push Token 등록
 
@@ -998,6 +1013,7 @@ Event
 # 15. 구현 우선순위
 
 ## Phase 1 — 이미지 흐름 먼저 연결
+FCM 푸시 알림을 포함한다. 사진 분석 결과 저장 후 알림 발송과 앱 상세 화면 이동까지 검증한다.
 
 ```text
 Pi
@@ -1041,7 +1057,6 @@ POST /api/v1/device/events/{eventId}/end
 ## Phase 3 — 서비스 기능 보강
 
 - 프리셋 관리
-- Push
 - 기기 인증
 - 사용자 인증
 - 공통 예외 처리
@@ -1058,7 +1073,7 @@ POST /api/v1/device/events/{eventId}/end
 3. 각 상황에 연결할 프리셋 종류/문구
 4. 모델 서비스 실제 포트 및 Docker 서비스 이름 — 포트 `8000` 제안(모델 서비스 Dockerfile 기본값), 서비스 이름은 compose 확정 시
 5. 기기 인증 방식 및 키 발급 방법
-6. Push 서비스의 최종 선택/세부 payload
+6. FCM 사용과 1단계 포함은 확정. 발송 시점·비동기 발송·동일 방문 태그 갱신은 11장의 2026-10-15 협의를 따른다.
 7. Vision 응답에 bounding box가 필요한지 여부
 8. 세션 유예 윈도우(30초)·ToF 복귀 안정화 시간(3~5초)의 정확한 값 — 시제품 실측 후 확정
 
