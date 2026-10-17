@@ -15,7 +15,7 @@ docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model
 
 - 첫 실행 때 모델 가중치(약 10GB)를 `/models` 볼륨에 내려받는다. 그 뒤로는 인터넷 없이 뜬다.
 - 컨테이너는 root가 아닌 일반 사용자 `app`(UID 1000)으로 실행된다. 호스트 폴더를 `/models`에 연결할 때는 UID 1000 사용자(WSL 기본 계정)가 쓸 수 있는 폴더여야 한다. 이미 받아 둔 가중치 폴더는 읽기 전용으로도 연결할 수 있다: `-v $PWD/data/weights:/models:ro`.
-- 파인튜닝한 물품 인식 가중치(아직 서비스 미사용, 19MB): [Release `package-model-v1`](https://github.com/centreject/DataCat/releases/tag/package-model-v1) → [`yoloe-11s-package-oi.pt`](https://github.com/centreject/DataCat/releases/download/package-model-v1/yoloe-11s-package-oi.pt) (sha256 `0f0bf0ec…32c5ce`). 받아서 가중치 폴더(`data/weights/` 또는 `/models`)에 둔다. 결과·다시 만드는 법은 [`eval/README.md`](eval/README.md), [`finetune/`](finetune/).
+- 파인튜닝한 물품 인식 가중치(19MB, 서비스가 첫 실행 때 자동으로 받고 sha256을 확인함): [Release `package-model-v1`](https://github.com/centreject/DataCat/releases/tag/package-model-v1) → [`yoloe-11s-package-oi.pt`](https://github.com/centreject/DataCat/releases/download/package-model-v1/yoloe-11s-package-oi.pt) (sha256 `0f0bf0ec…32c5ce`). 인터넷이 없는 곳에서는 미리 받아 가중치 폴더(`data/weights/` 또는 `/models`)에 둔다. 결과·다시 만드는 법은 [`eval/README.md`](eval/README.md), [`finetune/`](finetune/).
 - 준비 확인: `curl http://localhost:8000/health` → `{"status":"ok","profile":"lite"}` (로딩 중에는 `loading`, 다른 요청은 503)
 - 동작 확인: `python docker/smoke.py` — 모든 엔드포인트를 한 번씩 호출해 응답 형식을 검사한다(표준 라이브러리만 사용).
 

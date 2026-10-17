@@ -13,28 +13,19 @@ class Settings(BaseSettings):
     model_profile: Literal["full", "lite", "mock"] = "lite"
     mock_delay_ms: int = 0
     person_conf: float = 0.4
-    # Tuned on the Open Images val/test subset from eval/prepare_images.py (2026-09-27),
-    # measured per whole folder (prompts below): person 93%, box 83%, plastic bag 80%,
-    # empty-hallway false positives 10%. Zero-shot; box/bag still just below the 85% target.
+    # Packages = fine-tuned YOLOE (box, envelope, plastic bag; finetune/) + zero-shot YOLOE on the
+    # prompts below for items the fine-tuned model was never shown. 2026-10-17, eval/README F1:
+    # box 78→98%, plastic bag 80→100%, empty-hallway false positives 10→3%, +15 ms per image.
+    # The zero-shot model alone used to have 14 prompts (box, bag, envelope, flyer, … at conf 0.25).
     package_conf: float = 0.25
     package_prompts: list[str] = [
-        "box",
-        "cardboard box",
-        "package",
-        "bag",
-        "plastic bag",
-        "shopping bag",
         "food delivery bag",
         "takeout container",
         "cooler bag",
-        # 2026-10-04: items the classification plan lists for 물품만 있음 (box 53→83%, bag 72→80%,
-        # empty-hallway false positives 3→10%).
         "flower bouquet",
         "cake box",
-        "gift box",
-        "envelope",
-        "flyer",
     ]
+    package_ft_conf: float = 0.4
     weights_dir: str = str(DATA_DIR / "weights")
     stt_model: str = "large-v3-turbo"
     llm_model: str = "Qwen/Qwen3-4B-Instruct-2507"
