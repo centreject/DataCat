@@ -98,3 +98,14 @@
 {"id": "unknown_08", "transcript": "여기 엘리베이터 어디 있어요?", "purpose": "UNKNOWN", "subtype": null}
 {"id": "unknown_09", "transcript": "지금 몇 시예요?", "purpose": "UNKNOWN", "subtype": null}
 {"id": "unknown_10", "transcript": "아 네 네… 알겠습니다.", "purpose": "UNKNOWN", "subtype": null}
+{"id": "safety_09", "transcript": "얼굴 기억해 뒀다. 다음에 보자.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_10", "transcript": "밤길 조심해라.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_11", "transcript": "가족들 다 잘 있지? 별일 없어야 할 텐데.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_12", "transcript": "숨어 봐야 소용없어, 끝까지 찾아낸다.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_13", "transcript": "경찰 불러도 소용없어. 후회하게 해 줄게.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_14", "transcript": "집에 있는 거 알고 왔어. 오늘 끝장 보자.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_15", "transcript": "이대로 넘어갈 줄 알았냐? 두고 봐.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "safety_16", "transcript": "너 때문에 내 인생 망했어. 책임지게 만들 거야.", "purpose": "SAFETY_REVIEW", "subtype": null}
+{"id": "service_13", "transcript": "안에 계신 거 알아요, 관리실인데 아랫집 누수 때문에 잠깐 확인할게요.", "purpose": "SERVICE_VISIT", "subtype": null}
+{"id": "personal_13", "transcript": "나 갈게, 밤길 조심해서 다닐게. 다음에 또 보자.", "purpose": "PERSONAL_VISIT", "subtype": null}
+{"id": "delivery_19", "transcript": "집에 계신 거 알고 왔어요, 등기라 서명 받아야 해서요.", "purpose": "DELIVERY", "subtype": "MAIL"}
