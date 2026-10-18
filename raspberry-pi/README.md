@@ -108,6 +108,12 @@ docker compose run --rm pi python distance_sensor.py --sensor tof  # 장치별 �
 - 컨테이너에서는 보드 자동 감지가 실패할 수 있어 `BLINKA_FORCEBOARD=RASPBERRY_PI_4B`로 지정한다.
 - 프리셋 음원은 이미지에 넣지 않고 `./sounds`를 읽기 전용으로 붙인다.
 
+참고: 이 이미지는 일반 PC Docker에서 그대로 실행되지 않는다.
+
+- Pi에서 빌드한 이미지는 ARM64용이라 x86 PC에서는 `exec format error`(에뮬레이션 시 느리게 동작). 같은 Dockerfile을 PC에서 다시 빌드하면 PC용 이미지는 만들어진다.
+- I2C·GPIO·웹캠·사운드 장치를 컨테이너에 넘기는 구성이라 해당 장치가 없는 PC에서는 컨테이너가 시작되지 않는다.
+- PC에서는 단위 테스트(`python3 -m unittest`)로 로직을 확인하고, 서버 쪽 시험은 `datacat-stack/pi-sim.ps1`(feature/app-design)로 Pi 요청을 흉내 낸다.
+
 ## 장치별 시험
 
 모든 명령은 이 폴더에서 실행한다. 사운드카드 번호는 USB 연결 순서로 바뀔 수 있어 코드에서는 카드 이름(`CARD=Headphones`, `CARD=Device`)을 쓴다.
