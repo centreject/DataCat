@@ -96,7 +96,7 @@ python3 -m venv --system-site-packages .venv   # RPi.GPIO(apt)를 venv에서 쓰
 
 ## Docker로 실행
 
-Pi에 Docker가 있으면 가상환경 없이 컨테이너로 실행할 수 있다. 호스트의 I2C 활성화(`dtparam=i2c_arm=on`)는 그대로 필요하다. **Pi 실기에서 아직 빌드·실행 확인 전이다.**
+Pi에 Docker가 있으면 가상환경 없이 컨테이너로 실행할 수 있다. 호스트의 I2C 활성화(`dtparam=i2c_arm=on`)는 그대로 필요하다. Pi 4 실기에서 빌드(약 4분, 이미지 약 820MB)와 장치 동작(ToF·웹캠·마이크·3.5mm 출력)을 확인했다.
 
 ```bash
 docker compose up -d --build                                       # main.py --offline 상시 실행
