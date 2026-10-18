@@ -194,6 +194,24 @@ python3 -m unittest -v
 
 GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리, API 요청 형식을 검사한다(33개). 실제 장치 동작은 위 장치별 시험으로 확인한다.
 
+## 실서버 연동 시험 (2026-10-18)
+
+Pi 4 → 3090 서버(Spring `feature/image-upload` + 실제 모델 `lite` + MySQL, `datacat-stack` compose)로 응대 흐름 전체를 실행했다.
+
+| 단계 | 결과 |
+| --- | --- |
+| ToF 접근 감지 → 촬영 | 정상. 접근 후 촬영 완료까지 1.1~2.2초 |
+| `POST /device/events` | 정상. 서버 응답 0.08~1.2초 |
+| 사람 사진 | `START_RECEPTION` → 재확인 게이트 → 안내 → 마이크 개방 → VAD 녹음(2.2초) 정상 |
+| 사람 없는 사진 | `SILENT_STANDBY`, 응대 안 함 |
+| `POST /device/events/{id}/audio` | 404(Spring 미구현) → 오류 안내(presetId 3) 재생 |
+| 이탈 | `CLEAR` 후 감시 상태 복귀 |
+
+- 카메라 방향이 틀어지면(책상을 향함, 뒤집힘) 사람이 있어도 `SILENT_STANDBY`. 설치 시 카메라를 똑바로, 센서와 같은 방향으로 둔다.
+- 사람 피규어는 감지되지 않았고, 휴대폰 화면의 사람 얼굴 사진은 감지됐다.
+- 같은 기기의 30초 이내 재요청은 서버가 기존 이벤트에 합친다(명세 6.1). 경우를 바꿔 시험할 때는 30초 간격을 둔다.
+- 시험 사진·녹음은 저장소에 올리지 않는다(Zero-Storage, 촬영 공간 노출).
+
 ## 다음 작업
 
 1. Spring `/audio`, `/end` 구현 후 연동 확인. 현재 Spring에는 `POST /device/events`(feature/image-upload)만 있어 음성 전송·종료 알림은 404
