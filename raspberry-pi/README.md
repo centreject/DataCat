@@ -1,50 +1,59 @@
-# Raspberry Pi 거리 센서
+# Raspberry Pi 단말
 
-HC-SR04로 거리를 측정하고 방문객 접근·이탈을 판정하는 코드다. 감지 거리는 아직 정하지 않았으며, 기본 실행에서는 거리만 출력한다. 접근 감지는 실행 옵션으로 감지 거리와 해제 거리를 지정하면 사용할 수 있다.
+방문객 접근 감지(ToF), 사진 촬영, 안내 음성 출력, 발화 녹음을 맡는 현관 단말 코드다. 지금은 서버 없이 Pi 단독으로 전체 응대 흐름을 실행할 수 있고(`main.py --offline`), Spring 연결은 다음 단계다.
 
 | 파일 | 역할 |
 | --- | --- |
-| `distance_sensor.py` | 거리 측정, 접근(`APPROACH`)·이탈(`CLEAR`) 판정 |
+| `main.py` | 응대 흐름: 접근 감지 → 촬영 → 이벤트 생성 → 재확인 게이트 → 안내 → 녹음 → 완료 안내 |
+| `distance_sensor.py` | 거리 측정, 접근(`APPROACH`)·이탈(`CLEAR`) 판정. `--sensor hcsr04\|tof` |
+| `tof_sensor.py` | VL53L0X(I2C) 측정. 범위 밖은 최대 거리, 통신 오류만 측정 실패로 넘긴다 |
 | `gate.py` | 재확인 게이트. 안내 재생 직전 방문객이 아직 있는지 판단(명세 5.3) |
+| `camera.py` | USB 웹캠 JPEG 촬영(메모리로 반환) |
+| `audio_output.py` | 안내 음성 출력(ALSA). `presetId` → `sounds/*.wav`, 재생이 끝나야 반환 |
+| `audio_input.py` | VAD 녹음. 16kHz/16bit/mono WAV를 메모리로 반환, 파일 저장 안 함 |
+| `cam_preview.py` | 웹캠 실시간 미리보기(설치 각도 맞추기용) |
 | `SERVER_SETUP.md` | Raspberry Pi 4 환경 설정과 RTX 3090 서버 연동 구성 |
 
 ## 장비
 
-| 항목 | 구성 |
-| --- | --- |
-| 보드 | Raspberry Pi 4 |
-| 실행 환경 | Ubuntu 22.04, Python 3 |
-| 거리 센서 | HC-SR04 |
-| 마이크 | USB 마이크 |
-| 스피커 | MAX98357 앰프 + 스피커 |
-| 카메라 | USB 카메라, 영상 입력 확인 |
+| 항목 | 구성 | 상태(2026-10-18) |
+| --- | --- | --- |
+| 보드 | Raspberry Pi 4, Ubuntu 22.04, Python 3.10 | |
+| 거리 센서 | VL53L0X ToF 모듈(VL53LXX-V2), I2C | 동작 확인 |
+| 거리 센서(이전) | HC-SR04 초음파 | 코드 유지(`--sensor hcsr04`) |
+| 카메라 | USB 웹캠(GEMBIRD AX2311), 640×480 | 동작 확인 |
+| 마이크 | USB 핀마이크(JMTek) | 동작 확인 |
+| 스피커 | 3.5mm 이어폰(임시) | 동작 확인 |
+| 스피커(예정) | MAX98357A I2S 앰프 | 납땜 손상 의심으로 보류 |
 
-현재 코드는 거리 측정, 접근·이탈 판정, 재확인 게이트까지 구현했다. 마이크 녹음, 스피커 재생, 카메라 촬영, 서버 전송은 다음 단계에서 연결한다. 센서 코드의 실제 보드 실행은 확인이 필요하다.
-
-### 기획서 부품과 다른 점
-
-최종기획서 v2의 거리 센서는 VL53L5CX(8×8 멀티존 ToF)이고, 현재 시제품은 HC-SR04를 쓴다.
-
-- HC-SR04도 초음파가 반사되어 돌아오는 시간으로 거리를 재는 비행시간(Time of Flight) 방식이다. 기획서의 ToF 역할(접근 거리·체류 판정, 이탈 재확인)을 그대로 맡으므로 서버에 보낼 `triggerType`은 명세 값 `TOF`를 쓰고, 거리는 cm 값에 10을 곱해 `distanceMm`으로 보낸다.
-- 한 점만 재는 센서라 멀티존처럼 위치를 나눠 보지 못하고, 음파가 퍼지는 범위(약 15°)에 걸린 가장 가까운 물체를 잰다. 옷처럼 소리를 흡수하는 표면은 측정이 실패할 수 있다.
+기획서의 거리 센서는 VL53L5CX(8×8 멀티존)이고, 시제품은 한 점만 재는 VL53L0X를 쓴다. 서버에는 `triggerType=TOF`, 측정한 mm 값을 `distanceMm`으로 보낸다.
 
 ## 배선
 
-전원을 끈 상태에서 연결한다. 코드의 GPIO 번호는 BCM 기준이다.
+전원을 끈 상태에서 연결한다.
 
-| HC-SR04 | Raspberry Pi 연결 |
+### VL53L0X (I2C)
+
+| 센서 | Raspberry Pi |
+| --- | --- |
+| VIN | 3.3V, 물리 핀 1 |
+| GND | GND, 물리 핀 9 |
+| SDA | GPIO2(SDA), 물리 핀 3 |
+| SCL | GPIO3(SCL), 물리 핀 5 |
+
+`sudo i2cdetect -y 1`에서 `29`가 보이면 인식된 것이다.
+
+### HC-SR04 (이전 구성)
+
+| HC-SR04 | Raspberry Pi |
 | --- | --- |
 | VCC | 5V, 물리 핀 2 |
 | GND | GND, 물리 핀 6 |
 | TRIG | GPIO24, 물리 핀 18 |
 | ECHO | 분압 회로를 거쳐 GPIO23, 물리 핀 16 |
 
-**센서 전원은 5V이며, 5V ECHO 신호를 Pi GPIO에 직접 연결하면 안 된다.** 아래처럼 저항으로 전압을 낮춘다. 두 저항 사이에서 GPIO23으로 연결하며, 센서와 Pi는 GND를 공유한다.
+**5V ECHO 신호를 Pi GPIO에 직접 연결하면 안 된다.** ECHO–분기점 330Ω, 분기점–GND 470Ω으로 낮춰 GPIO23에 연결한다(약 2.94V). 배선 참고: [GPIO Zero DistanceSensor](https://gpiozero.readthedocs.io/en/stable/api_input.html#distancesensor-hc-sr04).
 
-![초음파 센서 배선도](https://gpiozero.readthedocs.io/en/stable/_images/distance_sensor_bb.svg)
-
-
-※ 배선 구조 참고용이며, 실제 사용 저항은 ECHO–분기점 사이 330Ω, 분기점–GND 사이 470Ω이다.
 ```text
 HC-SR04 ECHO ── [330Ω] ──┬── GPIO23 (물리 핀 16)
                         │
@@ -53,61 +62,131 @@ HC-SR04 ECHO ── [330Ω] ──┬── GPIO23 (물리 핀 16)
 Pi GND ──────────────────┴── HC-SR04 GND
 ```
 
-이 구성의 GPIO 입력은 약 2.94V다. 배선 참고: [GPIO Zero 1.6.0 문서의 DistanceSensor 항목(PDF)](https://gpiozero.readthedocs.io/_/downloads/en/v1.6.0/pdf/).
+MAX98357A는 GPIO18·19·21(I2S)을 쓰므로 센서 핀과 겹치지 않는다.
 
-MAX98357 앰프는 GPIO18·19·21(I2S)을 쓰므로 센서 핀과 겹치지 않는다.
+## 설치
 
-## 실행
-
-다음 명령은 Raspberry Pi의 Ubuntu 22.04에서 실행한다. [Ubuntu 제공 GPIO 패키지](https://packages.ubuntu.com/jammy/python3-rpi.gpio)를 사용한다.
+새 Pi에서는 설치 스크립트 한 번이면 아래 수동 설치와 같은 결과가 된다(패키지, I2C, 그룹 권한, 가상환경, 장치 확인).
 
 ```bash
-sudo apt update
-sudo apt install python3-rpi.gpio
-cd raspberry-pi
-python3 distance_sensor.py
+cd raspberry-pi && ./setup.sh
 ```
 
-기본 실행은 거리만 출력한다. 종료는 `Ctrl+C`다. GPIO 접근 권한 오류가 발생하면 같은 파일을 `sudo python3 distance_sensor.py`로 실행해 확인한다. 일반 PC에서는 GPIO 측정이 동작하지 않는다.
+수동 설치:
 
-접근 감지를 시험할 때는 아래 두 옵션을 함께 지정한다. `N`, `M` 자리에 현장에서 정한 거리(cm)를 넣는다. 해제 거리 `M`은 감지 거리 `N`보다 크게 지정한다.
+```bash
+# I2C 활성화: /boot/firmware/config.txt 에 dtparam=i2c_arm=on (Ubuntu Pi 이미지 기본값)
+sudo apt install -y i2c-tools python3-venv python3-rpi.gpio
 
-```text
-python3 distance_sensor.py --threshold-cm N --release-cm M
+# 장치 권한. 이 Ubuntu 이미지는 /dev/i2c-*를 i2c가 아니라 dialout 그룹에 준다(/lib/udev/rules.d/99-gpio.rules)
+sudo usermod -aG dialout,video,audio $USER
+# 다시 로그인해야 적용된다. 재로그인 전에 시험하려면 명령 앞에 sg <그룹> -c "..."를 붙인다.
+
+python3 -m venv --system-site-packages .venv   # RPi.GPIO(apt)를 venv에서 쓰기 위해
+.venv/bin/pip install -r requirements.txt
 ```
 
-- 감지 거리 이내 값이 3회 연속 측정되면 `APPROACH`를 한 번 출력한다. 연속 횟수는 `--samples`로 바꾼다. 기획서의 체류시간 임계값은 이 값으로 맞춘다.
-- 감지 상태에서 해제 거리 이상 값이 3초(`--clear-s`) 동안 이어지면 `CLEAR`를 출력하고 다음 접근을 기다린다. 기획서의 복귀 안정화 시간(권장 3~5초)에 해당한다.
-- 두 거리 사이에서는 기존 상태를 유지한다. 중간에 한 번이라도 다시 가까워지면 처음부터 센다.
-- 측정 사이에 0.1초 대기하며, ECHO의 상승·하강 대기는 각각 최대 0.03초로 제한한다.
-- 응답 없음이나 2~400cm 범위 밖의 값은 측정 실패로 처리한다. 실패를 이탈로 간주하지 않으므로, 실패가 계속되면 자동으로 재감지 대기 상태가 되지 않는다.
+권한 문제는 증상이 서로 달라 헷갈린다.
 
-초음파 센서는 물체까지의 거리를 측정한다. 사람 여부는 이 코드에서 판단하지 않는다. 설치 위치에서 거리값을 확인한 뒤 감지·해제 거리를 조정해야 한다. Python과 Linux의 실행 지연 때문에 측정값에 오차가 있을 수 있다.
+| 증상 | 원인 |
+| --- | --- |
+| `PermissionError: '/dev/i2c-1'` | `dialout` 그룹 없음 |
+| `arecord: no soundcards found` (카드가 있는데도) | `audio` 그룹 없음 |
+| 웹캠 `/dev/video0`를 열 수 없음 | `video` 그룹 없음 |
 
-## 재확인 게이트
+## Docker로 실행
 
-서버가 `START_RECEPTION`을 보내면 단말은 안내를 재생하기 직전 거리를 다시 재서 방문객이 아직 있는지 로컬에서 판단한다(명세 5.3). `gate.visitor_present()`가 이 판단을 맡는다.
+Pi에 Docker가 있으면 가상환경 없이 컨테이너로 실행할 수 있다. 호스트의 I2C 활성화(`dtparam=i2c_arm=on`)는 그대로 필요하다. **Pi 실기에서 아직 빌드·실행 확인 전이다.**
 
-- 0.06초 간격으로 5회 측정하고, 유효값의 과반이 해제 거리 안쪽이면 방문객이 있다고 본다.
-- 유효값이 하나도 없으면 이탈로 본다. 측정 실패가 계속될 때 아무도 없는 현관에 안내를 재생하지 않기 위해서다.
-- 이탈이면 안내를 재생하지 않고 서버에 `VISITOR_LEFT`로 세션 종료를 알린다. 서버 전송은 다음 단계에서 연결한다.
+```bash
+docker compose up -d --build                                       # main.py --offline 상시 실행
+docker compose logs -f
+docker compose run --rm pi python distance_sensor.py --sensor tof  # 장치별 시험
+```
+
+- 장치는 `/dev/i2c-1`, `/dev/gpiomem`, `/dev/video0`, `/dev/snd`를 넘긴다. 컨테이너는 root로 돌아 그룹 권한이 필요 없다.
+- 컨테이너에서는 보드 자동 감지가 실패할 수 있어 `BLINKA_FORCEBOARD=RASPBERRY_PI_4B`로 지정한다.
+- 프리셋 음원은 이미지에 넣지 않고 `./sounds`를 읽기 전용으로 붙인다.
+
+## 장치별 시험
+
+모든 명령은 이 폴더에서 실행한다. 사운드카드 번호는 USB 연결 순서로 바뀔 수 있어 코드에서는 카드 이름(`CARD=Headphones`, `CARD=Device`)을 쓴다.
+
+```bash
+# 장치 확인
+i2cdetect -y 1                      # VL53L0X: 29
+arecord -l; aplay -l                # 마이크: USB Audio Device, 이어폰: bcm2835 Headphones
+ls /dev/video*                      # 웹캠: /dev/video0
+
+# 거리 센서: 거리만 출력 / 접근·이탈 판정
+.venv/bin/python distance_sensor.py --sensor tof
+.venv/bin/python distance_sensor.py --sensor tof --threshold-cm 30 --release-cm 50
+
+# 웹캠: 한 장 저장 / 실시간 미리보기(브라우저 http://localhost:8090, VSCode가 포트 연결)
+.venv/bin/python camera.py cam_test.jpg
+.venv/bin/python cam_preview.py
+
+# 스피커: 삐 소리 / WAV 파일 / 프리셋(sounds/ 음원 필요)
+.venv/bin/python audio_output.py
+.venv/bin/python audio_output.py some.wav
+.venv/bin/python audio_output.py 1
+
+# 마이크: VAD 녹음 후 바로 재생(파일로 남기지 않음)
+.venv/bin/python audio_input.py
+
+# ALSA만으로 마이크→이어폰 확인
+arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && aplay -D plughw:CARD=Headphones,DEV=0 /tmp/t.wav
+```
+
+## 응대 흐름 (서버 없이)
+
+```bash
+.venv/bin/python main.py --offline [--threshold-cm 30 --release-cm 50]
+```
+
+1. 감지 거리 안쪽 3회 연속 → `APPROACH`, 웹캠 촬영
+2. 이벤트 생성 → (서버 흉내) `START_RECEPTION`
+3. 재확인 게이트. 방문객이 떠났으면 안내 없이 `VISITOR_LEFT`로 종료
+4. 안내 재생(presetId 1). **재생이 끝난 뒤에만 마이크를 연다**(명세 5.3, 법적 제약)
+5. VAD 녹음. 5초 안에 발화가 없으면 `TIMEOUT`으로 종료
+6. 음성 전송 → (서버 흉내) 녹음을 다시 들려줌 → 완료 안내(presetId 2)
+7. 방문객이 떠나 `CLEAR`가 나올 때까지 다음 응대를 하지 않음
+
+`--offline`의 서버 응답은 `main.py`의 `OfflineServer`가 명세의 정상 응답을 흉내 낸 것이다. 프리셋 음원(`sounds/greeting.wav`, `completion.wav`, `fallback.wav`)이 없으면 삐 소리로 대신한다.
+
+## 판정 규칙
+
+- **접근:** 감지 거리 이내 값이 3회 연속(`--samples`) → `APPROACH` 한 번
+- **이탈:** 해제 거리 이상이 3초(`--clear-s`) 이어지면 `CLEAR`. 기획서 복귀 안정화 시간(권장 3~5초)
+- 두 거리 사이에서는 상태 유지. 중간에 한 번이라도 다시 가까워지면 처음부터 센다.
+- **VL53L0X 범위 밖:** 앞이 비면 센서가 약 8190mm를 준다. 이것을 측정 실패로 두면 이탈을 확인하지 못하므로 최대 거리(120cm)로 바꾼다. 그래서 tof의 해제 거리는 120cm보다 작아야 한다.
+- **측정 실패:** I2C 오류, 응답 지연(0.5초), 3cm 미만(VL53L0X) / 응답 없음, 2~400cm 밖(HC-SR04). 실패는 이탈로 보지 않는다.
+- **재확인 게이트:** 0.06초 간격 5회 측정, 유효값의 과반이 해제 거리 안쪽이면 방문객 있음. 유효값이 없으면 이탈로 본다.
+
+실측(손, 감지 30cm/해제 50cm): 접근·이탈 모두 정상. 손이 50cm 가까이 멀어지면 가끔 범위 밖(120cm)으로 튀지만 이탈은 30회 연속이 필요해 영향 없음. 사람 몸 기준 감지·해제 거리는 설치 위치에서 다시 정한다.
+
+## VAD 녹음 규칙
+
+| 항목 | 값 | 근거 |
+| --- | --- | --- |
+| 형식 | WAV, PCM 16-bit, 16kHz, mono | 명세 6.3 |
+| 종료 | 발화 뒤 침묵 800ms | 명세 6.3(700~1,000ms) |
+| 발화 시작 | 최근 300ms 중 180ms 이상 음성 | 문 닫는 소리 같은 짧은 잡음 무시 |
+| 발화 없음 | 마이크 개방 후 5초 → `TIMEOUT` | 명세 6.4 |
+| 최대 길이 | 30초 | 모델이 앞 30초만 전사(명세 7.2) |
+| 저장 | 메모리에서만 처리, 오류 시에도 마이크 즉시 닫음 | Zero-Storage, 명세 11장 |
 
 ## 테스트
 
-GPIO 라이브러리 없이 일반 PC에서도 상태 전환, 이탈 유지 시간, ECHO 대기 시간 제한, 재확인 게이트를 검사할 수 있다.
-
 ```bash
-cd raspberry-pi
 python3 -m unittest -v
 ```
 
-단위 테스트는 실제 센서의 거리 정확도나 배선을 검증하지 않는다.
+GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리를 검사한다(29개). 실제 장치 동작은 위 장치별 시험으로 확인한다.
 
 ## 다음 작업
 
-1. 보드에서 거리 측정값을 확인하고 감지·해제 거리를 정한다.
-2. 카메라 촬영과 이벤트 생성 API 전송을 연결한다.
-3. USB 마이크 녹음(VAD 종료)과 MAX98357 안내 음성 출력을 확인한다.
-4. 재확인 게이트를 안내 재생 앞에 연결하고 전체 흐름을 서버와 연동한다.
-
-서버 연결은 [main의 API v1.5](https://github.com/centreject/DataCat/blob/main/API_v1_5.md)를 기준으로 맞춘다. 거리 감지 → 이미지 전송 → 서버의 `START_RECEPTION` 응답 → 재확인 게이트 → 안내 음성 재생 완료 → 녹음 순서로 연결한다.
+1. Spring API 클라이언트(`api_client.py`)로 `OfflineServer` 교체. 현재 Spring에는 `POST /device/events`(feature/image-upload)만 있고 `/audio`, `/end`는 미구현.
+2. 프리셋 음원 3개(인사·완료·오류 안내) 준비
+3. 설치 위치에서 감지·해제 거리 결정
+4. MAX98357A 복구 시 `audio_output.py`의 `DEFAULT_DEVICE`만 I2S 카드로 변경

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""HC-SR04 거리 측정. 감지 거리는 실행 옵션으로 지정한다."""
+"""HC-SR04 또는 VL53L0X 거리 측정. 감지 거리는 실행 옵션으로 지정한다."""
 
 import argparse
 import math
 import time
+
+from tof_sensor import TOF_MAX_MM, TofSensor
 
 
 TRIG_PIN = 24  # BCM 번호, 물리 핀 18
@@ -74,6 +76,8 @@ class ProximityDetector:
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sensor", choices=("hcsr04", "tof"), default="hcsr04",
+                        help="거리 센서 종류(기본: hcsr04). tof는 VL53L0X(I2C)")
     parser.add_argument("--threshold-cm", type=float, help="접근 감지 거리(cm)")
     parser.add_argument("--release-cm", type=float, help="감지 해제 거리(cm), 감지 거리보다 크게 지정")
     parser.add_argument("--samples", type=int, default=3, help="접근 확인에 필요한 연속 측정 횟수(기본: 3)")
@@ -89,21 +93,19 @@ def parse_args():
     if args.threshold_cm is not None:
         if not (2 <= args.threshold_cm < args.release_cm <= 400):
             parser.error("2 <= 감지 거리 < 해제 거리 <= 400 조건이 필요합니다.")
+        if args.sensor == "tof" and args.release_cm >= TOF_MAX_MM / 10:
+            # 대상 없음은 최대 거리로 들어오므로 해제 거리가 그 안쪽이어야 이탈을 확인할 수 있다.
+            parser.error(f"tof 센서의 해제 거리는 {TOF_MAX_MM / 10:g}cm보다 작아야 합니다.")
     return args
 
 
-def main():
-    args = parse_args()
+def open_hcsr04():
+    """(거리 측정 함수, 정리 함수)를 반환한다."""
     try:
         import RPi.GPIO as GPIO
     except (ImportError, RuntimeError) as exc:
-        print(f"GPIO를 사용할 수 없습니다: {exc}")
-        print("Raspberry Pi에서 python3-rpi.gpio 설치와 실행 환경을 확인하세요.")
-        return 1
-
-    detector = (ProximityDetector(args.threshold_cm, args.release_cm, args.samples,
-                                  clear_samples=round(args.clear_s / POLL_INTERVAL))
-                if args.threshold_cm is not None else None)
+        raise RuntimeError(f"GPIO를 사용할 수 없습니다: {exc}\n"
+                           "Raspberry Pi에서 python3-rpi.gpio 설치와 실행 환경을 확인하세요.")
     configured_pins = []
     try:
         GPIO.setmode(GPIO.BCM)
@@ -112,6 +114,33 @@ def main():
         GPIO.setup(ECHO_PIN, GPIO.IN)
         configured_pins.append(ECHO_PIN)
         time.sleep(0.1)
+    except (RuntimeError, OSError):
+        if configured_pins:
+            GPIO.cleanup(configured_pins)
+        raise
+    return (lambda: measure_distance(GPIO)), (lambda: GPIO.cleanup(configured_pins))
+
+
+def open_tof():
+    try:
+        sensor = TofSensor()
+    except (ImportError, ValueError) as exc:  # 라이브러리 없음, I2C 장치 없음
+        raise RuntimeError(f"VL53L0X를 사용할 수 없습니다: {exc}")
+    return sensor.read_cm, (lambda: None)
+
+
+def main():
+    args = parse_args()
+    detector = (ProximityDetector(args.threshold_cm, args.release_cm, args.samples,
+                                  clear_samples=round(args.clear_s / POLL_INTERVAL))
+                if args.threshold_cm is not None else None)
+    try:
+        read_distance, cleanup = open_tof() if args.sensor == "tof" else open_hcsr04()
+    except (RuntimeError, OSError) as exc:
+        print(f"센서 초기화 실패: {exc}")
+        return 1
+
+    try:
         if detector:
             print(f"접근 <= {args.threshold_cm:g}cm, 연속 {args.samples}회 / "
                   f"해제 >= {args.release_cm:g}cm, {args.clear_s:g}초 유지")
@@ -120,7 +149,7 @@ def main():
         print("종료: Ctrl+C", flush=True)
 
         while True:
-            distance = measure_distance(GPIO)
+            distance = read_distance()
             if distance is None:
                 print("측정 실패: 응답 없음 또는 측정 범위 밖", flush=True)
             else:
@@ -133,11 +162,10 @@ def main():
     except KeyboardInterrupt:
         print("\n측정 종료")
     except (RuntimeError, OSError) as exc:
-        print(f"GPIO 오류: {exc}")
+        print(f"센서 오류: {exc}")
         return 1
     finally:
-        if configured_pins:
-            GPIO.cleanup(configured_pins)
+        cleanup()
     return 0
 
 
