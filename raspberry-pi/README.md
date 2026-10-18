@@ -1,10 +1,11 @@
 # Raspberry Pi 단말
 
-방문객 접근 감지(ToF), 사진 촬영, 안내 음성 출력, 발화 녹음을 맡는 현관 단말 코드다. 지금은 서버 없이 Pi 단독으로 전체 응대 흐름을 실행할 수 있고(`main.py --offline`), Spring 연결은 다음 단계다.
+방문객 접근 감지(ToF), 사진 촬영, 안내 음성 출력, 발화 녹음을 맡는 현관 단말 코드다. Spring 서버에 연결해 실행하거나(`main.py --server URL`), 서버 없이 Pi 단독으로 실행한다(`main.py --offline`).
 
 | 파일 | 역할 |
 | --- | --- |
 | `main.py` | 응대 흐름: 접근 감지 → 촬영 → 이벤트 생성 → 재확인 게이트 → 안내 → 녹음 → 완료 안내 |
+| `api_client.py` | Spring 단말 API 클라이언트(명세 6장). 표준 라이브러리만 사용 |
 | `distance_sensor.py` | 거리 측정, 접근(`APPROACH`)·이탈(`CLEAR`) 판정. `--sensor hcsr04\|tof` |
 | `tof_sensor.py` | VL53L0X(I2C) 측정. 범위 밖은 최대 거리, 통신 오류만 측정 실패로 넘긴다 |
 | `gate.py` | 재확인 게이트. 안내 재생 직전 방문객이 아직 있는지 판단(명세 5.3) |
@@ -144,10 +145,11 @@ ls /dev/video*                      # 웹캠: /dev/video0
 arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && aplay -D plughw:CARD=Headphones,DEV=0 /tmp/t.wav
 ```
 
-## 응대 흐름 (서버 없이)
+## 응대 흐름
 
 ```bash
-.venv/bin/python main.py --offline [--threshold-cm 30 --release-cm 50]
+.venv/bin/python main.py --server http://<Spring IP>:8080 [--threshold-cm 30 --release-cm 50]
+.venv/bin/python main.py --offline   # 서버 없이
 ```
 
 1. 감지 거리 안쪽 3회 연속 → `APPROACH`, 웹캠 촬영
@@ -157,6 +159,8 @@ arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && a
 5. VAD 녹음. 5초 안에 발화가 없으면 `TIMEOUT`으로 종료
 6. 음성 전송 → (서버 흉내) 녹음을 다시 들려줌 → 완료 안내(presetId 2)
 7. 방문객이 떠나 `CLEAR`가 나올 때까지 다음 응대를 하지 않음
+
+서버 요청 대기는 10초. 이벤트 생성·음성 전송이 실패하면(연결 실패, 503 등) 오류 안내(presetId 3)를 재생하고, 종료 알림 실패는 로그만 남긴다.
 
 `--offline`의 서버 응답은 `main.py`의 `OfflineServer`가 명세의 정상 응답을 흉내 낸 것이다. 프리셋 음원(`sounds/greeting.wav`, `completion.wav`, `fallback.wav`)이 없으면 삐 소리로 대신한다.
 
@@ -188,11 +192,13 @@ arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && a
 python3 -m unittest -v
 ```
 
-GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리를 검사한다(29개). 실제 장치 동작은 위 장치별 시험으로 확인한다.
+GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리, API 요청 형식을 검사한다(33개). 실제 장치 동작은 위 장치별 시험으로 확인한다.
 
 ## 다음 작업
 
-1. Spring API 클라이언트(`api_client.py`)로 `OfflineServer` 교체. 현재 Spring에는 `POST /device/events`(feature/image-upload)만 있고 `/audio`, `/end`는 미구현.
+1. Spring `/audio`, `/end` 구현 후 연동 확인. 현재 Spring에는 `POST /device/events`(feature/image-upload)만 있어 음성 전송·종료 알림은 404
+   - 2026-10-18 3090 실서버 확인: 사람 감지 → `START_RECEPTION`까지 정상
 2. 프리셋 음원 3개(인사·완료·오류 안내) 준비
 3. 설치 위치에서 감지·해제 거리 결정
 4. MAX98357A 복구 시 `audio_output.py`의 `DEFAULT_DEVICE`만 I2S 카드로 변경
+5. 촬영 지연 단축(실서버 시험에서 접근 후 촬영까지 약 2초, 카메라를 미리 열어 두는 방식 검토)
