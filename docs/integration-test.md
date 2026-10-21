@@ -25,6 +25,25 @@ Pi(실제 센서·웹캠·마이크) → Spring → 모델 → 앱. 수연님 30
 
 ---
 
+## 2026-10-22 · 진짜 모델 + Spring 판정·푸시 (3차, PR #8)
+
+Spring `feature/push-notification`(`3617170`), 모델 `datacat-model`(파인튜닝 + 상용 점검 반영, lite), MySQL 8.4. 2차와 같은 사진 50장에 더해, 사진마다 새 기기로 보내고 `GET /api/v1/events/{id}`의 앱 표시 필드를 확인했다.
+
+| 항목 | 결과 |
+|---|---|
+| `gradlew test` | 통과 |
+| 사진 50장 응대 지시 | 50/50, Spring p95 176ms(모델 단독 76ms) |
+| 8대 동시 | 8/8, 최대 0.81초 |
+| 사람 → A1 | `START_RECEPTION`, 분류는 음성 뒤, 여러 명 사진은 "복수 방문자" |
+| 상자·봉지 → A3 | `UNATTENDED_DELIVERY` / 물품만 있음 / 무응답 |
+| 빈 복도·동물 → A5 | `NO_VISITOR` / 기타·판단 불가 (빈 복도 1장은 모델 오탐으로 A3) |
+| 회색 사진(렌즈 가림) → A4 | `CAMERA_BLOCKED` / 안전 확인 필요 / needsReview true |
+| 모델 정지·로딩 중 → A0 | `START_RECEPTION`(정지 시 2.0초), 다시 켜면 정상 |
+
+물품 반복 알림 방지(A-1)와 `/audio`·`/end`는 PR #8 범위 밖이라 시험하지 않았다.
+
+---
+
 ## 2026-10-17 · 진짜 모델 + Spring 사진 접수 (2차)
 
 Spring은 인태님 `feature/image-upload`(PR #5, `9a71dbd`), 모델은 진짜 이미지(`datacat-model`, `MODEL_PROFILE=lite`, RTX 3060 Ti 8GB), DB는 MySQL 8.4 컨테이너. 셋을 한 Docker 네트워크에 두고 Spring에 `MODEL_SERVICE_URL=http://<모델 컨테이너>:8000`만 주었다. 사진은 평가용 실제 사진 50장(사람·택배 상자·비닐봉투·빈 복도·동물 각 10장, 평균 292KB)을 `POST /api/v1/device/events`로 보냈다(명세 6.1 형식, 요청마다 다른 deviceId).
