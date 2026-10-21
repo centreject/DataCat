@@ -1,0 +1,7 @@
+# Mock image only (Dockerfile.mock): the web stack of requirements.txt, same versions, no ML libraries.
+fastapi==0.141.1
+uvicorn==0.54.0
+pydantic-settings==2.15.0
+python-multipart==0.0.32
+pillow==12.3.0
+numpy==2.4.6
