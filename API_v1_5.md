@@ -189,7 +189,9 @@ POST /api/v1/device/events
 | `metadata` | JSON (`application/json`) | O | 이벤트 메타데이터 |
 | `image` | File (`image/jpeg`) | O | 1차 판정용 이미지 |
 
-`metadata` 예시: > 요청 전체는 `multipart/form-data`이며, `metadata` 파트의 Content-Type은 반드시 `application/json`으로 지정한다. 일반 텍스트 파트(`text/plain`)로 전송하면 Spring은 415 `UNSUPPORTED_MEDIA_TYPE`을 반환한다. `image` 파트는 파일 이름과 `image/jpeg` Content-Type을 포함해야 한다.
+`metadata` 예시:
+
+> 요청 전체는 `multipart/form-data`이며, `metadata` 파트의 Content-Type은 반드시 `application/json`으로 지정한다. 일반 텍스트 파트(`text/plain`)로 전송하면 Spring은 415 `UNSUPPORTED_MEDIA_TYPE`을 반환한다. `image` 파트는 파일 이름과 `image/jpeg` Content-Type을 포함해야 한다.
 
 ```json
 {
