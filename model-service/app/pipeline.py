@@ -1,5 +1,6 @@
 import logging
 
+from app.errors import ApiError
 from app.language.purposes import CATALOG
 from app.language.rules import rule_analyze
 from app.media import decode_wav
@@ -18,6 +19,9 @@ def analyze_transcript(model: LanguageModel | None, transcript: str) -> Analysis
         return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
     try:
         return model.analyze(transcript)
+    except ApiError as busy:  # MODEL_BUSY: expected under load, no traceback needed
+        log.warning("language model %s; using keyword rules", busy.code)
+        return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
     except Exception:
         log.exception("language model failed; using keyword rules")
         return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})

@@ -114,3 +114,17 @@ def test_load_registry_loads_vision(gpu_registry):
 
     assert isinstance(gpu_registry.vision, YoloVision)
     assert gpu_registry.ready is True
+
+
+def test_vision_survives_missing_fine_tuned_weights(monkeypatch):
+    # Offline first start or a removed Release: person detection must keep working, packages too.
+    from app.vision import yolo
+
+    def unavailable(path):
+        raise OSError("no network")
+
+    monkeypatch.setattr(yolo, "fetch_package_ft", unavailable)
+    vision = yolo.YoloVision(Settings())
+    assert vision.package_mode == "zero-shot" and vision.package_ft_model is None
+    assert "person" in labels(vision, "person")
+    assert "package" in labels(vision, "package_box")

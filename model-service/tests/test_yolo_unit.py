@@ -1,6 +1,5 @@
 """YoloVision result mapping and predict arguments, with Ultralytics models stubbed (no GPU)."""
 
-import threading
 from types import SimpleNamespace
 
 import pytest
@@ -9,6 +8,7 @@ from PIL import Image
 
 from app.config import Settings
 from app.schemas import Detection
+from app.gpu import GpuSlot
 from app.vision import yolo
 from app.vision.yolo import YoloVision
 
@@ -34,7 +34,7 @@ def stub_vision(people, packages, packages_ft=()) -> YoloVision:
     vision.person_model = StubModel(people)
     vision.package_model = StubModel(packages)
     vision.package_ft_model = StubModel(list(packages_ft))
-    vision.lock = threading.Lock()
+    vision.slot = GpuSlot("vision", 1)
     return vision
 
 
@@ -114,3 +114,10 @@ def test_uses_fp16_without_deprecated_half_flag():
         assert "half" not in model.kwargs
         assert model.kwargs["quantize"] == 16
 
+
+
+def test_without_fine_tuned_weights_zero_shot_still_finds_packages():
+    # Fine-tuned weights missing (offline first start): vision keeps working with prompts only.
+    vision = stub_vision([], packages=[0.6])
+    vision.package_ft_model = None
+    assert vision.detect(Image.new("RGB", (200, 200))) == [Detection(label="package", confidence=0.6)]

@@ -1,6 +1,6 @@
 import hashlib
+import logging
 import os
-import threading
 from pathlib import Path
 
 import torch
@@ -8,6 +8,7 @@ from PIL import Image
 from torchvision.ops import nms
 
 from app.config import DATA_DIR, Settings
+from app.gpu import GpuSlot
 from app.schemas import Detection
 
 # Keep Ultralytics' settings file inside the project instead of ~/.config (must exist before import).
@@ -27,16 +28,34 @@ PACKAGE_WEIGHTS = "yoloe-11s-seg.pt"
 PACKAGE_FT_WEIGHTS = "yoloe-11s-package-oi.pt"
 PACKAGE_FT_URL = f"https://github.com/centreject/DataCat/releases/download/package-model-v1/{PACKAGE_FT_WEIGHTS}"
 TEXT_ENCODER = "mobileclip_blt.ts"  # YOLOE's prompt encoder; fetched by bare name otherwise
-PACKAGE_FT_SHA256 = "0f0bf0ec859b7dc9297a8f8ee4d5e54c914b0f34715aa2bb1cef10060332c5ce"  # .pt is a pickle
+# .pt files are pickles (loading one runs code), so every weight file must match what we tested.
+SHA256 = {
+    PERSON_WEIGHTS: "85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5",
+    PACKAGE_WEIGHTS: "8e439445c87338b79d9ce21dec109f4621e26df67e94d26ea1a98c1e64dce3e3",
+    TEXT_ENCODER: "a67804d1b0f07b8b9a20c1761ec0847f34660f5fa338ec70e8f3fce68ed95e54",
+    PACKAGE_FT_WEIGHTS: "0f0bf0ec859b7dc9297a8f8ee4d5e54c914b0f34715aa2bb1cef10060332c5ce",
+}
 MERGE_IOU = 0.7  # same object found by both package models counts once
+
+log = logging.getLogger(__name__)
+
+
+def fetch(path: Path, url: str | None = None) -> None:
+    """Download if missing (Ultralytics' release, or `url`), then refuse anything but the tested file."""
+    if not path.exists():
+        if url:
+            safe_download(url=url, file=path, min_bytes=1e5)
+        else:
+            attempt_download_asset(path)
+    if hashlib.sha256(path.read_bytes()).hexdigest() != SHA256[path.name]:
+        path.unlink()  # never load an unexpected pickle; the next start downloads it again
+        raise RuntimeError(f"{path.name}: checksum mismatch")
 
 
 def fetch_package_ft(path: Path) -> None:
-    if not path.exists():
-        safe_download(url=PACKAGE_FT_URL, file=path, min_bytes=1e5)
-    if hashlib.sha256(path.read_bytes()).hexdigest() != PACKAGE_FT_SHA256:
-        path.unlink()  # never load an unexpected pickle; the next start downloads it again
-        raise RuntimeError(f"{path.name}: checksum mismatch")
+    fetch(path, PACKAGE_FT_URL)
+
+
 COCO_PERSON = 0
 # COCO bird, cat, dog → "animal" (plan: an animal alone is not a visitor).
 COCO_ANIMALS = (14, 15, 16)
@@ -51,20 +70,30 @@ class YoloVision:
         # Ultralytics resolves bare asset names against SETTINGS["weights_dir"], else downloads to
         # the working directory. Pre-fetch the text encoder there so nothing lands in the cwd.
         SETTINGS.update({"weights_dir": str(weights)})
-        attempt_download_asset(weights / TEXT_ENCODER)
-        fetch_package_ft(weights / PACKAGE_FT_WEIGHTS)
+        for name in (TEXT_ENCODER, PERSON_WEIGHTS, PACKAGE_WEIGHTS):
+            fetch(weights / name)
+        try:
+            fetch_package_ft(weights / PACKAGE_FT_WEIGHTS)
+            self.package_ft_model = YOLOE(str(weights / PACKAGE_FT_WEIGHTS))
+            prompts, self.package_mode = settings.package_prompts, "fine-tuned"
+        except Exception:
+            # Packages are an extra; losing them must not take person detection down with them.
+            log.exception("fine-tuned package weights unavailable; zero-shot prompts only")
+            self.package_ft_model = None
+            prompts, self.package_mode = settings.package_fallback_prompts, "zero-shot"
 
         self.settings = settings
         self.person_model = YOLO(str(weights / PERSON_WEIGHTS))
         self.package_model = YOLOE(str(weights / PACKAGE_WEIGHTS))
-        prompts = settings.package_prompts
         self.package_model.set_classes(prompts, self.package_model.get_text_pe(prompts))
-        self.package_ft_model = YOLOE(str(weights / PACKAGE_FT_WEIGHTS))
-        self.lock = threading.Lock()
+        self.slot = GpuSlot("vision", settings.vision_wait_s)
         self.detect(Image.new("RGB", (640, 480)))  # warm-up so the first real request is fast
 
     def detect(self, image: Image.Image) -> list[Detection]:
-        with self.lock:
+        package_models = [(self.package_model, self.settings.package_conf)]
+        if self.package_ft_model is not None:
+            package_models.insert(0, (self.package_ft_model, self.settings.package_ft_conf))
+        with self.slot():
             people = self.person_model.predict(
                 image,
                 classes=[COCO_PERSON, *COCO_ANIMALS],
@@ -75,10 +104,7 @@ class YoloVision:
             # agnostic_nms: overlapping prompts ("box", "cardboard box") on one object count once.
             packages = [
                 model.predict(image, conf=conf, agnostic_nms=True, quantize=16, verbose=False)[0].boxes
-                for model, conf in (
-                    (self.package_ft_model, self.settings.package_ft_conf),
-                    (self.package_model, self.settings.package_conf),
-                )
+                for model, conf in package_models
             ]
         xyxy = torch.cat([b.xyxy.float().cpu() for b in packages])
         conf = torch.cat([b.conf.float().cpu() for b in packages])

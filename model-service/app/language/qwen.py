@@ -1,8 +1,8 @@
 import copy
-import threading
 from pathlib import Path
 
 from app.config import Settings
+from app.gpu import GpuSlot
 from app.hub_cache import load_cached_first
 from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
 from app.language.purposes import CATALOG
@@ -74,7 +74,7 @@ class QwenLanguage:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         cache = str(Path(settings.weights_dir) / "hf")
-        kwargs = {"device_map": "cuda", "cache_dir": cache}
+        kwargs = {"device_map": "cuda", "cache_dir": cache, "revision": settings.llm_revision}
         if settings.llm_quantize_4bit:
             kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16
@@ -84,7 +84,7 @@ class QwenLanguage:
         self.torch = torch
         self.tokenizer = load_cached_first(
             lambda local_files_only: AutoTokenizer.from_pretrained(
-                settings.llm_model, cache_dir=cache, local_files_only=local_files_only
+                settings.llm_model, cache_dir=cache, revision=settings.llm_revision, local_files_only=local_files_only
             )
         )
         self.model = load_cached_first(
@@ -93,7 +93,7 @@ class QwenLanguage:
             )
         )
         self.max_new_tokens = settings.llm_max_new_tokens
-        self.lock = threading.Lock()
+        self.slot = GpuSlot("language", settings.llm_wait_s)
         self._build_prefix_cache()
         self.analyze("택배 왔습니다")  # warm-up
 
@@ -125,7 +125,7 @@ class QwenLanguage:
             and ids.shape[1] > n
             and self.torch.equal(ids[:, :n], self._prefix_ids)
         )
-        with self.lock, self.torch.inference_mode():
+        with self.slot(), self.torch.inference_mode():
             output = self.model.generate(
                 **inputs,
                 past_key_values=copy.deepcopy(self._prefix_cache) if cached else None,

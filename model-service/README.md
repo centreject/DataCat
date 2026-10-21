@@ -17,6 +17,13 @@ docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model
 - 컨테이너는 root가 아닌 일반 사용자 `app`(UID 1000)으로 실행된다. 호스트 폴더를 `/models`에 연결할 때는 UID 1000 사용자(WSL 기본 계정)가 쓸 수 있는 폴더여야 한다. 이미 받아 둔 가중치 폴더는 읽기 전용으로도 연결할 수 있다: `-v $PWD/data/weights:/models:ro`.
 - 파인튜닝한 물품 인식 가중치(19MB, 서비스가 첫 실행 때 자동으로 받고 sha256을 확인함): [Release `package-model-v1`](https://github.com/centreject/DataCat/releases/tag/package-model-v1) → [`yoloe-11s-package-oi.pt`](https://github.com/centreject/DataCat/releases/download/package-model-v1/yoloe-11s-package-oi.pt) (sha256 `0f0bf0ec…32c5ce`). 인터넷이 없는 곳에서는 미리 받아 가중치 폴더(`data/weights/` 또는 `/models`)에 둔다. 결과·다시 만드는 법은 [`eval/README.md`](eval/README.md), [`finetune/`](finetune/).
 - 준비 확인: `curl http://localhost:8000/health` → `{"status":"ok","profile":"lite"}` (로딩 중에는 `loading`, 다른 요청은 503)
+- 운영(2026-10-22, [`docs/hardening.md`](docs/hardening.md)):
+  - 빌드할 때 `--build-arg BUILD_COMMIT=$(git rev-parse --short HEAD)`를 주면 `/health`의 `build`에 커밋이 보인다.
+  - 로그는 요청마다 한 줄(`rid=… POST /internal/v1/vision/detect 200 85ms`). 사진·음성·전사문은 남기지 않는다. Spring이 `X-Request-ID`를 보내면 그 값을 쓴다.
+  - 모델이 다른 요청을 처리 중이면 사진 3초·음성 5초까지만 기다리고 503 `MODEL_BUSY`(언어 모델만 바쁘면 키워드 규칙으로 답함). `VISION_WAIT_S`, `STT_WAIT_S`, `LLM_WAIT_S`로 조정.
+  - 물품 학습 가중치를 못 받으면 예전 방식(프롬프트 14개)으로 계속 동작하고 `/health`에 `"package_model": "zero-shot"`.
+  - 3090 PC를 다른 PC에 열 때는 `MODEL_API_KEY`를 정하고 Spring이 `X-Api-Key` 헤더로 보내게 한다(기본은 꺼짐).
+  - Qwen·Whisper는 시험한 커밋으로 고정(`LLM_REVISION`, `STT_REVISION`), YOLO 가중치는 sha256 확인.
 - 동작 확인: `python docker/smoke.py` — 모든 엔드포인트를 한 번씩 호출해 응답 형식을 검사한다(표준 라이브러리만 사용).
 
 ### 프로필 (`MODEL_PROFILE`)

@@ -1,6 +1,5 @@
 import ctypes
 import importlib.util
-import threading
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +29,7 @@ _preload_cuda12_libs()
 from faster_whisper import WhisperModel  # noqa: E402
 
 from app.config import Settings  # noqa: E402
+from app.gpu import GpuSlot  # noqa: E402
 from app.hub_cache import load_cached_first  # noqa: E402
 from app.speech.filters import clean_segments  # noqa: E402
 
@@ -46,9 +46,10 @@ class WhisperSpeech:
                 compute_type=settings.stt_compute_type,
                 download_root=str(Path(settings.weights_dir) / "whisper"),
                 local_files_only=local_files_only,
+                revision=settings.stt_revision,
             )
         )
-        self.lock = threading.Lock()
+        self.slot = GpuSlot("stt", settings.stt_wait_s)
         self._warm_up()
 
     def _warm_up(self) -> None:
@@ -60,7 +61,7 @@ class WhisperSpeech:
             pass
 
     def transcribe(self, audio: np.ndarray) -> str:
-        with self.lock:
+        with self.slot():
             segments, _ = self.model.transcribe(
                 audio,
                 language="ko",

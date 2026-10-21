@@ -4,7 +4,7 @@ import io
 import struct
 
 import numpy as np
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 from app.errors import ApiError
 
@@ -28,7 +28,11 @@ def decode_jpeg(data: bytes) -> Image.Image:
                 400, "INVALID_IMAGE", f"이미지 해상도가 너무 큽니다({width}x{height}, 최대 {MAX_IMAGE_PIXELS // 1_000_000}MP)."
             )
         return image.convert("RGB")
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+    except ApiError:
+        raise
+    except Exception:
+        # Not only UnidentifiedImageError/OSError: Ultralytics patches Image.open and, on a bad file,
+        # tries to import pi_heif (not installed) → ModuleNotFoundError. Any failure here is a bad upload.
         raise ApiError(400, "INVALID_IMAGE", "이미지를 읽을 수 없습니다. JPEG 파일이어야 합니다.")
 
 

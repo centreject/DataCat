@@ -30,7 +30,7 @@ def post_audio(client, name, wav=None, path="audio/process"):
 
 
 def test_health_ok_with_mock_profile(client):
-    assert client.get("/health").json() == {"status": "ok", "profile": "mock"}
+    assert client.get("/health").json() == {"status": "ok", "profile": "mock", "build": "dev"}
 
 
 def test_vision_answer_follows_file_name(client):

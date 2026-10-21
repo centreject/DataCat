@@ -53,3 +53,16 @@ def test_warm_up_failure_fails_loading(monkeypatch):
     monkeypatch.setattr(whisper_module, "WhisperModel", BrokenCuda)
     with pytest.raises(RuntimeError):
         whisper_module.WhisperSpeech(Settings())
+
+
+def test_whisper_weights_are_pinned_to_a_tested_revision(monkeypatch):
+    seen = {}
+
+    class Recording(StubWhisperModel):
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+            seen.update(kwargs)
+
+    monkeypatch.setattr(whisper_module, "WhisperModel", Recording)
+    whisper_module.WhisperSpeech(Settings())
+    assert seen["revision"] == Settings().stt_revision and len(seen["revision"]) == 40
