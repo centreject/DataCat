@@ -26,7 +26,21 @@ docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model
 | `lite` (기본) | VRAM 8GB | large-v3-turbo int8_float16 | Qwen3-4B 4bit |
 | `full` | 시연 PC(3090) | large-v3-turbo float16 | Qwen3-4B bf16 |
 
-8GB(RTX 3060 Ti)에서 VRAM을 약 6.2GB 쓰고, 음성 처리 전체 p95는 1.49초다(2026-10-04). `full`은 3090에서 아직 재지 않았으므로 시연도 측정 전까지 `lite`로 돌린다.
+8GB(RTX 3060 Ti)에서 VRAM을 약 6.2GB 쓰고, 음성 처리 전체 p95는 1.49초다(2026-10-04). 3090 `lite`는 2026-10-18 수연님 시험에서 사진 76ms, 음성 전체 0.65~0.90초, VRAM 약 6GB. `full`은 아직 재지 않았으므로 시연도 측정 전까지 `lite`로 돌린다.
+
+#### 3090에서 `full` 재기 (C6)
+
+저장소 루트에서, 모델 이미지를 빌드해 둔 뒤 실행한다. 가중치는 `lite`와 같은 볼륨을 쓰므로 새로 받지 않는다. 결과는 `model-service/bench/results/`에 JSON으로 남는다.
+
+```bash
+M="docker run --rm --gpus all -v datacat-models:/models -v $PWD/model-service:/w -w /w -e MODEL_PROFILE=full datacat-model"
+$M python -m bench.benchmark --profile full --runs 20      # 속도·VRAM (lite와 비교하려면 --profile lite도)
+$M python -m eval.eval_language --cases heldout            # 용건·긴급 정확도 (시험 문장 64개)
+```
+
+- 실행 중인 `model` 컨테이너가 있으면 먼저 멈춘다(GPU 메모리를 나눠 쓰면 수치가 틀어짐).
+- 사진·음성 평가 자료(`data/`)는 저장소에 없어 속도는 합성 입력으로 잰다. 정확도는 텍스트 문장으로 잰다.
+- 결과 JSON과 출력 표를 AI 담당에게 보내면 `lite`와 비교해 시연 프로필을 정한다.
 
 ### docker-compose 예시 (덕민님 `datacat-stack/docker-compose.yml`의 `model` 블록 자리)
 
