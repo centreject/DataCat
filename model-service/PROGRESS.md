@@ -171,6 +171,7 @@
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-10-22 | 안내 음원 선택(민중 청취): Qwen3 Sohee 밝은 말투로 인사·완료·오류 안내 확정 → `preset-audio/final/`. 완료 안내 추가 후보 3개(`blind3/`). 수연님은 Pi `sounds/`에 복사만 하면 됨 |
 | 2026-10-22 | 안내 음원 기계 티 줄이기 비교: Qwen3-TTS(Sohee, 말투 지시) 45개 vs Supertonic F1·M2. 발음은 모두 정확, UTMOS는 Supertonic F1 4.20 > Qwen 3.7대. pyworld 억양 조정은 음질만 떨어뜨려 제외. 이름 가린 청취 세트 `preset-audio/blind/` → 24일 회의에서 선택 |
 | 2026-10-22 | 안내 음원 3개(+대안 문구 2개) 음성 합성: Supertonic 2(OpenRAIL-M, ONNX). 목소리 4개 만들어 Whisper로 받아쓰기 검사 → F1·M2만 남김. `preset-audio/`, 선택은 24일 회의 |
 | 2026-10-22 | 최종 코드(`438ba10`) Docker 확인: smoke 5개 통과, `/health`에 빌드·모델 버전, 깨진 사진 400, 가짜 서버 smoke·`busy` 503. PR #7 제목 갱신, 24일 회의 안건에 공유 내용 추가 |
