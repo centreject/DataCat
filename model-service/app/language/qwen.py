@@ -94,6 +94,7 @@ class QwenLanguage:
         )
         self.max_new_tokens = settings.llm_max_new_tokens
         self.slot = GpuSlot("language", settings.llm_wait_s)
+        self.version = f"{settings.llm_model}@{settings.llm_revision[:7]} {'4bit' if settings.llm_quantize_4bit else 'bf16'}"
         self._build_prefix_cache()
         self.analyze("택배 왔습니다")  # warm-up
 

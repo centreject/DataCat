@@ -39,7 +39,7 @@
 |---|---|
 | 1 | 학습 가중치를 못 받으면 경고 후 프롬프트 14개로 동작. GPU 테스트로 사람·상자 인식 유지 확인. `/health`에 `package_model` |
 | 2 | Qwen `cdbee75f…`, Whisper `0a363e91…` 커밋 고정(지금 받아 둔 것과 같음). YOLO·텍스트 인코더·학습 가중치 4개 sha256 확인 |
-| 3 | `app/gpu.py` `GpuSlot`: 사진 3초·음성 5초 기다리고 503 `MODEL_BUSY`. 언어 모델이 바쁘면 실패 대신 키워드 규칙(`RULES_FALLBACK`). Docker에서 음성 12개 동시: 모두 200, 가장 늦은 응답 8.6초(Spring 음성 대기 10초 안) |
+| 3 | `app/gpu.py` `GpuSlot`: 사진 3초·음성 인식 4초·언어 2초 기다리고 503 `MODEL_BUSY`. 언어 모델이 바쁘면 실패 대신 키워드 규칙(`RULES_FALLBACK`). Docker에서 음성 12개 동시: 모두 200, 가장 늦은 응답 8.6초(Spring 음성 대기 10초 안) |
 | 4 | 한 추론이 60초를 넘기면 `/health` `degraded` + `stuck`, Docker healthcheck는 unhealthy |
 | 5 | 요청마다 `rid=… POST /internal/v1/… 200 85ms` 한 줄, 응답 헤더 `X-Request-ID`. 예상 밖 오류(500)도 남김. 방문객 말은 로그에 없음(시험으로 확인). uvicorn 기본 접근 로그는 중복이라 끔 |
 | 6 | `/health`에 `build`(빌드 커밋). Docker `--build-arg BUILD_COMMIT` |
@@ -49,3 +49,21 @@
 | **추가 발견** | **깨진 사진이 500으로 나가던 버그.** Ultralytics가 `PIL.Image.open`을 바꿔 두고, 못 여는 파일이면 설치되지 않은 `pi_heif`를 불러 `ModuleNotFoundError`가 났다. 실제 Docker 이미지에서 재현 → 400 `INVALID_IMAGE`로 고침. CI 준비 중 깨끗한 환경에서 드러남 |
 
 시험: 단위 232개, GPU 36개 통과. Docker 이미지로 깨진 사진 400, 키 없으면 401, 요청 ID 전달, 동시 요청 확인.
+
+## 코드 리뷰 반영 (2026-10-22)
+
+같은 날 두 갈래(코드 냄새 / 명세 대비)로 리뷰해 고친 것:
+
+- **음성 최악 대기가 10초를 넘을 수 있었음**: STT 5초 + 언어 3초 대기에 실행 시간을 더하면 약 10~11초. → STT 4초·언어 2초로 낮춰 최악 약 8.5초. 합이 Spring 대기 안인지 테스트로 고정.
+- `/health`에 `models`(모델별 이름·고정 커밋·양자화) 추가 — #6에서 계획한 "모델 이름·버전"이 빠져 있었음.
+- 사진 해석 실패 처리: 모든 예외 → 400이던 것을 파일 오류(`OSError`·`ValueError`·`ImportError`)만 400으로. 메모리 부족 같은 진짜 장애는 500으로 남김.
+- 요청 ID: 호출자가 보낸 값은 영문·숫자·`._:-`만 남기고 64자까지(로그 위조 방지).
+- 클라이언트가 끊긴 요청을 500으로 기록하던 것 → `-`.
+- 가짜 모델 서버: 파일 이름에 `busy`가 있으면 503 `MODEL_BUSY` — 팀원이 바쁠 때 처리를 시험할 수 있게.
+- 정리: 폴백 처리 중복 제거, 멈춘 추론 판단을 `ModelRegistry.stuck()`으로, 오류 본문 함수 재사용, 물품 프롬프트 목록 중복 제거, `fetch` → `fetch_verified`, `finetune/prep.py` import 시 부작용 제거, `compare.py` 설명 정정.
+
+알고도 두는 것:
+
+- `MODEL_BUSY`는 먼저 온 순서를 보장하지 않는다(`threading.Lock`). 대기 시간이 짧게 제한돼 있어 현관 1대에서는 문제없다.
+- `stuck`이면 Docker가 unhealthy로 표시만 하고 다시 시작하지는 않는다. 시연 PC에서는 `restart: unless-stopped`와 함께 사람이 보고 재시작한다(자동 재시작 도구는 쓰지 않음).
+- 가중치 sha256이 틀리면 파일을 지운다. 읽기 전용(`:ro`)으로 연결한 폴더에서는 지우지 못해 그 오류로 실패한다. 사람·기본 물품 가중치가 틀리면 이미지 인식 전체가 실패한다 — 검증 안 된 pickle을 여는 것보다 안전한 쪽을 택함.

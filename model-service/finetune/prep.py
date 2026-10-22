@@ -17,7 +17,6 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-ROOT = Path(sys.argv[1])
 TARGETS = {"/m/025dyy": 0, "/m/0frqm": 1, "/m/05gqfk": 2}
 NAMES = ["box", "envelope", "plastic bag"]
 NEG = {"/m/080hkjn", "/m/01s55n", "/m/0hf58v5", "/m/02dgv"}  # handbag, suitcase, luggage&bags, door
@@ -25,7 +24,7 @@ MIN_AREA = 0.01
 TRAIN_CAP = {0: 1600, 1: 900, 2: 900, "neg": 800}
 EVAL_CAP = {0: 150, 1: 100, 2: 100, "neg": 150}
 URL = "https://open-images-dataset.s3.amazonaws.com/{}/{}.jpg"
-EXISTING = {p.stem.split("_", 1)[-1] for p in (Path(__file__).resolve().parents[1] / "data/images").rglob("*.jpg")}
+EXISTING_IMAGES = Path(__file__).resolve().parents[1] / "data/images"  # already used for evaluation
 
 
 def scan(path):
@@ -97,7 +96,9 @@ def write(chosen, split, out, val_every=0):
 
 
 if __name__ == "__main__":
-    ev = pick(*scan(ROOT / "csv/val-bbox.csv"), EVAL_CAP, skip=EXISTING)
+    ROOT = Path(sys.argv[1])
+    existing = {p.stem.split("_", 1)[-1] for p in EXISTING_IMAGES.rglob("*.jpg")}
+    ev = pick(*scan(ROOT / "csv/val-bbox.csv"), EVAL_CAP, skip=existing)
     write(ev, "validation", ROOT / "eval")
     tr = pick(*scan(ROOT / "csv/train-bbox.csv"), TRAIN_CAP)
     write(tr, "train", ROOT / "train", val_every=10)

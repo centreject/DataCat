@@ -28,11 +28,9 @@ def decode_jpeg(data: bytes) -> Image.Image:
                 400, "INVALID_IMAGE", f"이미지 해상도가 너무 큽니다({width}x{height}, 최대 {MAX_IMAGE_PIXELS // 1_000_000}MP)."
             )
         return image.convert("RGB")
-    except ApiError:
-        raise
-    except Exception:
-        # Not only UnidentifiedImageError/OSError: Ultralytics patches Image.open and, on a bad file,
-        # tries to import pi_heif (not installed) → ModuleNotFoundError. Any failure here is a bad upload.
+    # Not only UnidentifiedImageError (an OSError): Ultralytics patches Image.open and, on a bad file,
+    # tries to import pi_heif (not installed) → ModuleNotFoundError (2026-10-22). MemoryError etc. stay 500.
+    except (OSError, ValueError, ImportError, Image.DecompressionBombError):
         raise ApiError(400, "INVALID_IMAGE", "이미지를 읽을 수 없습니다. JPEG 파일이어야 합니다.")
 
 

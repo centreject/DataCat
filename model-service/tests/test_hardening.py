@@ -191,3 +191,57 @@ def test_unexpected_error_is_still_logged_with_its_request_id(caplog):
         )
     assert r.status_code == 500 and r.json()["code"] == "INFERENCE_FAILED"
     assert any("ev-9" in rec.getMessage() and " 500 " in rec.getMessage() for rec in caplog.records if rec.name == "app.access")
+
+
+# ── code review 2026-10-22 ──────────────────────────────────────────────────
+
+
+def test_audio_worst_case_fits_springs_10s_timeout():
+    # /audio/process waits for STT, then the LLM: both waits plus run times (STT ≤0.5 s, LLM ≤2 s
+    # at p95 on the 3060 Ti) must stay under Spring's 10 s audio timeout (review finding).
+    s = Settings()
+    assert s.stt_wait_s + 0.5 + s.llm_wait_s + 2.0 < 10
+    assert s.vision_wait_s + 0.2 < 5
+
+
+def test_request_id_from_caller_is_sanitised():
+    with ready_client(language=Says()) as client:
+        r = client.post("/internal/v1/language/analyze", json={"transcript": "택배"},
+                        headers={"X-Request-ID": "ev-1 \x1b[31mfake log line" + "x" * 100})
+    rid = r.headers["X-Request-ID"]
+    assert rid.startswith("ev-1") and len(rid) <= 64 and " " not in rid and "\x1b" not in rid
+
+
+class Versioned(Sees):
+    version = "yolo11s + yoloe-11s (fine-tuned)"
+
+
+def test_health_lists_model_versions():
+    with ready_client(vision=Versioned()) as client:
+        assert client.get("/health").json()["models"] == {"vision": "yolo11s + yoloe-11s (fine-tuned)"}
+
+
+def test_memory_error_while_decoding_is_not_reported_as_a_bad_image(monkeypatch):
+    import PIL.Image
+
+    from app.media import decode_jpeg
+
+    def out_of_memory(*args, **kwargs):
+        raise MemoryError
+
+    monkeypatch.setattr(PIL.Image, "open", out_of_memory)
+    with pytest.raises(MemoryError):
+        decode_jpeg(b"\xff\xd8")
+
+
+def test_mock_answers_model_busy_for_busy_file_names(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    monkeypatch.setenv("MODEL_PROFILE", "mock")
+    with TestClient(create_app()) as client:
+        client.app.state.loader.join(timeout=5)
+        r = client.post("/internal/v1/vision/detect", files={"image": ("busy.jpg", tiny_jpeg(), "image/jpeg")})
+        a = client.post("/internal/v1/audio/process", files={"audio": ("busy.wav", tone_wav(1), "audio/wav")})
+    assert r.status_code == a.status_code == 503 and r.json()["code"] == "MODEL_BUSY"

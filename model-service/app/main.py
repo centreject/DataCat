@@ -1,6 +1,7 @@
 import hmac
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -12,7 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.formparsers import MultiPartParser
 
 from app.config import Settings
-from app.errors import install_error_handlers
+from app.errors import error_body, install_error_handlers
 from app.registry import ModelRegistry, load_registry
 from app.routes import router
 
@@ -42,7 +43,7 @@ class UploadLimit:
     @staticmethod
     def _too_large() -> JSONResponse:
         message = f"업로드가 너무 큽니다(최대 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)."
-        return JSONResponse(status_code=400, content={"code": "INVALID_REQUEST", "message": message})
+        return JSONResponse(status_code=400, content=error_body("INVALID_REQUEST", message))
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -78,6 +79,7 @@ class UploadLimit:
 
 
 access_log = logging.getLogger("app.access")
+REQUEST_ID_UNSAFE = re.compile(r"[^A-Za-z0-9._:-]")
 
 
 class RequestLog:
@@ -96,7 +98,9 @@ class RequestLog:
             await self.app(scope, receive, send)
             return
         headers = dict(scope["headers"])
-        rid = headers.get(b"x-request-id", b"").decode("latin-1")[:64] or uuid.uuid4().hex[:12]
+        # Caller-supplied, so keep it to a safe charset and length (it goes into logs and a header).
+        rid = REQUEST_ID_UNSAFE.sub("", headers.get(b"x-request-id", b"").decode("latin-1"))[:64]
+        rid = rid or uuid.uuid4().hex[:12]
         start, status = time.perf_counter(), [0]
 
         async def send_with_id(message):
@@ -110,13 +114,16 @@ class RequestLog:
             if self.api_key and path.startswith("/internal/") and not hmac.compare_digest(
                 headers.get(b"x-api-key", b""), self.api_key
             ):
-                body = {"code": "UNAUTHORIZED", "message": "X-Api-Key가 없거나 맞지 않습니다."}
+                body = error_body("UNAUTHORIZED", "X-Api-Key가 없거나 맞지 않습니다.")
                 await JSONResponse(status_code=401, content=body)(scope, receive, send_with_id)
             else:
                 await self.app(scope, receive, send_with_id)
-        finally:  # also for unexpected errors, which Starlette answers with 500 outside this middleware
+        except Exception:
+            status[0] = status[0] or 500  # Starlette answers it with 500 outside this middleware
+            raise
+        finally:  # "-" = no response sent (client went away)
             ms = (time.perf_counter() - start) * 1000
-            access_log.info("rid=%s %s %s %s %.0fms", rid, scope["method"], path, status[0] or 500, ms)
+            access_log.info("rid=%s %s %s %s %.0fms", rid, scope["method"], path, status[0] or "-", ms)
 
 
 def create_app(
@@ -168,11 +175,9 @@ def create_app(
             return {"status": "error", **body}
         if registry is None or not registry.ready:
             return {"status": "loading", **body}
-        models = {"vision": registry.vision, "stt": registry.stt, "language": registry.language}
-        stuck = [
-            name for name, m in models.items()
-            if getattr(m, "slot", None) is not None and m.slot.running_for() > settings.stuck_after_s
-        ]
+        stuck = registry.stuck(settings.stuck_after_s)
+        if versions := registry.versions():
+            body["models"] = versions
         if registry.failed:
             body["failed"] = list(registry.failed)
         if stuck:

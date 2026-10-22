@@ -2,8 +2,9 @@
 
 Usage (from model-service/):  python -u finetune/compare.py DATA_ROOT WEIGHTS.pt [conf ...]
 Sets: DATA_ROOT/eval (Open Images validation, by class) + data/images package_box/package_bag/empty.
-"Zero-shot" uses Settings().package_prompts; set PACKAGE_PROMPTS='[...]' to try another list
-(e.g. only the items the fine-tuned model does not know).
+"Zero-shot" uses Settings().package_prompts — since 2026-10-17 only the 5 items the fine-tuned model
+doesn't know, so "both together" is the service as it runs. To reproduce the pre-fine-tuning baseline
+(14 prompts, eval/README F1 "지금" column) set PACKAGE_PROMPTS to Settings().package_fallback_prompts.
 """
 
 import statistics

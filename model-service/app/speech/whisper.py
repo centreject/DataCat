@@ -50,6 +50,7 @@ class WhisperSpeech:
             )
         )
         self.slot = GpuSlot("stt", settings.stt_wait_s)
+        self.version = f"{settings.stt_model}@{settings.stt_revision[:7]} {settings.stt_compute_type}"
         self._warm_up()
 
     def _warm_up(self) -> None:

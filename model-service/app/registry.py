@@ -15,6 +15,16 @@ class ModelRegistry:
     ready: bool
     failed: tuple[str, ...] = ()  # models that raised while loading (e.g. CUDA OOM)
 
+    def stuck(self, after_s: float) -> list[str]:
+        """Models whose current inference has run longer than `after_s` (hung GPU driver)."""
+        models = {"vision": self.vision, "stt": self.stt, "language": self.language}
+        return [name for name, m in models.items() if (slot := getattr(m, "slot", None)) and slot.running_for() > after_s]
+
+    def versions(self) -> dict[str, str]:
+        """What each loaded model actually is, for /health (images are rebuilt at different times)."""
+        return {name: v for name, m in (("vision", self.vision), ("stt", self.stt), ("language", self.language))
+                if (v := getattr(m, "version", None))}
+
 
 def load_registry(settings: Settings) -> ModelRegistry:
     # Imported here so the app (and unit tests) start without GPU libraries loaded.

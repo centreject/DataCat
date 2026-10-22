@@ -11,20 +11,23 @@ from app.schemas import Analysis, AudioProcessResponse
 log = logging.getLogger(__name__)
 
 
+def _rules(transcript: str) -> Analysis:
+    return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
+
+
 def analyze_transcript(model: LanguageModel | None, transcript: str) -> Analysis:
     # No speech: Spring/app decide what to show (agreed 2026-09-27), so empty summary + default purpose.
     if not transcript.strip():
         return Analysis(summary="", purpose=CATALOG.default, flags=["NO_SPEECH"])
     if model is None:  # LLM failed to load
-        return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
+        return _rules(transcript)
     try:
         return model.analyze(transcript)
-    except ApiError as busy:  # MODEL_BUSY: expected under load, no traceback needed
-        log.warning("language model %s; using keyword rules", busy.code)
-        return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
+    except ApiError as err:  # MODEL_BUSY: expected under load, no traceback needed
+        log.warning("language model %s; using keyword rules", err.code)
     except Exception:
         log.exception("language model failed; using keyword rules")
-        return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
+    return _rules(transcript)
 
 
 def process_audio(registry: ModelRegistry, wav: bytes) -> AudioProcessResponse:

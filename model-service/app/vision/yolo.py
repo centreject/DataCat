@@ -40,7 +40,7 @@ MERGE_IOU = 0.7  # same object found by both package models counts once
 log = logging.getLogger(__name__)
 
 
-def fetch(path: Path, url: str | None = None) -> None:
+def fetch_verified(path: Path, url: str | None = None) -> None:
     """Download if missing (Ultralytics' release, or `url`), then refuse anything but the tested file."""
     if not path.exists():
         if url:
@@ -53,7 +53,7 @@ def fetch(path: Path, url: str | None = None) -> None:
 
 
 def fetch_package_ft(path: Path) -> None:
-    fetch(path, PACKAGE_FT_URL)
+    fetch_verified(path, PACKAGE_FT_URL)
 
 
 COCO_PERSON = 0
@@ -71,7 +71,7 @@ class YoloVision:
         # the working directory. Pre-fetch the text encoder there so nothing lands in the cwd.
         SETTINGS.update({"weights_dir": str(weights)})
         for name in (TEXT_ENCODER, PERSON_WEIGHTS, PACKAGE_WEIGHTS):
-            fetch(weights / name)
+            fetch_verified(weights / name)
         try:
             fetch_package_ft(weights / PACKAGE_FT_WEIGHTS)
             self.package_ft_model = YOLOE(str(weights / PACKAGE_FT_WEIGHTS))
@@ -87,6 +87,7 @@ class YoloVision:
         self.package_model = YOLOE(str(weights / PACKAGE_WEIGHTS))
         self.package_model.set_classes(prompts, self.package_model.get_text_pe(prompts))
         self.slot = GpuSlot("vision", settings.vision_wait_s)
+        self.version = f"yolo11s + yoloe-11s ({self.package_mode})"
         self.detect(Image.new("RGB", (640, 480)))  # warm-up so the first real request is fast
 
     def detect(self, image: Image.Image) -> list[Detection]:

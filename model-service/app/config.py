@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings
 # model-service/ — anchors data paths so they don't depend on the working directory.
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = SERVICE_ROOT / "data"
+# Items the fine-tuned package model (box, envelope, plastic bag) was never shown.
+EXTRA_PACKAGE_PROMPTS = ["food delivery bag", "takeout container", "cooler bag", "flower bouquet", "cake box"]
 
 
 class Settings(BaseSettings):
@@ -19,19 +21,13 @@ class Settings(BaseSettings):
     # box 78→98%, plastic bag 80→100%, empty-hallway false positives 10→3%, +15 ms per image.
     # The zero-shot model alone used to have 14 prompts (box, bag, envelope, flyer, … at conf 0.25).
     package_conf: float = Field(0.25, ge=0, le=1)
-    package_prompts: list[str] = [
-        "food delivery bag",
-        "takeout container",
-        "cooler bag",
-        "flower bouquet",
-        "cake box",
-    ]
+    package_prompts: list[str] = EXTRA_PACKAGE_PROMPTS
     package_ft_conf: float = Field(0.4, ge=0, le=1)
     # Used alone when the fine-tuned weights can't be fetched (offline first start, Release gone):
     # packages are still found, as before 2026-10-17 (box 83%, bag 80%, empty-hallway false alarms 10%).
     package_fallback_prompts: list[str] = [
-        "box", "cardboard box", "package", "bag", "plastic bag", "shopping bag", "food delivery bag",
-        "takeout container", "cooler bag", "flower bouquet", "cake box", "gift box", "envelope", "flyer",
+        "box", "cardboard box", "package", "bag", "plastic bag", "shopping bag", *EXTRA_PACKAGE_PROMPTS,
+        "gift box", "envelope", "flyer",
     ]
     weights_dir: str = str(DATA_DIR / "weights")
     stt_model: str = "large-v3-turbo"
@@ -40,11 +36,12 @@ class Settings(BaseSettings):
     llm_model: str = "Qwen/Qwen3-4B-Instruct-2507"
     llm_revision: str = "cdbee75f17c01a7cc42f958dc650907174af0554"
     llm_max_new_tokens: int = Field(64, ge=1, le=256)
-    # Longest wait for a model busy with another request before answering 503 MODEL_BUSY.
-    # Below Spring's timeouts (photo 5 s, audio 10 s). A busy LLM falls back to keyword rules.
-    vision_wait_s: float = Field(3.0, gt=0)
-    stt_wait_s: float = Field(5.0, gt=0)
-    llm_wait_s: float = Field(3.0, gt=0)
+    # Longest wait for a model busy with another request before answering 503 MODEL_BUSY. A busy LLM
+    # falls back to keyword rules. /audio/process waits for STT then the LLM, so its worst case is
+    # stt_wait + STT run (≤0.5 s) + llm_wait + LLM run (≤2 s on the 3060 Ti) ≈ 8.5 s < Spring's 10 s.
+    vision_wait_s: float = Field(3.0, gt=0)  # + ~0.1 s run < Spring's 5 s
+    stt_wait_s: float = Field(4.0, gt=0)
+    llm_wait_s: float = Field(2.0, gt=0)
     stuck_after_s: float = Field(60.0, gt=0)  # /health turns degraded when one inference runs longer
     # Optional shared secret: when set, /internal/v1/* needs header X-Api-Key with this value.
     model_api_key: str = ""
