@@ -7,7 +7,8 @@ from make_presets import to_wav, resample
 CHOSEN = {  # blind2 letter → source take
     "greeting.wav": "qwen_bright/greeting__lively__s2.wav",            # greeting_Y (1st)
     "greeting_alt.wav": "qwen_bright/greeting__lively__s1.wav",        # greeting_X (2nd)
-    "completion.wav": "qwen_bright/completion__bright__s3.wav",        # completion_Z
+    "completion.wav": "qwen_completion/completion__lively__s5.wav",    # blind3 completion_P: 강세 없음, 약간 어눌
+    "completion_alt.wav": "qwen_bright/completion__bright__s3.wav",    # blind2 completion_Z: 약간 강세
     "fallback.wav": "qwen_bright/fallback__lively__s2.wav",            # fallback_X
 }
 out = Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)

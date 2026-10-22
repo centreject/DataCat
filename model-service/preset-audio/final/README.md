@@ -6,8 +6,9 @@ Pi `raspberry-pi/sounds/`에 이 이름 그대로 복사하면 된다. 16kHz·mo
 |---|---|---|---|
 | `greeting.wav` | 마이크에 말씀해 주세요. | blind2 `greeting_Y` (1순위) | 경쾌하고 따뜻하게, 조금 높은 음 |
 | `greeting_alt.wav` | 〃 | blind2 `greeting_X` (2순위) | 〃 |
-| `completion.wav` | 접수되었습니다. | blind2 `completion_Z` ("그나마") | 밝고 미소 띤 안내원처럼 |
+| `completion.wav` | 접수되었습니다. | blind3 `completion_P` (강세 없음, 약간 어눌) | 경쾌하고 따뜻하게 |
+| `completion_alt.wav` | 〃 | blind2 `completion_Z` (약간 강세) | 밝고 미소 띤 안내원처럼 |
 | `fallback.wav` | 일시적인 오류로 접수할 수 없습니다. 잠시 후 다시 시도해 주세요. | blind2 `fallback_X` | 경쾌하고 따뜻하게 |
 
-완료 안내 추가 후보: `../blind3/completion_{P,Q,R}.wav` (경쾌한 말투 10개 중 음높이·억양 폭 상위 3개). 더 나은 것이 있으면 `completion.wav`를 바꾼다.
+완료 안내는 짧은 문장이라 밝은 말투를 세게 주면 음절마다 힘이 들어갔다(blind3 Q·R: "접!수!되었!습니다!"). 밝기와 함께 강세가 없는지도 들어 보고 골랐다.
 녹음 알림 문구("안녕하세요. 용건을 말씀해 주시면, 집주인에게 전달됩니다.")나 "전달했습니다. 감사합니다."로 정해지면 같은 방식으로 다시 만든다(`../tools/`).
