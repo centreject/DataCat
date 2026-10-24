@@ -581,8 +581,10 @@ GET /health
 |---|---|
 | `loading` | 모델을 불러오는 중. 추론 요청은 503 `MODEL_NOT_READY` |
 | `ok` | 모든 모델 준비 완료 |
-| `degraded` | 일부 모델만 실패. `failed` 목록이 함께 온다(예: `["language"]`). 언어 모델이 빠지면 요약·용건은 키워드 규칙으로 대신한다 |
+| `degraded` | 일부 모델만 실패. `failed` 목록이 함께 온다(예: `["language"]`). 언어 모델이 빠지면 요약·용건은 키워드 규칙으로 대신한다. 추론 하나가 60초를 넘겨 멈춘 것으로 보이면 `stuck` 목록이 온다(이때 Docker healthcheck는 unhealthy) |
 | `error` | 모든 모델 로딩 실패. 추론 요청은 503 |
+
+추가 필드(2026-10-22, 판단에 쓰지 않아도 됨): `build`(이미지를 만든 커밋), `models`(모델별 이름·버전), `package_model`(`fine-tuned` 또는 학습 가중치를 못 받았을 때 `zero-shot`).
 
 `profile`은 `lite`(GPU 8GB) 또는 `full`(시연 PC). Docker healthcheck와 Spring 기동 순서 확인(`depends_on: condition: service_healthy`)에 사용한다.
 
@@ -881,6 +883,10 @@ GET /api/v1/events/101
 | `405` | `METHOD_NOT_ALLOWED` | 허용되지 않는 메서드 |
 | `500` | `INFERENCE_FAILED` | 모델 추론 중 오류 |
 | `503` | `MODEL_NOT_READY` | 모델 로딩 중이거나 해당 모델 로딩 실패 |
+| `503` | `MODEL_BUSY` | 다른 요청을 처리 중이라 대기 한도(사진 3초, 음성 인식 4초)를 넘김. 바로 실패로 처리해도 된다. 음성 전체 처리의 최악은 약 8.5초로 Spring 대기 10초 안(2026-10-22 추가). 언어 모델만 바쁠 때는 503 대신 키워드 규칙으로 답하고 `RULES_FALLBACK` |
+| `401` | `UNAUTHORIZED` | 모델 서비스에 `MODEL_API_KEY`를 설정했는데 `X-Api-Key` 헤더가 없거나 다름(설정하지 않으면 해당 없음, 2026-10-22 추가) |
+
+모든 응답에 `X-Request-ID` 헤더가 붙는다. Spring이 요청에 `X-Request-ID`(예: `event-101`)를 넣으면 그 값을 쓰므로(영문·숫자·`._:-`만 남기고 64자까지) 두 서버의 로그를 이어 볼 수 있다. 모델 서비스 로그에는 사진·음성·전사문을 남기지 않는다.
 
 **서버 응답 대기 타임아웃**: 초기 권장 **3~5초**. 10초 이상은 방문객이 기기를 고장으로 오인해 이탈할 수 있으므로 상한으로 두지 않는다. 2.4GHz Wi-Fi·Cloudflare Tunnel 왕복 지연 실측 후 조정하되, 오탐(false timeout)이 잦으면 상향 조정한다.
 

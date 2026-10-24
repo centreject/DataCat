@@ -15,7 +15,15 @@ docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model
 
 - 첫 실행 때 모델 가중치(약 10GB)를 `/models` 볼륨에 내려받는다. 그 뒤로는 인터넷 없이 뜬다.
 - 컨테이너는 root가 아닌 일반 사용자 `app`(UID 1000)으로 실행된다. 호스트 폴더를 `/models`에 연결할 때는 UID 1000 사용자(WSL 기본 계정)가 쓸 수 있는 폴더여야 한다. 이미 받아 둔 가중치 폴더는 읽기 전용으로도 연결할 수 있다: `-v $PWD/data/weights:/models:ro`.
-- 준비 확인: `curl http://localhost:8000/health` → `{"status":"ok","profile":"lite"}` (로딩 중에는 `loading`, 다른 요청은 503)
+- 파인튜닝한 물품 인식 가중치(19MB, 서비스가 첫 실행 때 자동으로 받고 sha256을 확인함): [Release `package-model-v1`](https://github.com/centreject/DataCat/releases/tag/package-model-v1) → [`yoloe-11s-package-oi.pt`](https://github.com/centreject/DataCat/releases/download/package-model-v1/yoloe-11s-package-oi.pt) (sha256 `0f0bf0ec…32c5ce`). 인터넷이 없는 곳에서는 미리 받아 가중치 폴더(`data/weights/` 또는 `/models`)에 둔다. 결과·다시 만드는 법은 [`eval/README.md`](eval/README.md), [`finetune/`](finetune/).
+- 준비 확인: `curl http://localhost:8000/health` → `{"status":"ok","profile":"lite","build":"<커밋>","models":{…},"package_model":"fine-tuned"}` (로딩 중에는 `loading`, 다른 요청은 503)
+- 운영(2026-10-22, [`docs/hardening.md`](docs/hardening.md)):
+  - 빌드할 때 `--build-arg BUILD_COMMIT=$(git rev-parse --short HEAD)`를 주면 `/health`의 `build`에 커밋이 보인다.
+  - 로그는 요청마다 한 줄(`rid=… POST /internal/v1/vision/detect 200 85ms`). 사진·음성·전사문은 남기지 않는다. Spring이 `X-Request-ID`를 보내면 그 값을 쓴다.
+  - 모델이 다른 요청을 처리 중이면 사진 3초·음성 인식 4초·언어 2초까지만 기다리고 503 `MODEL_BUSY`(언어 모델만 바쁘면 키워드 규칙으로 답함). `VISION_WAIT_S`, `STT_WAIT_S`, `LLM_WAIT_S`로 조정.
+  - 물품 학습 가중치를 못 받으면 예전 방식(프롬프트 14개)으로 계속 동작하고 `/health`에 `"package_model": "zero-shot"`.
+  - 3090 PC를 다른 PC에 열 때는 `MODEL_API_KEY`를 정하고 Spring이 `X-Api-Key` 헤더로 보내게 한다(기본은 꺼짐).
+  - Qwen·Whisper는 시험한 커밋으로 고정(`LLM_REVISION`, `STT_REVISION`), YOLO 가중치는 sha256 확인.
 - 동작 확인: `python docker/smoke.py` — 모든 엔드포인트를 한 번씩 호출해 응답 형식을 검사한다(표준 라이브러리만 사용).
 
 ### 프로필 (`MODEL_PROFILE`)
@@ -25,7 +33,21 @@ docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model
 | `lite` (기본) | VRAM 8GB | large-v3-turbo int8_float16 | Qwen3-4B 4bit |
 | `full` | 시연 PC(3090) | large-v3-turbo float16 | Qwen3-4B bf16 |
 
-8GB(RTX 3060 Ti)에서 VRAM을 약 6.2GB 쓰고, 음성 처리 전체 p95는 1.49초다(2026-10-04). `full`은 3090에서 아직 재지 않았으므로 시연도 측정 전까지 `lite`로 돌린다.
+8GB(RTX 3060 Ti)에서 VRAM을 약 6.2GB 쓰고, 음성 처리 전체 p95는 1.49초다(2026-10-04). 3090 `lite`는 2026-10-18 수연님 시험에서 사진 76ms, 음성 전체 0.65~0.90초, VRAM 약 6GB. `full`은 아직 재지 않았으므로 시연도 측정 전까지 `lite`로 돌린다.
+
+#### 3090에서 `full` 재기 (C6)
+
+저장소 루트에서, 모델 이미지를 빌드해 둔 뒤 실행한다. 가중치는 `lite`와 같은 볼륨을 쓰므로 새로 받지 않는다. 결과는 `model-service/bench/results/`에 JSON으로 남는다.
+
+```bash
+M="docker run --rm --gpus all -v datacat-models:/models -v $PWD/model-service:/w -w /w -e MODEL_PROFILE=full datacat-model"
+$M python -m bench.benchmark --profile full --runs 20      # 속도·VRAM (lite와 비교하려면 --profile lite도)
+$M python -m eval.eval_language --cases heldout            # 용건·긴급 정확도 (시험 문장 64개)
+```
+
+- 실행 중인 `model` 컨테이너가 있으면 먼저 멈춘다(GPU 메모리를 나눠 쓰면 수치가 틀어짐).
+- 사진·음성 평가 자료(`data/`)는 저장소에 없어 속도는 합성 입력으로 잰다. 정확도는 텍스트 문장으로 잰다.
+- 결과 JSON과 출력 표를 AI 담당에게 보내면 `lite`와 비교해 시연 프로필을 정한다.
 
 ### docker-compose 예시 (덕민님 `datacat-stack/docker-compose.yml`의 `model` 블록 자리)
 
@@ -63,7 +85,7 @@ docker build -f model-service/Dockerfile.mock -t datacat-model-mock model-servic
 docker run -p 8000:8000 datacat-model-mock
 ```
 
-- `/health` → `{"status":"ok","profile":"mock"}` (바로 준비됨)
+- `/health` → `{"status":"ok","profile":"mock","build":"dev"}` (바로 준비됨). 파일 이름에 `busy`를 넣으면 503 `MODEL_BUSY`
 - **답은 업로드 파일 이름에 든 낱말로 고른다.**
   - 이미지: `person`, `package`, `animal`, `empty` (조합 가능: `person_package.jpg`). 낱말이 없으면 `person`. `LOW_VISIBILITY`는 실제 이미지로 계산한다(단색 이미지를 보내면 붙음).
   - 음성: `delivery`(기본), `food`, `mail`, `pickup`, `personal`, `service`, `emergency`, `threat`, `solicit`, `wrong`, `unknown`, `silent` — 예: `emergency.wav`. 전사문과 답은 [`app/mock.py`](app/mock.py)의 `SCENARIOS`.

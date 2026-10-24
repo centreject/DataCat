@@ -1,8 +1,8 @@
 import copy
-import threading
 from pathlib import Path
 
 from app.config import Settings
+from app.gpu import GpuSlot
 from app.hub_cache import load_cached_first
 from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
 from app.language.purposes import CATALOG
@@ -34,7 +34,8 @@ def _system_prompt() -> str:
 summary 규칙:
 - 공백 포함 20자 이내
 - 명사형으로 끝낸다 (예: "택배 문 앞 보관", "가스 검침 방문")
-- 말을 그대로 옮기지 말고 끝을 명사로 바꾼다: "두고 갈게요"→보관, "왔습니다"→도착·방문, "해 주세요"→요청, 묻는 말→문의- 방문객이 말하지 않은 내용은 만들지 않는다
+- 말을 그대로 옮기지 말고 끝을 명사로 바꾼다: "두고 갈게요"→보관, "왔습니다"→도착·방문, "해 주세요"→요청, 묻는 말→문의
+- 방문객이 말하지 않은 내용은 만들지 않는다
 
 한 줄 외의 설명은 쓰지 않는다."""
 
@@ -73,7 +74,7 @@ class QwenLanguage:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         cache = str(Path(settings.weights_dir) / "hf")
-        kwargs = {"device_map": "cuda", "cache_dir": cache}
+        kwargs = {"device_map": "cuda", "cache_dir": cache, "revision": settings.llm_revision}
         if settings.llm_quantize_4bit:
             kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16
@@ -83,7 +84,7 @@ class QwenLanguage:
         self.torch = torch
         self.tokenizer = load_cached_first(
             lambda local_files_only: AutoTokenizer.from_pretrained(
-                settings.llm_model, cache_dir=cache, local_files_only=local_files_only
+                settings.llm_model, cache_dir=cache, revision=settings.llm_revision, local_files_only=local_files_only
             )
         )
         self.model = load_cached_first(
@@ -92,7 +93,8 @@ class QwenLanguage:
             )
         )
         self.max_new_tokens = settings.llm_max_new_tokens
-        self.lock = threading.Lock()
+        self.slot = GpuSlot("language", settings.llm_wait_s)
+        self.version = f"{settings.llm_model}@{settings.llm_revision[:7]} {'4bit' if settings.llm_quantize_4bit else 'bf16'}"
         self._build_prefix_cache()
         self.analyze("택배 왔습니다")  # warm-up
 
@@ -124,7 +126,7 @@ class QwenLanguage:
             and ids.shape[1] > n
             and self.torch.equal(ids[:, :n], self._prefix_ids)
         )
-        with self.lock, self.torch.inference_mode():
+        with self.slot(), self.torch.inference_mode():
             output = self.model.generate(
                 **inputs,
                 past_key_values=copy.deepcopy(self._prefix_cache) if cached else None,
