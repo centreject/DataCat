@@ -14,7 +14,13 @@ public record EventDetailResponse(
         EventStatus status,
         String snapshotUrl,
         OffsetDateTime occurredAt,
-        OffsetDateTime endedAt
+        OffsetDateTime endedAt,
+        String mainCategory,
+        String subCategory,
+        String responsePolicy,
+        String processingStatus,
+        String reason,
+        boolean needsReview
 ) {
 
     public static EventDetailResponse from(Event event) {
@@ -44,7 +50,13 @@ public record EventDetailResponse(
                 event.getStatus(),
                 snapshotUrl,
                 event.getOccurredAt().atOffset(ZoneOffset.ofHours(9)),
-                endedAt
+                endedAt,
+                event.getMainCategory(),
+                event.getSubCategory(),
+                event.getResponsePolicy(),
+                event.getProcessingStatus(),
+                event.getReason(),
+                event.getNeedsReview()
         );
     }
 }

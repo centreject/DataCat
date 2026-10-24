@@ -1,12 +1,27 @@
 # DataCat 무인현관 API 명세서
 
 > **Version**: v1.5  
-> **Date**: 2026-10-04  
+> **Date**: 2026-10-21\
 > **Scope**: Raspberry Pi ↔ Spring Boot ↔ 모델 서비스 ↔ Flutter App  
 > **Status**: 팀 합의용 확정본. `TBD` 항목은 이벤트 분류 기획 또는 실측 과정에서 확정한다.  
 > **v1.5 변경**: 모델 서비스 출력을 이벤트 분류 기획(feature/app-design `상황분류_종류와_조건.md`)에 맞춤 — `purpose` 9개 값(7.6), 배송 세부 유형 `subtype`, 처리 상태 `flags`, Vision `animal` 라벨과 `LOW_VISIBILITY` 표시.  
 > **v1.4 변경**: 모델 서비스(7장) 응답 규칙 확정 — `label` 값(`person`/`package`)과 package 범위, 발화 없음 응답, 요약 문체·검증, 음성 30초 처리, 상태 확인 API(7.5), 모델 서비스 오류 코드(12장), 포트 8000 제안(16장).  
 > **v1.3 변경**: ToF 재확인 게이트를 Spring(서버, 지연된 값 재사용)에서 Pi(현관기기, 실시간 로컬 판단)로 이동. 6.4 세션 종료 API의 트리거 조건을 이 로직에 맞춰 구체화. `EventStatus`를 실제 관측되는 상태만 남기도록 축소. 12장 오류 코드에서 미구현 인증(401) 제거. 4.1 모델 서비스 주소를 예시 표기임을 명확히 함. 13.1/13.2 시퀀스 다이어그램을 Pi-로컬 ToF 재확인 반영해 수정.
+
+### Spring 구현 현황 — 팀플 7주차, 2026-10-21
+
+이 문서는 구현된 API와 이후 구현할 계약을 함께 포함한다. 아래 표는 `feature/push-notification`의 현재 Spring 구현 범위다.
+
+| 항목 | 현재 상태 |
+|---|---|
+| 사진 접수·Vision 호출·사진 저장·30초 방문 병합 (6.1) | 구현 |
+| 사진 판정 A0~A5·앱 표시 필드 6개 (6.1, 9장) | 구현 |
+| 프리셋 3종 조회 (10.1) | 구현. Pi의 실제 재생 연동은 별도 시험 대상 |
+| 푸시 토큰 등록·DB 커밋 후 비동기 FCM 발송 (11장) | 구현. 실제 Android 앱의 알림 수신·상세 이동 확인 |
+| 문 앞 잔류 물품의 반복 알림 방지 (판정표 A-1) | 상태 저장용 코드·서비스 테스트 작성. 6.1 호출 흐름 연결은 미완료 |
+| 2차 사진·음성·세션 종료 (6.2~6.4) | Spring API 구현 예정 |
+| 실제 Pi·실제 Vision 모델과의 통합 시험 | Pi 담당이 이전 feature/image-upload로 별도 시험. 현재 푸시 브랜치 반영 후 재시험 예정 |
+| Spring·MySQL·모델의 전체 Docker 실행 구성 | Pi 담당 환경에서 기존 브랜치 실행 확인. 현재 푸시 브랜치 반영·재현 확인은 후속 작업 |
 
 ---
 
@@ -186,10 +201,12 @@ POST /api/v1/device/events
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|---:|---|
-| `metadata` | JSON | O | 이벤트 메타데이터 |
+| `metadata` | JSON (`application/json`) | O | 이벤트 메타데이터 |
 | `image` | File (`image/jpeg`) | O | 1차 판정용 이미지 |
 
 `metadata` 예시:
+
+> 요청 전체는 `multipart/form-data`이며, `metadata` 파트의 Content-Type은 반드시 `application/json`으로 지정한다. 일반 텍스트 파트(`text/plain`)로 전송하면 Spring은 415 `UNSUPPORTED_MEDIA_TYPE`을 반환한다. `image` 파트는 파일 이름과 `image/jpeg` Content-Type을 포함해야 한다.
 
 ```json
 {
@@ -202,6 +219,30 @@ POST /api/v1/device/events
 
 > `distanceMm`: 촬영 시점 ToF 거리값(mm). 이벤트 기록·로그용 정보이며, 방문객 이탈 재확인은 Pi가 로컬에서 별도로 수행한다(5.3 참고). Spring의 판정에는 사용하지 않는다.
 
+### 센서·버튼 동시 입력 처리
+
+#### 서버의 방문 병합
+
+- 같은 deviceId의 마지막 성공 사진 요청의 서버 처리 시작 시각을 기준으로, 30초 이내 요청은 기존 방문으로 병합한다.
+- TOF와 BUTTON처럼 입력 종류가 달라도 같은 장치이면 병합 대상이다.
+- 성공 요청마다 병합 기준 시각을 갱신한다.
+- 신규 방문은 HTTP 201, 기존 방문 병합은 HTTP 200을 반환한다.
+- 병합 시 기존 eventId와 최초 triggerType을 유지한다.
+
+#### Pi 입력 처리 협의 방향
+
+2026-10-15 Pi·서버 담당자가 확인한 방향이며, 실제 장치 연결 후 동작을 검증한다.
+
+- 센서와 버튼 입력이 동시에 발생하면 먼저 들어온 입력 하나로 접수를 시작하고, 나머지 중복 시작 입력은 무시한다.
+- 서버 전송·안내 음성 재생·녹음이 진행 중일 때는 새 접수를 동시에 시작하지 않는다.
+- 서버의 30초 방문 병합과 Pi의 입력 차단 기간은 별도로 관리한다.
+
+#### 장치 시험 후 확정할 사항 — TBD
+
+- 동시 입력으로 묶는 시간 범위와 버튼 중복 신호 제거 기준
+- 접수 진행 중 추가 버튼 입력을 무시할지, 한 번 보류할지
+- 접수 완료·오류 발생 후 다시 입력을 받을 수 있는 상태로 돌아가는 조건과 시점
+
 ### Spring 처리 순서
 
 ```text
@@ -211,10 +252,47 @@ POST /api/v1/device/events
    → 없으면 Event 생성 및 신규 eventId 발급
 3. 1차 이미지 저장
 4. Vision API 호출
-5. Vision 결과 수신 (사람/물체 감지 여부)
-6. 현재 이벤트 분류/정책 적용
-7. Pi가 수행할 action 반환
+5. 정상 응답이면 A1~A5 판정, 모델 호출/응답 실패면 A0 판정
+6. 신규/병합 판정 규칙을 적용하고 사진·분류 정보를 DB에 저장·커밋
+7. 알림 대상이면 별도 작업 큐에 FCM 발송 요청
+8. Pi가 수행할 action 반환 (FCM 발송 완료는 기다리지 않음)
 ```
+
+### 사진 판정 — 판정표 A 반영
+
+아래 조건을 위에서부터 검사해 처음 일치하는 줄을 사용한다. `person`·`package`의 존재 및 개수는 검증된 `detections`의 해당 라벨 개수다. 별도 신뢰도 임계값은 현재 추가하지 않는다. `distanceMm`은 기록용이다.
+
+| 규칙 | 조건 | status / action | eventType | mainCategory | needsReview |
+|---|---|---|---|---|---|
+| A0 | 모델 연결·읽기 타임아웃·HTTP 오류·응답 형식 오류 | WAITING_AUDIO / START_RECEPTION | null | null | true |
+| A1 | 사람 있음 | WAITING_AUDIO / START_RECEPTION | null | null | LOW_VISIBILITY일 때 true |
+| A2 | 사람 없음 + BUTTON | WAITING_AUDIO / START_RECEPTION | null | null | LOW_VISIBILITY일 때 true |
+| A3 | 사람 없음 + TOF + 물품 있음 | COMPLETED / SILENT_STANDBY | UNATTENDED_DELIVERY | 물품만 있음 | false |
+| A4 | 사람·물품 없음 + TOF + LOW_VISIBILITY | COMPLETED / SILENT_STANDBY | CAMERA_BLOCKED | 안전 확인 필요 | true |
+| A5 | 그 외. 사람·물품 없음 또는 동물만 감지 | COMPLETED / SILENT_STANDBY | NO_VISITOR | 기타·판단 불가 | false |
+
+- A0~A2의 `responsePolicy`는 `일반 접수`, A3~A5는 `무응답`이다.
+- `processingStatus`는 기본 `정상`, A0는 `이미지 판단 실패`, A1에서 사람이 2명 이상이면 `복수 방문자`다.
+- `reason`은 서버가 판정 근거 한 줄을 만든다. A1/A2에서 `LOW_VISIBILITY`이면 `카메라 가림 상태에서 호출`로 기록한다.
+- 음성 분석 전에는 A0~A2의 `eventType`, `mainCategory`, `subCategory`, `purpose`, `transcript`, `summary`를 비워 둔다. 앱은 `WAITING_AUDIO`를 기준으로 접수 중임을 표시한다.
+- 모델 장애가 A0로 처리되고 저장에 성공하면 신규 201 또는 병합 200을 반환한다. 파일 읽기·DB 저장 등 다른 서버 오류는 A0로 숨기지 않는다.
+
+### 병합 시 판정과 알림
+
+- 사진·거리값·Vision 결과·마지막 성공 요청 시각은 갱신한다. 세션 사진의 물품 최대 개수도 기록한다.
+- 기존 사진 판정이 없으면 새 판정을 적용한다.
+- 기존 판정이 있으면 새 A0는 덮어쓰지 않는다. 나머지는 A0~A5 순서에서 새 판정이 더 앞설 때만 분류·상태·종료 시각을 갱신한다.
+- 같거나 낮은 우선순위이면 기존 분류·상태·종료 시각을 유지한다. 같은 규칙 안의 세부 값 변경도 현재는 분류 갱신으로 취급하지 않는다.
+- 신규 또는 분류가 변경된 A0~A4만 푸시 대상이다. A5와 분류가 유지된 병합은 발송하지 않는다.
+- 예를 들어 A3 이후 A1은 음성 대기로 바뀌고 같은 방문 태그로 알림을 갱신한다. A1 이후 A3는 기존 음성 대기 판정을 유지한다.
+
+### 문 앞 잔류 물품 — 연결 작업 남음
+
+판정표 A-1의 목표는 같은 물품이 계속 보이면 기존 물품 이벤트를 재사용하고, 실제 감지 개수가 늘었을 때만 새 이벤트·알림을 만드는 것이다.
+`DevicePackageState`와 `PackageReceptionService` 및 서비스 테스트는 작성했으나, 현재 6.1은 이 서비스를 호출하지 않는다.
+따라서 **30초 병합 창을 벗어난 같은 물품의 반복 이벤트·알림 방지는 아직 보장하지 않는다.**
+
+30초 일반 방문 병합과 물품 추가 시 신규 이벤트 생성의 적용 순서, 진행 중인 사람 응대와 물품 상태의 연결을 정리한 뒤 호출 흐름·파일 정리·통합 테스트에 반영한다. A5에서 물품 상태를 비우는 연결과 응대 종료 시 최대 물품 수 저장도 후속 작업이다.
 
 > 사람 감지 시 `START_RECEPTION`을 반환하지만, 이 시점 이후 방문객이 실제로 자리에 있는지에 대한 최종 확인은 Pi가 로컬 ToF로 수행한다(5.3 참고). Spring은 지연된 값으로 재판정하지 않는다.
 
@@ -434,7 +512,7 @@ POST /internal/v1/vision/detect
 
 > bounding box가 서버 판정에 필요해질 경우 `bbox` 필드를 선택적으로 추가할 수 있다. 현재 MVP에서는 필수 아님.
 
-> **1차 판별 가이드(잠정)**: `detections` 배열 내 `label == 'person'` 존재 여부를 기본 신호로 Spring이 `START_RECEPTION`/`SILENT_STANDBY`를 판정한다. 이 판정 이후 실제 응대 시점(프리셋 재생 직전)에 방문객이 여전히 있는지에 대한 재확인은 Spring이 아니라 Pi가 로컬 ToF로 수행한다(5.3 참고) — Vision 응답은 지연된 이미지 한 장에 대한 판단일 뿐이므로 이탈 여부의 최종 근거로 쓰지 않는다. 세부 조건문은 이벤트 분류 기획 확정 후 Spring에 구현한다.
+> **Spring 판정**: 현재 6.1의 A0~A5 조건을 적용한다. 사람 감지 외에 버튼 입력·물품·`LOW_VISIBILITY`·모델 장애를 함께 처리한다. 실제 응대 직전 방문객이 남아 있는지는 Pi가 로컬 ToF로 재확인한다(5.3). 모델 내부 오류는 12장에 정의하되, 사진 접수의 모델 호출 실패는 Spring에서 A0로 처리한다.
 
 ---
 
@@ -659,13 +737,16 @@ Spring 조건문
 eventType
 ```
 
-`eventType`의 최종 종류와 조건은 이벤트 분류 담당의 기획 확정 후 반영한다. 현재 초기 후보 값(승인 필요):
+현재 사진 판정에 적용한 값과 이후 음성·종료 단계에서 사용할 값을 구분한다. 앱 표시 값 6개는 9.4를 따른다.
 
-| 값 | 의미 |
-|---|---|
-| `UNATTENDED_DELIVERY` | 사람 없음/이탈 + 물건 있음 (무응답 배송 완료) |
-| `VISITOR_ACCEPTED` | 사람 감지 + 용건 접수 완료 |
-| `VISITOR_TIMEOUT` | 호출 후 응답 없이 이탈 (부재 처리) |
+| 값 | 의미 | Spring 구현 |
+|---|---|---|
+| null | 사진만으로 용건 미확정. A0~A2는 음성 대기 | 구현 |
+| `UNATTENDED_DELIVERY` | 사진에 사람 없이 물품이 감지됨 | A3 구현. 이탈 후 물품 판정은 후속 단계 |
+| `CAMERA_BLOCKED` | 사람·물품 없이 사진 확인이 어려움 | A4 구현 |
+| `NO_VISITOR` | 사람·물품 없음 또는 동물만 감지 | A5 구현 |
+| `VISITOR_ACCEPTED` | 음성으로 용건 접수 완료 | 음성 API 구현 시 반영 |
+| `VISITOR_TIMEOUT` | 음성 없이 방문 종료 | 종료 API 구현 시 반영 |
 
 ---
 
@@ -687,12 +768,18 @@ GET /api/v1/events?page=0&size=20
     {
       "eventId": 101,
       "deviceId": "door-01",
-      "eventType": null,
-      "purpose": "DELIVERY",
-      "summary": "택배 배송 방문",
+      "eventType": "UNATTENDED_DELIVERY",
+      "purpose": null,
+      "summary": null,
       "status": "COMPLETED",
       "occurredAt": "2026-09-20T22:30:00+09:00",
-      "snapshotUrl": "/api/v1/events/101/snapshot"
+      "snapshotUrl": "/api/v1/events/101/snapshot",
+      "mainCategory": "물품만 있음",
+      "subCategory": null,
+      "responsePolicy": "무응답",
+      "processingStatus": "정상",
+      "reason": "사람은 감지되지 않았고 물품이 감지되었습니다.",
+      "needsReview": false
     }
   ],
   "page": 0,
@@ -701,7 +788,8 @@ GET /api/v1/events?page=0&size=20
 }
 ```
 
-> `eventType`은 이벤트 분류 기획 확정 전까지 `null` 또는 미확정 값이 될 수 있다.
+`page`는 0부터 시작하며 기본 0, `size`는 기본 20이다. `page >= 0`, `1 <= size <= 100`을 허용한다.
+정렬은 `occurredAt` 내림차순, 같은 시각이면 `eventId` 내림차순이다. 응답 200, 잘못된 페이지 값·숫자 형식은 400이다. 요청 본문은 없다.
 
 ---
 
@@ -720,16 +808,24 @@ GET /api/v1/events/{eventId}
   "eventId": 101,
   "deviceId": "door-01",
   "triggerType": "TOF",
-  "eventType": null,
-  "purpose": "DELIVERY",
-  "transcript": "택배 왔습니다. 문 앞에 놓고 갈게요.",
-  "summary": "택배 배송 방문",
+  "eventType": "UNATTENDED_DELIVERY",
+  "purpose": null,
+  "transcript": null,
+  "summary": null,
   "status": "COMPLETED",
   "snapshotUrl": "/api/v1/events/101/snapshot",
   "occurredAt": "2026-09-20T22:30:00+09:00",
-  "endedAt": "2026-09-20T22:30:30+09:00"
+  "endedAt": "2026-09-20T22:30:30+09:00",
+  "mainCategory": "물품만 있음",
+  "subCategory": null,
+  "responsePolicy": "무응답",
+  "processingStatus": "정상",
+  "reason": "사람은 감지되지 않았고 물품이 감지되었습니다.",
+  "needsReview": false
 }
 ```
+
+`eventId`는 1 이상의 정수다. 요청 본문·쿼리 파라미터는 없으며 성공 200, 잘못된 ID는 400, 없는 이벤트는 404다.
 
 ---
 
@@ -746,6 +842,30 @@ GET /api/v1/events/{eventId}/snapshot
 ```http
 Content-Type: image/jpeg
 ```
+
+성공 200의 본문은 JPEG 파일 데이터이며 JSON이 아니다. `Cache-Control: no-store`를 사용한다.
+이벤트 또는 저장된 사진이 없으면 404 JSON 오류를 반환한다.
+
+---
+
+## 9.4 앱 표시용 분류 필드
+
+목록의 각 `content` 항목과 상세 응답에 동일한 6개 필드를 포함한다. 기존 `eventType`, `purpose`, `status`는 유지한다.
+판정표 6장의 한글 표시 값을 사용하며, 아직 판정하지 않은 값이나 기존 데이터에는 null이 올 수 있다.
+
+| 필드 | 타입 | 의미 및 현재 응답 |
+|---|---|---|
+| `mainCategory` | String 또는 null | 앱의 주 분류. 사진 단계는 `물품만 있음`, `안전 확인 필요`, `기타·판단 불가`. A0~A2는 null |
+| `subCategory` | String 또는 null | 배송 등의 세부 분류. 현재 사진 단계는 null. 음성 연동 시 판정표 C의 변환 적용 |
+| `responsePolicy` | String 또는 null | 응대 방식. 현재 `일반 접수` 또는 `무응답`. `긴급 알림`·`장애 안내`는 후속 정책 범위 |
+| `processingStatus` | String 또는 null | 판정 처리 상태. 현재 `정상`, `복수 방문자`, `이미지 판단 실패` |
+| `reason` | String 또는 null | Spring이 만드는 판정 근거 한 줄 |
+| `needsReview` | Boolean | 사용자 확인 필요 여부. 현재 A0·해당 카메라 가림 판정은 true |
+
+`status`는 `WAITING_AUDIO`·`COMPLETED` 같은 진행 단계이며, `processingStatus`는 판정 과정에서 생긴 상황이다. 서로 대체하지 않는다.
+예를 들어 A0는 `status=WAITING_AUDIO`, `processingStatus=이미지 판단 실패`, `needsReview=true`다.
+기존 DB 기록의 `needsReview`가 null이면 현재 API는 false를 반환한다. 이 기본값이 기존 기록의 재판정 완료를 뜻하지는 않는다.
+`WAITING_AUDIO`의 앱 안내·푸시 문구는 음성 입력을 기다린다는 뜻이며, 음성 처리 완료나 실제 녹음 실행을 보증하지 않는다.
 
 ---
 
@@ -772,9 +892,17 @@ GET /api/v1/presets
     "presetId": 2,
     "type": "COMPLETION",
     "text": "접수되었습니다."
+  },
+  {
+    "presetId": 3,
+    "type": "FALLBACK",
+    "text": "일시적인 오류로 접수할 수 없습니다. 잠시 후 다시 시도해 주세요."
   }
 ]
 ```
+인사·접수 완료·오류 안내 3종을 제공한다.
+오류 안내의 presetId 3과 FALLBACK 타입은 기존 앱 목업과 맞춘다.
+Pi는 서버 연결 실패 시에도 오류 안내를 재생할 수 있도록 해당 고정 음원을 로컬에 보관한다.
 
 ---
 
@@ -810,13 +938,46 @@ PUT /api/v1/presets/{presetId}
 
 # 11. Push 알림
 
-방문 이벤트 알림이 필요할 경우 Push 서비스를 사용한다.
+FCM 푸시 알림은 1단계 MVP에 포함한다.
+
+**발송 기준 — 2026-10-15 앱·서버 담당 협의**
+
+- 1단계 MVP에서는 사진 분석 결과를 DB에 저장한 직후 방문 알림 발송을 요청한다.
+- 2단계 MVP에서는 음성 분석 결과를 DB에 반영한 뒤 같은 방문의 알림 내용을 갱신한다.
+- FCM 발송은 DB 저장이 커밋된 이후 별도 비동기 작업으로 실행한다. Pi에 대한 HTTP 응답은 FCM 발송 완료를 기다리지 않는다.
+- 같은 방문은 `event_{eventId}` 태그를 고정하여 기존 알림 표시를 갱신한다. Android에서는 `android.notification.tag`에 지정한다.
+- FCM `data.eventId`는 문자열로 전달한다. 앱은 해당 값으로 방문 상세 API를 호출한다.
+- 토큰 등록과 나머지 메시지 형식은 앱 브랜치의 [PUSH.md](https://github.com/centreject/DataCat/blob/feature/app-design/datacat-stack/PUSH.md)를 따른다.
+
+발송 시점은 이번 협의 내용을 기준으로 한다. PUSH.md에 남아 있는 기존 "방문 처리 종료 후 발송" 설명은 이번 합의에 맞춰 갱신할 대상이다.
+
+FCM 메시지는 PUSH.md의 `message.notification`, `message.data`, `message.android` 구조를 따른다. 현재 예시는 11.2에 정리한다.
+
+현재 Spring은 Android 토큰 등록과 사진 판정 후 FCM 발송을 구현했다. 음성·종료 결과에 따른 알림 갱신은 해당 API 구현 시 연결한다.
+
+### 현재 발송 조건과 실패 처리
+
+- 신규 판정 또는 병합으로 분류가 변경된 A0~A4는 발송 대상이다. A5와 분류가 유지된 병합은 발송하지 않는다(6.1).
+- 같은 물품의 반복 알림 억제는 판정표 A-1 연결 후 적용한다. 현재는 30초 방문 병합 범위 밖의 반복 알림을 억제하지 못한다.
+- 방문 저장이 커밋된 뒤 알림 문구·eventId를 복사해 작업 큐에 넣는다. 작업 실행 전에 Event 값이 바뀌어도 이미 등록한 메시지는 바뀌지 않는다.
+- 작업 스레드 1개, 대기 큐 100개로 실행한다. 큐가 가득 차거나 발송·토큰 조회가 실패하면 로그를 남기며, 그 실패로 사진 접수 응답을 실패시키지 않는다.
+- 현재 등록된 Android 토큰 전체로 발송한다. 사용자별·기기별 수신 대상 분리는 구현하지 않았다.
+- FCM 응답이 `UNREGISTERED`인 토큰만 삭제한다. 다른 오류는 기록하고 다음 토큰을 처리한다.
+- 재시도·영구 발송 큐는 없다. 서버 종료·큐 초과 등으로 알림이 누락될 수 있으며 방문 기록은 DB 조회로 확인한다.
+- `FCM_ENABLED=false`가 기본이며 이때 발송만 생략한다. 토큰 등록·사진 접수·조회 API는 사용할 수 있다.
+
+Pi 응답은 Vision 분석과 방문 DB 저장을 기다리지만, FCM의 네트워크 응답을 기다리지는 않는다. 사진 접수 자체의 순차 처리(`synchronized`)는 그대로다.
 
 ## 11.1 Push Token 등록
 
+앱이 Firebase에서 받은 자신의 등록 토큰을 Spring에 저장한다. 앱 시작·토큰 변경·접속 서버 변경 시 앱이 호출한다.
+
 ```http
 POST /api/v1/push-tokens
+Content-Type: application/json
 ```
+
+Path Parameter·Query Parameter는 없다.
 
 ### Request
 
@@ -827,22 +988,75 @@ POST /api/v1/push-tokens
 }
 ```
 
-### Push Payload 예시
+- `deviceToken`: 필수, 공백만인 값 불가, 최대 512자. 앱의 FCM 등록 토큰 원문을 전달한다.
+- `platform`: 현재 정확히 `ANDROID`만 허용한다. iOS 등록은 현재 범위에 포함하지 않는다.
+- 동일한 토큰을 다시 보내면 새 행을 만들지 않고 등록 시각을 갱신한다. 토큰 대소문자는 구별한다.
+
+### Response
+
+신규 등록과 동일 토큰 재등록 모두 **201 Created**, 응답 본문 없음이다. 빈 본문을 JSON으로 파싱하지 않는다.
+형식 검사는 FCM 발송 가능성을 검증하는 절차가 아니므로, 201만으로 휴대폰 수신 성공을 판단하지 않는다.
+
+| HTTP 상태 | 상황 |
+|---|---|
+| 201 | 신규 등록 또는 재등록 성공 |
+| 400 | 토큰 누락·공백·길이 초과, ANDROID 외 platform, 잘못된 JSON |
+| 415 | application/json이 아닌 요청 |
+| 500 | DB 저장 등 서버 오류 |
+
+실패 예시: 빈 토큰을 보내면 400 JSON을 반환한다.
 
 ```json
 {
-  "tag": "event_101",
-  "collapseKey": "event_101",
-  "type": "VISIT_EVENT",
-  "eventId": "101",
-  "title": "새 방문이 있습니다.",
-  "body": "방문 용건이 접수되었습니다."
+  "code": "INVALID_REQUEST",
+  "message": "deviceToken은 비어 있을 수 없습니다."
 }
 ```
 
-> **인플레이스(In-Place) 갱신**: `tag`/`collapseKey`를 `"event_{eventId}"` 고정 규격으로 넣는다. 세션 유예 윈도우(30초) 내에 벨 재입력이나 추가 발화가 발생해 같은 eventId로 병합되면, 새 알림을 쌓지 않고 기존 알림창의 내용을 덮어쓴다.
+## 11.2 FCM 메시지
 
-앱은 Push에서 `eventId`를 받은 뒤 상세 API를 호출한다.
+이 절은 Spring이 Firebase Admin SDK로 만드는 메시지이며 Pi·앱이 호출하는 별도 Spring REST API가 아니다.
+다음 JSON은 FCM HTTP v1 형식으로 표현한 동등한 예시다. 현재 구현은 SDK의 `Message`를 구성해 전송한다.
+
+```json
+{
+  "message": {
+    "token": "FCM_DEVICE_TOKEN",
+    "notification": {
+      "title": "방문객이 왔어요",
+      "body": "용건을 듣고 있어요"
+    },
+    "data": {
+      "type": "VISIT_EVENT",
+      "eventId": "101",
+      "tag": "event_101"
+    },
+    "android": {
+      "priority": "high",
+      "collapse_key": "event_101",
+      "notification": {
+        "tag": "event_101"
+      }
+    }
+  }
+}
+```
+
+`data`의 값은 모두 문자열이다. 같은 방문의 태그·collapse key는 항상 `event_{eventId}`다.
+동일 태그로 현재 표시 중인 알림의 교체를 요청하며, 새 eventId는 다른 알림이다. 토큰·태그만으로 정확히 한 번 전달이나 최신 메시지의 전달 순서를 보장하지 않는다.
+
+현재 문구 생성 규칙:
+
+| 조건 | 제목 | 본문 |
+|---|---|---|
+| WAITING_AUDIO | 방문객이 왔어요 | 용건을 듣고 있어요 |
+| 완료 + 긴급 알림 정책 또는 안전 확인·공공 긴급 분류 | 긴급 · 세부 분류 또는 주 분류 | summary, 없으면 reason, 없으면 기본 안내 |
+| 완료 + 물품만 있음 | 물품 도착 (세부 분류가 있으면 덧붙임) | 같은 우선순위로 본문 선택 |
+| 그 외 완료 | 새 방문 · 주 분류 | 같은 우선순위로 본문 선택 |
+
+`needsReview=true`이면 본문 뒤에 ` (확인 필요)`를 붙인다. 기본 안내는 `방문 기록을 확인해 주세요.`다.
+
+앱은 알림을 눌렀을 때 `data.eventId`로 다음 상세 API를 호출하고 DB에 저장된 최신 내용을 표시한다.
 
 ```http
 GET /api/v1/events/101
@@ -856,8 +1070,8 @@ GET /api/v1/events/101
 
 ```json
 {
-  "code": "MODEL_SERVER_TIMEOUT",
-  "message": "모델 서버 응답 시간이 초과되었습니다."
+  "code": "INVALID_REQUEST",
+  "message": "image 파트가 필요합니다."
 }
 ```
 
@@ -871,6 +1085,25 @@ GET /api/v1/events/101
 | `409` | 현재 Event 상태에서 수행할 수 없는 요청 |
 | `500` | Spring 내부 오류 |
 | `503` | 모델 서비스 또는 외부 의존 서비스 사용 불가 |
+
+### Spring 외부 API 오류 코드
+
+Pi·앱이 Spring API를 호출할 때 사용하는 오류 코드다.
+
+| HTTP Status | `code` | 의미 |
+|---:|---|---|
+| `400` | `INVALID_REQUEST` | 메타데이터 오류, 필수 파트 누락, 유효하지 않은 JPEG, 업로드 크기 초과 |
+| `404` | `NOT_FOUND` | 이벤트, 사진 또는 요청 경로 없음 |
+| `405` | `METHOD_NOT_ALLOWED` | 허용되지 않는 HTTP 메서드 |
+| `409` | `EVENT_STATE_CONFLICT` | 이벤트 상태 충돌용 예약 코드. 현재 사진 접수 흐름에서는 발생시키지 않음 |
+| `415` | `UNSUPPORTED_MEDIA_TYPE` | 지원하지 않는 요청 또는 multipart 파트 Content-Type |
+| `500` | `INTERNAL_SERVER_ERROR` | 파일·DB 저장 실패 또는 예상하지 못한 서버 오류 |
+| `503` | `MODEL_SERVICE_UNAVAILABLE` | ModelClient의 모델 호출 실패 표시. 현재 6.1에서는 이를 A0로 변환하며, 사진 요청에 그대로 반환하지 않음 |
+
+VisionModelClient는 모델 호출 실패를 503 상태의 예외로 통합하지만, 현재 사진 접수 서비스는 이 예외를 A0로 처리한다.
+사진·DB 저장에 성공하면 신규 201 또는 병합 200이다. 기존 판정이 있는 병합에서 A0가 발생하면 기존 분류를 유지한다(6.1).
+FCM 비동기 발송 오류는 Pi·앱 HTTP 오류로 전달하지 않는다.
+아래 모델 서비스 오류 코드는 모델 내부 API의 응답이며, Spring이 그대로 Pi·앱에 전달하는 코드는 아니다.
 
 모델 서비스(7장) 오류 코드:
 
@@ -913,9 +1146,10 @@ sequenceDiagram
     Pi->>Spring: 이벤트 + 1차 이미지 + distanceMm(로그용)
     Spring->>Spring: 유예 윈도우 내 기존 eventId 있는지 확인(병합 또는 신규 발급)
     Spring->>Vision: 이미지 분석 요청
-    Vision-->>Spring: detections
-    Spring->>Spring: 이벤트 분류/정책 적용
-    Spring->>DB: Event 저장
+    Vision-->>Spring: detections + flags 또는 호출 실패
+    Spring->>Spring: A0~A5 판정 및 병합 우선순위 적용
+    Spring->>DB: Event 저장·커밋
+    Note over Spring,App: 알림 대상이면 별도 작업에서 FCM 발송. Pi 응답은 발송 완료를 기다리지 않음
     Spring-->>Pi: action(START_RECEPTION) + preset
     Pi->>Pi: ToF 재확인 게이트(로컬, 프리셋 재생 직전)
     alt 방문객 여전히 존재
@@ -928,6 +1162,8 @@ sequenceDiagram
 ```
 
 ## 13.2 음성 처리
+
+다음은 이후 구현할 음성·종료 연동 계약이다. 현재 Spring의 구현 완료 범위는 문서 상단 표를 따른다.
 
 ```mermaid
 sequenceDiagram
@@ -960,7 +1196,7 @@ Event
 - triggerType
 - distanceMm       // 촬영 시점 ToF 거리값(mm), 로그·기록용 (이탈 판정은 Pi 로컬에서 수행, 5.3 참고)
 - status
-- eventType        // 최종 이벤트 분류, TBD
+- eventType        // 현재 사진 판정 값은 8장, 음성·종료 판정은 후속 구현
 - purpose          // 용건 (7.6의 9개 값)
 - subtype          // 배송 세부 유형 (DELIVERY일 때만)
 - flags            // 모델 처리 상태 (NO_SPEECH 등, 7.3)
@@ -972,6 +1208,18 @@ Event
 - endedAt
 ```
 
+현재 Spring Event 구현은 발생 시각을 `occurredAt`에 저장한다. 위 제안의 `createdAt`, `updatedAt`, `subtype`, `flags` 컬럼을 모두 구현한 것은 아니다.
+현재 추가 저장 값은 다음과 같다.
+
+| 위치 | 필드 | 사용 목적 |
+|---|---|---|
+| Event | mainCategory, subCategory, responsePolicy, processingStatus, reason, needsReview | 앱 표시 필드 6개 (9.4) |
+| Event | imageRuleId | A0~A5 병합 판정 우선순위 |
+| Event | lastImageReceivedAt | 30초 방문 병합 기준 |
+| Event | maxPackageCount | 세션 사진의 최대 물품 감지 수. 이후 종료 판정·물품 상태 연결에 사용 |
+| push_token | tokenId, deviceToken, platform, createdAt, updatedAt | 푸시 등록. tokenId는 원문 토큰의 SHA-256, 실제 발송에는 원문 사용 |
+| device_package_states | deviceId, packageCount, packageEventId, firstSeenAt, lastSeenAt | 물품 상태 저장용 코드·테스트 작성. 현재 6.1에서 갱신하지 않음 |
+
 > DB 컬럼명과 JPA 타입은 실제 구현 시 변경할 수 있다. API 계약과 DB 스키마는 동일한 개념을 사용하되 1:1로 같을 필요는 없다.
 
 ---
@@ -979,6 +1227,7 @@ Event
 # 15. 구현 우선순위
 
 ## Phase 1 — 이미지 흐름 먼저 연결
+FCM 푸시 알림을 포함한다. 사진 분석 결과 저장 후 알림 발송과 앱 상세 화면 이동까지 검증한다.
 
 ```text
 Pi
@@ -996,6 +1245,8 @@ POST /api/v1/device/events
 POST /internal/v1/vision/detect
 GET  /api/v1/events
 GET  /api/v1/events/{eventId}
+GET  /api/v1/events/{eventId}/snapshot
+POST /api/v1/push-tokens
 ```
 
 ## Phase 2 — 음성 흐름 추가
@@ -1022,7 +1273,6 @@ POST /api/v1/device/events/{eventId}/end
 ## Phase 3 — 서비스 기능 보강
 
 - 프리셋 관리
-- Push
 - 기기 인증
 - 사용자 인증
 - 공통 예외 처리
@@ -1035,13 +1285,15 @@ POST /api/v1/device/events/{eventId}/end
 아래 항목은 임의로 확정하지 않고 팀 논의 후 업데이트한다.
 
 1. ~~`purpose` 값~~ — 기획서 기반 9개로 확정(7.6). 우선순위 차이 한 곳도 이벤트 분류 담당 확인 완료(2026-10-08)
-2. 최종 `eventType` 종류와 분류 조건 — 초기 후보(8장 참고)는 제시됨, 이벤트 분류 담당 최종 승인 필요
-3. 각 상황에 연결할 프리셋 종류/문구
+2. 사진 판정 A0~A5와 앱 표시 필드는 판정표에 맞춰 구현(6.1, 9.4). 음성·종료 판정은 구현 시 판정표 B/C를 반영하며 추가 정책 변경은 협의
+3. 프리셋 3종은 10.1 반영 완료. 이후 추가 상황별 프리셋 연결은 해당 기능 구현 시 협의
 4. 모델 서비스 실제 포트 및 Docker 서비스 이름 — 포트 `8000` 제안(모델 서비스 Dockerfile 기본값), 서비스 이름은 compose 확정 시
 5. 기기 인증 방식 및 키 발급 방법
-6. Push 서비스의 최종 선택/세부 payload
+6. FCM 사용과 1단계 포함은 확정. 발송 시점·비동기 발송·동일 방문 태그 갱신은 11장의 2026-10-15 협의를 따른다.
 7. Vision 응답에 bounding box가 필요한지 여부
 8. 세션 유예 윈도우(30초)·ToF 복귀 안정화 시간(3~5초)의 정확한 값 — 시제품 실측 후 확정
+9. 물품 상태 판정 A-1과 일반 30초 방문 병합의 적용 순서 — 물품 추가 시 신규 이벤트 생성과 진행 중 응대 방문 재사용이 충돌하는 경우를 정리한 뒤 6.1에 연결
+10. FCM 발송 재시도·영구 큐·사용자별 수신 대상 분리 — 현재 구현 범위 밖
 
 ---
 
@@ -1105,3 +1357,4 @@ docs: add initial API specification
 | `v1.3` | 2026-09-27 | **ToF 재확인 게이트를 Spring→Pi로 이동**(6.1 `distanceMm`은 로그용으로 격하, Spring 처리 순서에서 재확인 단계 제거, 5.3에 Pi 로컬 게이트 블록 추가), 6.4 `reason` 값에 트리거 조건 표로 명시(`VISITOR_LEFT`=Pi 게이트 발동, `DEVICE_CANCELLED`=예약/미사용), `EventStatus`를 실제 관측 가능한 3개 값(`WAITING_AUDIO`/`COMPLETED`/`FAILED`)으로 축소, 12장 `401` 오류 코드에 Phase 3 예약·미구현 주석 추가, 4.1 모델 서비스 Base URL을 예시 플레이스홀더로 변경, 7.1 판별 가이드에서 Spring의 `distanceMm` 재판정 언급 제거, 13.1 시퀀스 다이어그램을 Pi-로컬 ToF 게이트 반영해 수정 |
 | `v1.4` | 2026-09-27 | **모델 서비스 응답 규칙 확정**: 7.1 `label`을 `person`/`package`로 확정하고 package 범위 명시, 7.2 음성 앞 30초만 전사·업로드 16MB, 7.3 요약 명사형·말하지 않은 내용 금지(전사문으로 대체), 7.4 발화 없음 응답과 `purpose` 사용 주의, 7.5 `GET /health` 신설(`loading`/`ok`/`degraded`/`error`), 12장 모델 서비스 오류 코드 표, 16장 포트 8000 제안 |
 | `v1.5` | 2026-10-04 | **모델 출력을 이벤트 분류 기획에 맞춤**: 7.1 `animal` 라벨·`package` 범위 확장·`flags`(`LOW_VISIBILITY`), 7.3·7.4 `purpose` 9개 값과 `subtype`(배송 세부 유형)·`flags`(`NO_SPEECH`/`SUMMARY_FROM_TRANSCRIPT`/`RULES_FALLBACK`), 발화 없음은 `UNKNOWN`, 7.6 신설(값 표, 앱 `mainCategory` 연결), 8장 예시 갱신, 13.2·14장 필드 반영, R3 리뷰 반영(우선순위 차이 명시, `LOW_VISIBILITY` 정의, 요약 규칙, 새 값 무시 안내) |
+| `v1.5` 구현 반영 | 2026-10-21 | 팀플 7주차: 사진 판정 A0~A5·병합 우선순위, 모델 실패 A0 처리, 앱 표시 필드 6개, Android 토큰 등록(201 빈 본문)·DB 커밋 후 비동기 FCM 발송 반영. 물품 상태 코드의 접수 흐름 연결과 음성·종료 API는 미완료로 구분 |
