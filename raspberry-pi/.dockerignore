@@ -1,0 +1,6 @@
+.venv
+__pycache__
+*.jpg
+*.txt
+!requirements.txt
+sounds
