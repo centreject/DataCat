@@ -39,7 +39,9 @@ class DataCatApp extends StatefulWidget {
 }
 
 class _DataCatAppState extends State<DataCatApp> with WidgetsBindingObserver {
-  late String _connectionKey = widget.settings.connectionKey;
+  // late 필드의 초기값은 처음 읽을 때 계산된다. 설정이 바뀐 뒤에 처음 읽히면 바뀐 값이 들어가서
+  // 첫 번째 서버 변경을 놓치므로, initState에서 바로 정해 둔다.
+  late String _connectionKey;
   late final VisitPolicy _policy = widget.policy ?? VisitPolicy();
   late final PushCenter _push = widget.push ?? PushCenter.disabled();
   final _navigator = GlobalKey<NavigatorState>();
@@ -48,6 +50,7 @@ class _DataCatAppState extends State<DataCatApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _connectionKey = widget.settings.connectionKey;
     widget.settings.addListener(_onSettingsChanged);
     widget.store.arrivalFilter = _policy.shouldNotify;
     widget.store.refresh();

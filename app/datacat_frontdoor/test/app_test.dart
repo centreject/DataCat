@@ -128,4 +128,23 @@ void main() {
     // 데모 모드에는 목업 서버 테스트 버튼이 없다
     expect(find.text('테스트 방문 보내기'), findsNothing);
   });
+
+  testWidgets('설정: 앱을 켠 뒤 처음 서버 주소를 바꿔도 새 주소로 연결된다', (tester) async {
+    SharedPreferences.setMockInitialValues({'app.demoMode': false});
+    final settings = AppSettings();
+    await settings.load();
+    final store = EventStore(settings.createApi());
+    await tester.pumpWidget(DataCatApp(settings: settings, store: store, autoRefresh: false));
+    await tester.pump(_afterLoad);
+    final before = store.api.label;
+
+    await settings.setBaseUrl('http://192.168.0.77:9090');
+    await tester.pump();
+
+    expect(store.api.label, isNot(before));
+    expect(store.api.label, '192.168.0.77:9090');
+
+    // 테스트 환경에는 서버가 없으니 요청 타임아웃까지 흘려보내 타이머를 정리한다.
+    await tester.pump(const Duration(seconds: 9));
+  });
 }
