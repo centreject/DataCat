@@ -4,6 +4,8 @@
 //   - 집 안 와이파이의 http:// 서버도 시험할 수 있게 평문 통신 허용
 //   - Firebase 가 요구하는 최소 안드로이드 버전 (API 23 = 안드로이드 6.0)
 //   - 앱 아이콘과 알림 아이콘 (tool/icon/android/res 를 복사)
+//   - 릴리스 빌드의 코드 축소(R8) 끄기: 켜 두면 shared_preferences 의 메서드가 지워져
+//     설정(서버 주소·테마)이 저장되지 않는다 (NoSuchMethodError ... SharedPreferencesApiRegistrar.getAll)
 import 'dart:io';
 
 void main() {
@@ -53,6 +55,18 @@ void _patchGradle(File f) {
   s = s
       .replaceAll(RegExp(r'minSdk\s*=\s*flutter\.minSdkVersion'), 'minSdk = maxOf(flutter.minSdkVersion, 23)')
       .replaceAll(RegExp(r'minSdkVersion\s+flutter\.minSdkVersion'), 'minSdkVersion Math.max(flutter.minSdkVersion, 23)');
+  if (!s.contains('MinifyEnabled = false') && !s.contains('minifyEnabled false')) {
+    final kts = f.path.endsWith('.kts');
+    final lines = kts
+        ? '\n            isMinifyEnabled = false\n            isShrinkResources = false'
+        : '\n            minifyEnabled false\n            shrinkResources false';
+    final before = s;
+    s = s.replaceFirstMapped(RegExp(r'release\s*\{'), (m) => '${m[0]}$lines');
+    if (s == before) {
+      stderr.writeln('${f.path} 에서 release 설정을 찾지 못했어요. 코드 축소를 끄지 못했어요.');
+      exit(1);
+    }
+  }
   f.writeAsStringSync(s);
   print('  ${f.path} OK');
 }
