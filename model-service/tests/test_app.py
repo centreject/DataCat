@@ -20,10 +20,10 @@ def test_health_reports_loading_then_ok():
     release = threading.Event()
     app = create_app(blocking_factory(release))
     with TestClient(app) as client:
-        assert client.get("/health").json() == {"status": "loading", "profile": "lite"}
+        assert client.get("/health").json() == {"status": "loading", "profile": "lite", "build": "dev"}
         release.set()
         app.state.loader.join(timeout=5)
-        assert client.get("/health").json() == {"status": "ok", "profile": "lite"}
+        assert client.get("/health").json() == {"status": "ok", "profile": "lite", "build": "dev"}
 
 
 def test_health_reports_error_when_loading_fails():
@@ -33,7 +33,7 @@ def test_health_reports_error_when_loading_fails():
     app = create_app(failing)
     with TestClient(app) as client:
         app.state.loader.join(timeout=5)
-        assert client.get("/health").json() == {"status": "error", "profile": "lite"}
+        assert client.get("/health").json() == {"status": "error", "profile": "lite", "build": "dev"}
 
 
 def test_health_degraded_when_a_model_failed():
@@ -42,7 +42,7 @@ def test_health_degraded_when_a_model_failed():
     with TestClient(app) as client:
         app.state.loader.join(timeout=5)
         body = client.get("/health").json()
-    assert body == {"status": "degraded", "profile": "lite", "failed": ["language"]}
+    assert body == {"status": "degraded", "profile": "lite", "build": "dev", "failed": ["language"]}
 
 
 def test_health_error_when_every_model_failed():

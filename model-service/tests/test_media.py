@@ -118,3 +118,17 @@ def test_decode_jpeg_rejects_garbage():
     with pytest.raises(ApiError) as e:
         decode_jpeg(b"\xff\xd8\xff not really")
     assert_api_error(e, "INVALID_IMAGE")
+
+
+def test_unreadable_image_is_400_even_with_ultralytics_patched_open(monkeypatch):
+    # Ultralytics replaces PIL.Image.open; on a bad file it tries to import pi_heif, which the image
+    # doesn't ship, so a garbage upload raised ModuleNotFoundError → 500 (found 2026-10-22).
+    import PIL.Image
+
+    def patched_open(*args, **kwargs):
+        raise ModuleNotFoundError("No module named 'pi_heif'")
+
+    monkeypatch.setattr(PIL.Image, "open", patched_open)
+    with pytest.raises(ApiError) as err:
+        decode_jpeg(b"not an image at all")
+    assert err.value.status == 400 and err.value.code == "INVALID_IMAGE"

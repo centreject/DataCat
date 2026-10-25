@@ -1,44 +1,50 @@
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 # model-service/ — anchors data paths so they don't depend on the working directory.
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = SERVICE_ROOT / "data"
+# Items the fine-tuned package model (box, envelope, plastic bag) was never shown.
+EXTRA_PACKAGE_PROMPTS = ["food delivery bag", "takeout container", "cooler bag", "flower bouquet", "cake box"]
 
 
 class Settings(BaseSettings):
     # mock: canned answers without GPU or weights, for teammates' integration tests (app/mock.py).
     model_profile: Literal["full", "lite", "mock"] = "lite"
-    mock_delay_ms: int = 0
-    person_conf: float = 0.4
-    # Tuned on the Open Images val/test subset from eval/prepare_images.py (2026-09-27),
-    # measured per whole folder (prompts below): person 93%, box 83%, plastic bag 80%,
-    # empty-hallway false positives 10%. Zero-shot; box/bag still just below the 85% target.
-    package_conf: float = 0.25
-    package_prompts: list[str] = [
-        "box",
-        "cardboard box",
-        "package",
-        "bag",
-        "plastic bag",
-        "shopping bag",
-        "food delivery bag",
-        "takeout container",
-        "cooler bag",
-        # 2026-10-04: items the classification plan lists for 물품만 있음 (box 53→83%, bag 72→80%,
-        # empty-hallway false positives 3→10%).
-        "flower bouquet",
-        "cake box",
-        "gift box",
-        "envelope",
-        "flyer",
+    mock_delay_ms: int = Field(0, ge=0)
+    person_conf: float = Field(0.4, ge=0, le=1)
+    # Packages = fine-tuned YOLOE (box, envelope, plastic bag; finetune/) + zero-shot YOLOE on the
+    # prompts below for items the fine-tuned model was never shown. 2026-10-17, eval/README F1:
+    # box 78→98%, plastic bag 80→100%, empty-hallway false positives 10→3%, +15 ms per image.
+    # The zero-shot model alone used to have 14 prompts (box, bag, envelope, flyer, … at conf 0.25).
+    package_conf: float = Field(0.25, ge=0, le=1)
+    package_prompts: list[str] = EXTRA_PACKAGE_PROMPTS
+    package_ft_conf: float = Field(0.4, ge=0, le=1)
+    # Used alone when the fine-tuned weights can't be fetched (offline first start, Release gone):
+    # packages are still found, as before 2026-10-17 (box 83%, bag 80%, empty-hallway false alarms 10%).
+    package_fallback_prompts: list[str] = [
+        "box", "cardboard box", "package", "bag", "plastic bag", "shopping bag", *EXTRA_PACKAGE_PROMPTS,
+        "gift box", "envelope", "flyer",
     ]
     weights_dir: str = str(DATA_DIR / "weights")
     stt_model: str = "large-v3-turbo"
+    # Hugging Face commits, so a new PC gets the same weights we measured (2026-10-22), not "latest".
+    stt_revision: str = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
     llm_model: str = "Qwen/Qwen3-4B-Instruct-2507"
-    llm_max_new_tokens: int = 64
+    llm_revision: str = "cdbee75f17c01a7cc42f958dc650907174af0554"
+    llm_max_new_tokens: int = Field(64, ge=1, le=256)
+    # Longest wait for a model busy with another request before answering 503 MODEL_BUSY. A busy LLM
+    # falls back to keyword rules. /audio/process waits for STT then the LLM, so its worst case is
+    # stt_wait + STT run (≤0.5 s) + llm_wait + LLM run (≤2 s on the 3060 Ti) ≈ 8.5 s < Spring's 10 s.
+    vision_wait_s: float = Field(3.0, gt=0)  # + ~0.1 s run < Spring's 5 s
+    stt_wait_s: float = Field(4.0, gt=0)
+    llm_wait_s: float = Field(2.0, gt=0)
+    stuck_after_s: float = Field(60.0, gt=0)  # /health turns degraded when one inference runs longer
+    # Optional shared secret: when set, /internal/v1/* needs header X-Api-Key with this value.
+    model_api_key: str = ""
 
     model_config = {"protected_namespaces": ()}
 

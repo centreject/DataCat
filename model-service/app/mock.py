@@ -8,6 +8,7 @@ The answer is picked by a keyword in the uploaded file name:
   image: person, package, animal, empty (combine: "person_package.jpg"); no keyword → person.
          LOW_VISIBILITY is computed from the real image, as in the real service.
   audio: one of SCENARIOS below ("emergency.wav"); no keyword → delivery.
+  "busy" in either name → 503 MODEL_BUSY, as the real service answers when a model is occupied.
 /language/analyze returns the canned answer for a scenario transcript, keyword rules otherwise.
 """
 
@@ -16,6 +17,7 @@ import time
 from fastapi import APIRouter, File, Request, UploadFile
 
 from app.config import Settings
+from app.errors import ApiError
 from app.language.rules import rule_analyze
 from app.media import decode_jpeg, decode_wav
 from app.pipeline import analyze_transcript
@@ -76,7 +78,10 @@ def load_mock_registry(settings: Settings) -> ModelRegistry:
 mock_router = APIRouter(prefix="/internal/v1")
 
 
-def _pause(request: Request) -> None:
+def _pause(request: Request, filename: str | None) -> None:
+    # "busy" in the file name: answer like a real model busy with another request (503 MODEL_BUSY).
+    if "busy" in (filename or "").lower():
+        raise ApiError(503, "MODEL_BUSY", "모델이 다른 요청을 처리 중입니다. 잠시 후 다시 시도해 주세요.")
     # MOCK_DELAY_MS adds waiting time, so callers can try their timeouts (real lite p95: audio 1.5 s).
     delay = request.app.state.settings.mock_delay_ms
     if delay:
@@ -86,7 +91,7 @@ def _pause(request: Request) -> None:
 @mock_router.post("/vision/detect", response_model=DetectResponse)
 def detect(request: Request, image: UploadFile = File(...)):
     picture = decode_jpeg(image.file.read())
-    _pause(request)
+    _pause(request, image.filename)
     detections = detections_for(image.filename)
     seen_person = any(d.label == "person" for d in detections)
     flags = ["LOW_VISIBILITY"] if low_visibility(picture) and not seen_person else []
@@ -96,14 +101,14 @@ def detect(request: Request, image: UploadFile = File(...)):
 @mock_router.post("/speech/transcribe", response_model=TranscribeResponse)
 def transcribe(request: Request, audio: UploadFile = File(...)):
     decode_wav(audio.file.read())
-    _pause(request)
+    _pause(request, audio.filename)
     return TranscribeResponse(transcript=SCENARIOS[scenario_for(audio.filename)][0])
 
 
 @mock_router.post("/audio/process", response_model=AudioProcessResponse)
 def audio_process(request: Request, audio: UploadFile = File(...)):
     decode_wav(audio.file.read())
-    _pause(request)
+    _pause(request, audio.filename)
     transcript = SCENARIOS[scenario_for(audio.filename)][0]
     analysis = analyze_transcript(MockLanguage(), transcript)
     return AudioProcessResponse(transcript=transcript, **analysis.model_dump())

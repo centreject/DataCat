@@ -1,0 +1,30 @@
+# Unit tests of the AI model service on every push/PR that touches it. CPU only: GPU tests
+# (-m gpu) need real weights and run on the AI owner's PC (model-service/README.md).
+name: model-service
+
+on:
+  push:
+    paths: ["model-service/**", ".github/workflows/model-service.yml"]
+  pull_request:
+    paths: ["model-service/**", ".github/workflows/model-service.yml"]
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: model-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: model-service/requirements.txt
+      - name: Install (CPU torch, no CUDA-only packages)
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
+          pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
+          grep -vE '^(torch|torchvision|bitsandbytes|nvidia-)' requirements.txt > /tmp/requirements-ci.txt
+          pip install -r /tmp/requirements-ci.txt pytest httpx
+      - run: python -m pytest -q

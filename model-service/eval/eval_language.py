@@ -41,6 +41,11 @@ def main() -> None:
 
         stt = WhisperSpeech(Settings())
         folder = DATA_DIR / "audio" / args.audio
+        # Cases added after the audio was synthesized have no WAV yet; skip them instead of crashing.
+        missing = [c["id"] for c in cases if not (folder / f"{c['id']}.wav").exists()]
+        if missing:
+            print(f"음성 파일 없음, 건너뜀: {', '.join(missing)}\n")
+        cases = [c for c in cases if c["id"] not in missing]
         for c in cases:
             c["transcript"] = stt.transcribe(decode_wav((folder / f"{c['id']}.wav").read_bytes()))
     ungrounded: list[str] = []
