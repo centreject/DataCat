@@ -17,6 +17,8 @@ RUN flutter pub get
 COPY . .
 # web/ 폴더가 없으면 (flutter create 를 안 한 경우) 여기서 만든다
 RUN [ -d web ] || flutter create . --platforms=web --project-name datacat_frontdoor
+# 앱 아이콘 (tool/icon/make_icons.py 로 만든 것)
+RUN cp -r tool/icon/web/. web/
 ARG API_URL=same-origin
 RUN flutter build web --release --dart-define=DATACAT_API=${API_URL}
 

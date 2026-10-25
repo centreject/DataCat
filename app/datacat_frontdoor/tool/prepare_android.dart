@@ -3,9 +3,11 @@
 //   - 앱 이름 "DataCat 현관"
 //   - 집 안 와이파이의 http:// 서버도 시험할 수 있게 평문 통신 허용
 //   - Firebase 가 요구하는 최소 안드로이드 버전 (API 23 = 안드로이드 6.0)
+//   - 앱 아이콘과 알림 아이콘 (tool/icon/android/res 를 복사)
 import 'dart:io';
 
 void main() {
+  _copyIcons(Directory('tool/icon/android/res'), Directory('android/app/src/main/res'));
   _patchManifest(File('android/app/src/main/AndroidManifest.xml'));
   for (final name in ['build.gradle.kts', 'build.gradle']) {
     final f = File('android/app/$name');
@@ -31,6 +33,17 @@ void _patchManifest(File f) {
   if (!s.contains('usesCleartextTraffic')) {
     s = s.replaceFirst('<application', '<application\n        android:usesCleartextTraffic="true"');
   }
+  // 푸시 알림이 상태 표시줄에 흰 네모로 나오지 않게 전용 알림 아이콘과 색을 지정한다
+  if (!s.contains('default_notification_icon')) {
+    s = s.replaceFirstMapped(
+      RegExp(r'<application[^>]*>'),
+      (m) => '${m[0]}\n'
+          '        <meta-data android:name="com.google.firebase.messaging.default_notification_icon"\n'
+          '            android:resource="@drawable/ic_stat_datacat"/>\n'
+          '        <meta-data android:name="com.google.firebase.messaging.default_notification_color"\n'
+          '            android:resource="@color/ic_launcher_background"/>',
+    );
+  }
   f.writeAsStringSync(s);
   print('  AndroidManifest.xml OK');
 }
@@ -42,4 +55,18 @@ void _patchGradle(File f) {
       .replaceAll(RegExp(r'minSdkVersion\s+flutter\.minSdkVersion'), 'minSdkVersion Math.max(flutter.minSdkVersion, 23)');
   f.writeAsStringSync(s);
   print('  ${f.path} OK');
+}
+
+void _copyIcons(Directory from, Directory to) {
+  if (!from.existsSync()) return;
+  var n = 0;
+  for (final e in from.listSync(recursive: true)) {
+    if (e is! File) continue;
+    final rel = e.path.substring(from.path.length + 1);
+    final dest = File('${to.path}/$rel');
+    dest.parent.createSync(recursive: true);
+    e.copySync(dest.path);
+    n++;
+  }
+  print('  아이콘 $n개 OK');
 }
