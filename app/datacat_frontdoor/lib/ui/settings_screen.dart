@@ -90,7 +90,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     _url.text = normalized;
-    await settings.setBaseUrl(normalized);
+    final saved = await settings.setBaseUrl(normalized);
+    if (!saved) {
+      messenger.showSnackBar(SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text('주소는 바꿨지만 휴대폰에 저장하지 못했어요. 앱을 다시 켜면 예전 주소로 돌아가요.\n${settings.storageError ?? ''}'),
+      ));
+      return;
+    }
     if (settings.demoMode) {
       messenger.showSnackBar(
         const SnackBar(content: Text('저장했어요. 데모 모드를 끄면 이 서버에 연결돼요.')),
@@ -449,6 +456,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(fontSize: 12, color: p.inkFaint),
               ),
             ),
+            if (scope.settings.storageError != null) ...[
+              const SizedBox(height: Gap.sm),
+              Center(
+                child: Text(
+                  '설정 저장소 오류: ${scope.settings.storageError}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: p.danger),
+                ),
+              ),
+            ],
           ],
         );
       },

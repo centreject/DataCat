@@ -48,31 +48,53 @@ class AppSettings extends ChangeNotifier {
         _ => ThemeMode.system,
       };
     } catch (e) {
-      // 저장소를 못 쓰는 환경이어도 기본값으로 앱은 뜬다.
+      // 저장소를 못 쓰는 환경이어도 기본값으로 앱은 뜬다. 원인은 설정 화면에 보여 준다.
+      storageError = '$e';
       debugPrint('설정을 불러오지 못했어요: $e');
     }
   }
 
-  Future<void> setBaseUrl(String value) async {
+  /// 휴대폰 저장소를 열거나 쓰다가 난 마지막 오류. 없으면 null.
+  String? storageError;
+
+  /// 저장소에 쓴다. 앱을 켤 때 저장소를 못 열었으면 여기서 다시 연다. 실패하면 false.
+  Future<bool> _persist(Future<bool> Function(SharedPreferences p) write) async {
+    try {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      final ok = await write(prefs);
+      storageError = ok ? null : '저장소가 쓰기를 거부했어요';
+      return ok;
+    } catch (e) {
+      storageError = '$e';
+      debugPrint('설정을 저장하지 못했어요: $e');
+      return false;
+    }
+  }
+
+  /// 휴대폰에 저장까지 됐으면 true. false면 앱을 다시 켤 때 예전 주소로 돌아간다.
+  Future<bool> setBaseUrl(String value) async {
     final v = value.trim();
-    if (v.isEmpty || v == _baseUrl) return;
-    _baseUrl = v;
-    notifyListeners();
-    await _prefs?.setString(_kBaseUrl, v);
+    if (v.isEmpty) return false;
+    if (v != _baseUrl) {
+      _baseUrl = v;
+      notifyListeners();
+    }
+    // 같은 주소여도 다시 써 둔다 (이전 저장이 실패했을 수 있다)
+    return _persist((p) => p.setString(_kBaseUrl, v));
   }
 
   Future<void> setDemoMode(bool value) async {
     if (value == _demoMode) return;
     _demoMode = value;
     notifyListeners();
-    await _prefs?.setBool(_kDemo, value);
+    await _persist((p) => p.setBool(_kDemo, value));
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     if (mode == _themeMode) return;
     _themeMode = mode;
     notifyListeners();
-    await _prefs?.setString(_kTheme, mode.name);
+    await _persist((p) => p.setString(_kTheme, mode.name));
   }
 
   /// 해/달 버튼: 지금 보이는 밝기의 반대로 고정한다.
