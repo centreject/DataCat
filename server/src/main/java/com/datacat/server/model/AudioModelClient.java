@@ -41,13 +41,18 @@ public class AudioModelClient {
     private final RestClient restClient;
 
     public AudioModelClient(
-            @Value("${datacat.model.base-url}") String baseUrl
+            @Value("${datacat.model.base-url}") String baseUrl,
+            @Value("${datacat.model.audio-read-timeout-ms:5000}") int readTimeoutMillis
     ) {
+        if (readTimeoutMillis <= 0) {
+            throw new IllegalArgumentException("음성 모델 읽기 대기는 0보다 커야 합니다.");
+        }
+
         SimpleClientHttpRequestFactory requestFactory =
                 new SimpleClientHttpRequestFactory();
 
         requestFactory.setConnectTimeout(2_000);
-        requestFactory.setReadTimeout(5_000);
+        requestFactory.setReadTimeout(readTimeoutMillis);
 
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)

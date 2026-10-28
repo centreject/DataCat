@@ -4,7 +4,8 @@ Java 21 · Spring Boot 4.1.1 · Gradle Wrapper · MySQL
 
 팀플 8주차 구현과 2026-10-24~25 로컬 검증을 반영한 문서다.
 음성·종료 API를 구현했고, 수정 Android 앱에서 배송 결과 알림 수신과 22번 방문 상세·사진·전사문 표시를 확인했다.
-현재 코드의 실제 Pi·실제 모델 재시험은 별도로 진행한다.
+10/26 모델 담당자가 PR #9의 실제 모델 시험 결과를 보고했다. 실제 Pi 마이크·스피커와 Docker 재현은 별도로 진행한다.
+9주차의 리뷰 반영·대기 시간·실기 시험 계획은 [9주차 실행 계획](docs/week9-plan.md)을 따른다.
 
 ## 현재 구현 범위
 
@@ -43,6 +44,7 @@ CREATE DATABASE IF NOT EXISTS datacat
 | DB_PASSWORD | 필수: 본인의 MySQL 비밀번호 | DB 비밀번호 |
 | DB_URL | jdbc:mysql://localhost:3306/datacat | DB 접속 주소 |
 | MODEL_SERVICE_URL | http://localhost:8000 | 모델 서비스 루트 주소 |
+| MODEL_AUDIO_READ_TIMEOUT_MS | 5000 | 음성 모델 응답 읽기 대기(ms), 양수만 허용. 실측 비교 시 10000으로 변경 가능 |
 | SNAPSHOT_DIR | ./data/snapshots | 사진 저장 폴더 |
 | FCM_ENABLED | false | Firebase 푸시 활성화 |
 | FCM_CREDENTIALS_FILE | 빈 값 | 활성화 시 서버용 서비스 계정 JSON 경로 |
@@ -249,8 +251,9 @@ Flutter 로컬 시험은 휴대폰과 PC를 같은 네트워크에 연결하고 
 - 기존 DB 컬럼 호환을 위해 maxPackageCount·package_count를 남기지만, 새 도착 여부를 개수 증가로 판단하지 않는다.
 - 사진·음성·종료를 한 프로세스의 synchronized로 순차 처리한다. 다른 장치도 모델 응답 동안 기다릴 수 있으며 여러 인스턴스 간 잠금은 없다.
 - FCM은 작업 스레드 1개·대기 큐 100개다. 영구 큐·실패 재시도·사용자별 수신 대상 분리는 아직 없다.
-- 모델 연결 대기 2초·응답 읽기 대기 5초다. 전체 HTTP의 5초 상한은 아니다.
-- 최신 모델 명세의 약 8.5초 산정과 현재 Spring 5초 설정을 구분한다. 실제 모델·Pi·Tunnel을 연결해 측정·조정해야 한다.
+- 모델 연결 대기 2초, 사진 읽기 대기 5초, 음성 읽기 대기 기본값 5초다. 음성은 `MODEL_AUDIO_READ_TIMEOUT_MS`로 조정한다. 전체 HTTP의 5초 상한은 아니다.
+- [10/26 PR #9 실모델 시험](https://github.com/centreject/DataCat/pull/9#issuecomment-6414598771)에서 모델 담당자는 현재 순차 처리 구조의 읽기 대기를 5초로 유지할 수 있다고 보고했다. 합성 음성 기준 음성 API 최대 1.66초, 모델 단독 최대 2.11초였으며 실제 Pi 마이크·스피커 검증과는 구분한다.
+- 잠금 범위를 줄여 모델 호출을 동시에 허용하거나 모델·장비를 변경하면 10초를 후보로 재측정한다. 8대 동시 요청에서 보고된 11.10초는 서버 대기를 포함한 API 응답 시간으로, 음성 읽기 대기만 늘려 해결되지 않는다.
 - 모델 명세의 선택 X-Api-Key·X-Request-ID 전송은 현재 Spring 클라이언트에 연결하지 않았다.
 
 ## 자동 테스트와 수동 검증
@@ -264,6 +267,7 @@ cd C:\springproject\DataCat\server
 
 테스트는 H2 메모리 DB와 test 프로필을 사용하며 외부 MySQL·모델·FCM 없이 실행할 수 있다.
 Java 21 검증 환경에서 전체 145개가 통과했다. Windows에서도 최종 `gradlew.bat test`의 BUILD SUCCESSFUL을 확인했다.
+9주차 수정본은 10/28 Java 21 환경에서 전체 147개 통과(실패·오류·건너뜀 0)를 확인했다. 실행 환경 보정과 미검증 범위는 [9주차 검증 기록](docs/week9-verification.md)을 참고한다.
 H2 성공만으로 실제 MySQL·Pi·모델 연동 성공을 판단하지 않는다.
 
 PowerShell·로컬 MySQL에서 다음을 별도로 확인했다.

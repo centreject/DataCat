@@ -72,7 +72,7 @@ class AudioModelClientTests {
             }
         });
         server.start();
-        client = new AudioModelClient("http://127.0.0.1:" + server.getAddress().getPort());
+        client = new AudioModelClient("http://127.0.0.1:" + server.getAddress().getPort(), 5_000);
     }
 
     @AfterEach
@@ -213,6 +213,24 @@ class AudioModelClientTests {
     void mapsReadTimeoutTo503() {
         delayMillis.set(5_500);
         assertStatus(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void acceptsSlowResponseWithTenSecondReadTimeout() {
+        client = new AudioModelClient("http://127.0.0.1:" + server.getAddress().getPort(), 10_000);
+        delayMillis.set(8_500);
+
+        AudioProcessResponse result = client.process(audio("delivery.wav"));
+
+        assertEquals("DELIVERY", result.purpose());
+        assertEquals("택배 문 앞 보관", result.summary());
+    }
+
+    @Test
+    void rejectsUnboundedOrNegativeReadTimeout() {
+        String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
+        assertThrows(IllegalArgumentException.class, () -> new AudioModelClient(baseUrl, 0));
+        assertThrows(IllegalArgumentException.class, () -> new AudioModelClient(baseUrl, -1));
     }
 
     @Test
