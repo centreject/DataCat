@@ -1,0 +1,314 @@
+{
+ "units": "mm",
+ "overall_WxHxD": [
+  105.0,
+  192.0,
+  42.0
+ ],
+ "parts": {
+  "01_front_shell": {
+   "valid": true,
+   "volume_cm3": 82.77,
+   "bbox": [
+    -52.5,
+    52.5,
+    -0.0,
+    192.0,
+    -0.0,
+    42.0
+   ]
+  },
+  "02_lcd_pi_chassis": {
+   "valid": true,
+   "volume_cm3": 11.15,
+   "bbox": [
+    -40.0,
+    40.0,
+    43.05,
+    136.95,
+    14.0,
+    33.5
+   ]
+  },
+  "03_wall_plate": {
+   "valid": true,
+   "volume_cm3": 53.53,
+   "bbox": [
+    -52.1,
+    52.1,
+    0.4,
+    189.1,
+    -0.0,
+    11.0
+   ]
+  },
+  "04_black_visor": {
+   "valid": true,
+   "volume_cm3": 1.6,
+   "bbox": [
+    -35.85,
+    35.85,
+    149.15,
+    172.85,
+    40.8,
+    42.0
+   ]
+  },
+  "05_led_light_pipe": {
+   "valid": true,
+   "volume_cm3": 0.2,
+   "bbox": [
+    -10.2,
+    10.2,
+    134.3,
+    139.7,
+    38.3,
+    42.0
+   ]
+  },
+  "06_camera_cradle": {
+   "valid": true,
+   "volume_cm3": 2.22,
+   "bbox": [
+    -43.0,
+    -9.0,
+    152.29,
+    179.33,
+    16.02,
+    37.46
+   ]
+  }
+ },
+ "components": {},
+ "interference_mm3": {},
+ "screw_bite_mm3 (정상)": {
+  "01_front_shell ∩ M3 인서트": 48.433,
+  "01_front_shell ∩ M2x6 (회전축 핀)": 1.91,
+  "01_front_shell ∩ M2x8 태핑 (서보 고정)": 6.566,
+  "02_lcd_pi_chassis ∩ M2.5x6 태핑 (Pi)": 20.376,
+  "03_wall_plate ∩ M3x16 (바닥 잠금)": 14.903,
+  "06_camera_cradle ∩ M2x5 태핑 (카메라)": 9.55
+ },
+ "component_outside_envelope_mm3": {
+  "Raspberry Pi 4": 0.0,
+  "USB-C L형 플러그": 0.0,
+  "3.5인치 HDMI LCD": 0.0,
+  "Camera Module 3 Wide": 0.0,
+  "SG90 서보": 0.0,
+  "서보 혼": 0.0,
+  "VL53L0X ToF": 0.0,
+  "USB 핀마이크": 0.0,
+  "MAX98357A 앰프": 0.0,
+  "스피커 ø28": 0.0,
+  "16mm 호출벨": 0.0,
+  "상태 LED": 0.0,
+  "M3x10 (섀시)": 0.0,
+  "M3 인서트": 0.0,
+  "M2.5x6 태핑 (Pi)": 0.0,
+  "M2x5 태핑 (카메라)": 0.0,
+  "M2x6 (회전축 핀)": 0.0,
+  "M2x8 태핑 (서보 고정)": 0.0
+ },
+ "mounting_path_collision_mm3": {
+  "dy=+7.4, dz=+12.0": 0.0,
+  "dy=+7.4, dz=+8.0": 0.0,
+  "dy=+7.4, dz=+4.0": 0.0,
+  "dy=+7.4, dz=+2.0": 0.0,
+  "dy=+7.4, dz=+0.0": 0.0,
+  "dy=+6.0, dz=+0.0": 0.0,
+  "dy=+4.5, dz=+0.0": 0.0,
+  "dy=+3.0, dz=+0.0": 0.0,
+  "dy=+1.5, dz=+0.0": 0.0,
+  "dy=+0.0, dz=+0.0": 0.0
+ },
+ "fov_blocked_mm3": {
+  "tof_27x27": 0.0
+ },
+ "camera_target_rays": {
+  "tilt=10": {
+   "얼굴 160cm, 0.6m 앞": {
+    "in_fov": true,
+    "h_deg": 15.0,
+    "v_deg": 29.3,
+    "blocked_mm3": 0.0
+   },
+   "정수리 175cm, 0.6m 앞": {
+    "in_fov": true,
+    "h_deg": 15.0,
+    "v_deg": 41.2,
+    "blocked_mm3": 0.0
+   },
+   "바닥 0.5m 앞": {
+    "in_fov": false,
+    "h_deg": 15.0,
+    "v_deg": -61.2,
+    "blocked_mm3": 0.0
+   },
+   "문 앞 바닥 (옆 0.6, 앞 0.4m)": {
+    "in_fov": false,
+    "h_deg": -28.3,
+    "v_deg": -59.5,
+    "blocked_mm3": 0.0
+   },
+   "문 앞 바닥 (옆 0.9, 앞 0.5m)": {
+    "in_fov": false,
+    "h_deg": -35.7,
+    "v_deg": -53.9,
+    "blocked_mm3": 0.0
+   },
+   "바닥 (옆 0.6, 앞 0.8m)": {
+    "in_fov": true,
+    "h_deg": -15.2,
+    "v_deg": -47.1,
+    "blocked_mm3": 0.0
+   }
+  },
+  "tilt=20": {
+   "얼굴 160cm, 0.6m 앞": {
+    "in_fov": true,
+    "h_deg": 15.0,
+    "v_deg": 39.4,
+    "blocked_mm3": 0.0
+   },
+   "정수리 175cm, 0.6m 앞": {
+    "in_fov": false,
+    "h_deg": 15.0,
+    "v_deg": 51.2,
+    "blocked_mm3": 0.0
+   },
+   "바닥 0.5m 앞": {
+    "in_fov": false,
+    "h_deg": 15.0,
+    "v_deg": -51.3,
+    "blocked_mm3": 0.0
+   },
+   "문 앞 바닥 (옆 0.6, 앞 0.4m)": {
+    "in_fov": true,
+    "h_deg": -20.1,
+    "v_deg": -50.2,
+    "blocked_mm3": 0.0
+   },
+   "문 앞 바닥 (옆 0.9, 앞 0.5m)": {
+    "in_fov": true,
+    "h_deg": -28.5,
+    "v_deg": -44.9,
+    "blocked_mm3": 0.0
+   },
+   "바닥 (옆 0.6, 앞 0.8m)": {
+    "in_fov": true,
+    "h_deg": -11.0,
+    "v_deg": -37.8,
+    "blocked_mm3": 0.0
+   }
+  },
+  "tilt=30": {
+   "얼굴 160cm, 0.6m 앞": {
+    "in_fov": true,
+    "h_deg": 15.0,
+    "v_deg": 49.4,
+    "blocked_mm3": 0.0
+   },
+   "정수리 175cm, 0.6m 앞": {
+    "in_fov": false,
+    "h_deg": 15.0,
+    "v_deg": 61.1,
+    "blocked_mm3": 0.0
+   },
+   "바닥 0.5m 앞": {
+    "in_fov": true,
+    "h_deg": 15.0,
+    "v_deg": -41.3,
+    "blocked_mm3": 0.0
+   },
+   "문 앞 바닥 (옆 0.6, 앞 0.4m)": {
+    "in_fov": true,
+    "h_deg": -14.8,
+    "v_deg": -41.0,
+    "blocked_mm3": 0.0
+   },
+   "문 앞 바닥 (옆 0.9, 앞 0.5m)": {
+    "in_fov": true,
+    "h_deg": -23.5,
+    "v_deg": -35.9,
+    "blocked_mm3": 0.0
+   },
+   "바닥 (옆 0.6, 앞 0.8m)": {
+    "in_fov": true,
+    "h_deg": -8.3,
+    "v_deg": -28.4,
+    "blocked_mm3": 0.0
+   }
+  }
+ },
+ "servo_sweep_collision_mm3": {
+  "tilt=10": {},
+  "tilt=15": {},
+  "tilt=20": {},
+  "tilt=25": {},
+  "tilt=30": {}
+ },
+ "camera": {
+  "tilt_down_deg": 20.0,
+  "yaw_deg": -15.0,
+  "roll_deg": -90.0,
+  "view_dir": [
+   -0.259,
+   -0.33,
+   0.908
+  ]
+ },
+ "screw_engagement_mm": {
+  "M3x10 섀시 → 인서트(L4)": 4.0,
+  "M3x10 끝 ~ 인서트 구멍 바닥 여유": 0.5,
+  "M2.5x6 Pi → 스탠드오프": 4.6,
+  "M2x5 카메라 → 보스": 4.0,
+  "M3x16 바닥 → 브래킷 보스": 6.9,
+  "M3x16 끝 ~ 보스 구멍 바닥 여유": 2.5,
+  "M2x5 카메라 → 크래들 받침": 4.0,
+  "M2x6 회전축 핀 → 쉘 귀": 3.2,
+  "M2x8 서보 날개 → 기둥": 5.5
+ },
+ "servo": {
+  "model": "SG90",
+  "tilt_range_deg": [
+   10.0,
+   30.0
+  ],
+  "pivot_yz": [
+   161.0,
+   31.96
+  ]
+ },
+ "screen": {
+  "active_mm": [
+   48.96,
+   73.44
+  ],
+  "window_mm": [
+   49.5,
+   74.0
+  ],
+  "margin_each_side_mm": [
+   0.27,
+   0.28
+  ]
+ },
+ "z_stack_mm": {
+  "front_face": 42.0,
+  "front_inner_face": 39.5,
+  "lcd_glass_front": 39.5,
+  "lcd_pcb_back": 33.5,
+  "chassis": [
+   28.5,
+   33.5
+  ],
+  "pi_component_side": 14.0,
+  "pi_solder_side": 12.6,
+  "wall_plate": [
+   0,
+   3.0
+  ],
+  "camera_lens_front": 39.45779110245426
+ },
+ "build_seconds": 1793169602.0
+}
