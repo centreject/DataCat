@@ -1,206 +1,129 @@
 package com.datacat.server.device;
 
-import com.datacat.server.classification.ImageClassificationResult;
 import com.datacat.server.classification.ImageClassificationService;
+import com.datacat.server.event.Event;
 import com.datacat.server.event.EventRepository;
+import com.datacat.server.event.EventStatus;
 import com.datacat.server.model.VisionResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 class PackageReceptionServiceTests {
-
-    @Autowired
-    private PackageReceptionService service;
-
-    @Autowired
-    private ImageClassificationService classificationService;
-
-    @Autowired
-    private EventRepository eventRepository;
-
-    @Autowired
-    private DevicePackageStateRepository packageStateRepository;
-
+    @Autowired private PackageReceptionService service;
+    @Autowired private ImageClassificationService classifier;
+    @Autowired private EventRepository events;
+    @Autowired private DevicePackageStateRepository states;
     private String deviceId;
+    private final Instant firstAt = Instant.parse("2026-10-24T06:00:00Z");
 
-    @BeforeEach
-    void setUp() {
-        deviceId = "package-db-test-"
-                + UUID.randomUUID();
-    }
+    @BeforeEach void setUp() { deviceId = "presence-db-" + UUID.randomUUID(); }
 
-    @Test
-    void samePackageAfterThirtySecondsReusesEvent() {
-        Instant firstTime = Instant.parse("2026-10-21T06:00:00Z");
-        Instant secondTime = firstTime.plusSeconds(61);
-        long countBefore = eventRepository.count();
-
-        PackageReceptionService.ReceptionResult first =
-                receive(1, "first.jpg", firstTime);
-
-        PackageReceptionService.ReceptionResult second =
-                receive(1, "unused.jpg", secondTime);
-
-        DevicePackageState state = packageStateRepository
-                .findById(deviceId)
-                .orElseThrow();
-
+    @Test void samePackageAfterThirtySecondsReusesEvent() {
+        long count = events.count();
+        var first = receive(1, firstAt);
+        var repeated = receive(1, firstAt.plusSeconds(61));
         assertTrue(first.created());
-        assertFalse(second.created());
-
-        assertEquals(
-                first.event().getEventId(),
-                second.event().getEventId()
-        );
-
-        assertEquals(countBefore + 1, eventRepository.count());
-        assertEquals("first.jpg", second.event().getSnapshotPath());
-        assertEquals(1, state.getPackageCount());
-        assertEquals(firstTime, state.getFirstSeenAt());
-        assertEquals(secondTime, state.getLastSeenAt());
+        assertFalse(repeated.created());
+        assertEquals(first.event().getEventId(), repeated.event().getEventId());
+        assertEquals(count + 1, events.count());
+        var state = states.findById(deviceId).orElseThrow();
+        assertTrue(state.getPackagePresent());
+        assertEquals(firstAt, state.getFirstSeenAt());
+        assertEquals(firstAt.plusSeconds(61), state.getLastSeenAt());
+        assertEquals("photo.jpg", repeated.event().getSnapshotPath());
     }
 
-    @Test
-    void additionalPackageCreatesNewEvent() {
-        Instant firstTime = Instant.parse("2026-10-21T06:00:00Z");
-        Instant secondTime = firstTime.plusSeconds(61);
-        long countBefore = eventRepository.count();
-
-        PackageReceptionService.ReceptionResult first =
-                receive(1, "first.jpg", firstTime);
-
-        PackageReceptionService.ReceptionResult second =
-                receive(2, "second.jpg", secondTime);
-
-        DevicePackageState state = packageStateRepository
-                .findById(deviceId)
-                .orElseThrow();
-
-        assertTrue(second.created());
-
-        assertNotEquals(
-                first.event().getEventId(),
-                second.event().getEventId()
-        );
-
-        assertEquals(countBefore + 2, eventRepository.count());
-        assertEquals("물품 추가 (1개 → 2개)", second.event().getReason());
-        assertEquals(2, state.getPackageCount());
-
-        assertEquals(
-                second.event().getEventId(),
-                state.getPackageEventId()
-        );
-
-        assertEquals(firstTime, state.getFirstSeenAt());
-        assertEquals(secondTime, state.getLastSeenAt());
-    }
-
-    @Test
-    void fewerDetectionsDoNotCauseAnotherArrival() {
-        Instant firstTime = Instant.parse("2026-10-21T06:00:00Z");
-        long countBefore = eventRepository.count();
-
-        PackageReceptionService.ReceptionResult first =
-                receive(2, "first.jpg", firstTime);
-
-        PackageReceptionService.ReceptionResult fewer =
-                receive(1, "fewer.jpg", firstTime.plusSeconds(61));
-
-        PackageReceptionService.ReceptionResult sameAgain =
-                receive(2, "same-again.jpg", firstTime.plusSeconds(122));
-
-        DevicePackageState state = packageStateRepository
-                .findById(deviceId)
-                .orElseThrow();
-
+    @Test void changedCountsNeverCreateAnotherArrivalWhilePresent() {
+        long count = events.count();
+        var first = receive(1, firstAt);
+        var more = receive(3, firstAt.plusSeconds(61));
+        var fewer = receive(1, firstAt.plusSeconds(122));
+        assertFalse(more.created());
         assertFalse(fewer.created());
-        assertFalse(sameAgain.created());
-
-        assertEquals(
-                first.event().getEventId(),
-                sameAgain.event().getEventId()
-        );
-
-        assertEquals(2, state.getPackageCount());
-        assertEquals(countBefore + 1, eventRepository.count());
+        assertEquals(first.event().getEventId(), more.event().getEventId());
+        assertEquals(first.event().getEventId(), fewer.event().getEventId());
+        assertEquals(count + 1, events.count());
     }
 
-    @Test
-    void clearingStateKeepsVisitHistory() {
-        Instant firstTime = Instant.parse("2026-10-21T06:00:00Z");
-
-        PackageReceptionService.ReceptionResult first =
-                receive(1, "first.jpg", firstTime);
-
-        service.clearForDevice(deviceId);
-
-        assertFalse(packageStateRepository.existsById(deviceId));
-
-        assertTrue(
-                eventRepository.existsById(
-                        first.event().getEventId()
-                )
-        );
+    @Test void oneMissThenPackageResetsMissCount() {
+        var first = receive(1, firstAt);
+        service.observeMissing(deviceId);
+        assertEquals(1, states.findById(deviceId).orElseThrow().getMissCount());
+        var repeated = receive(2, firstAt.plusSeconds(61));
+        assertFalse(repeated.created());
+        var state = states.findById(deviceId).orElseThrow();
+        assertEquals(0, state.getMissCount());
+        assertEquals(first.event().getEventId(), state.getPackageEventId());
     }
 
-    private PackageReceptionService.ReceptionResult receive(
-            int packageCount,
-            String snapshotFilename,
-            Instant receivedAt
-    ) {
-        List<VisionResponse.Detection> detections =
-                new ArrayList<>();
+    @Test void twoMissesClearStateButKeepHistoryAndAllowNextArrival() {
+        var first = receive(1, firstAt);
+        service.observeMissing(deviceId);
+        assertTrue(states.existsById(deviceId));
+        service.observeMissing(deviceId);
+        assertFalse(states.existsById(deviceId));
+        assertTrue(events.existsById(first.event().getEventId()));
+        var next = receive(1, firstAt.plusSeconds(61));
+        assertTrue(next.created());
+        assertNotEquals(first.event().getEventId(), next.event().getEventId());
+    }
 
-        for (int i = 0; i < packageCount; i++) {
-            detections.add(new VisionResponse.Detection(
-                    "package",
-                    0.95
-            ));
-        }
+    @Test void completedSessionReplacesReferenceWithoutResettingContinuousResidencyStart() {
+        receive(2, firstAt);
+        service.observeMissing(deviceId);
+        Event session = new Event(deviceId, "BUTTON", EventStatus.WAITING_AUDIO, firstAt.plusSeconds(70));
+        session.recordImageReception(firstAt.plusSeconds(70), 1);
+        session.complete(firstAt.plusSeconds(80));
+        session = events.saveAndFlush(session);
+        service.rememberCompletedEvent(session, firstAt.plusSeconds(80));
+        var state = states.findById(deviceId).orElseThrow();
+        assertEquals(session.getEventId(), state.getPackageEventId());
+        assertEquals(firstAt, state.getFirstSeenAt());
+        assertEquals(0, state.getMissCount());
+        assertFalse(receive(4, firstAt.plusSeconds(140)).created());
+    }
 
-        VisionResponse vision = new VisionResponse(
-                detections,
-                List.of()
-        );
+    @Test void sessionWithoutPackageDoesNotClearExistingState() {
+        var first = receive(1, firstAt);
+        Event session = new Event(deviceId, "BUTTON", EventStatus.COMPLETED, firstAt);
+        session.recordImageReception(firstAt, 0);
+        session = events.saveAndFlush(session);
+        service.rememberCompletedEvent(session, firstAt.plusSeconds(1));
+        assertEquals(first.event().getEventId(), states.findById(deviceId).orElseThrow().getPackageEventId());
+    }
 
-        ImageClassificationResult classification =
-                classificationService.classify(
-                        "TOF",
-                        vision
-                );
+    @Test void legacyCountRowsAreReadAsPresentWithZeroMisses() {
+        var first = receive(1, firstAt);
+        var state = states.findById(deviceId).orElseThrow();
+        ReflectionTestUtils.setField(state, "packagePresent", null);
+        ReflectionTestUtils.setField(state, "missCount", null);
+        ReflectionTestUtils.setField(state, "legacyPackageCount", 3);
+        assertTrue(state.getPackagePresent());
+        assertEquals(0, state.getMissCount());
+        assertFalse(receive(1, firstAt.plusSeconds(61)).created());
+        assertEquals(first.event().getEventId(), state.getPackageEventId());
+    }
 
-        DeviceEventMetadata metadata = new DeviceEventMetadata(
-                deviceId,
-                "TOF",
-                1850,
-                receivedAt.atOffset(ZoneOffset.UTC)
-        );
-
-        return service.receive(
-                metadata,
-                classification,
-                snapshotFilename,
-                "{}",
-                receivedAt
-        );
+    private PackageReceptionService.ReceptionResult receive(int count, Instant at) {
+        var vision = new VisionResponse(IntStream.range(0, count)
+                .mapToObj(i -> new VisionResponse.Detection("package", .95)).toList(), List.of());
+        var metadata = new DeviceEventMetadata(deviceId, "TOF", 1850, at.atOffset(ZoneOffset.UTC));
+        return service.receive(metadata, classifier.classify("TOF", vision), "photo.jpg", "{}", at);
     }
 }

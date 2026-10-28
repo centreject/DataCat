@@ -16,161 +16,89 @@ public class PackageReceptionService {
     private final EventRepository eventRepository;
     private final DevicePackageStateRepository packageStateRepository;
 
-    public PackageReceptionService(
-            EventRepository eventRepository,
-            DevicePackageStateRepository packageStateRepository
-    ) {
+    public PackageReceptionService(EventRepository eventRepository,
+                                   DevicePackageStateRepository packageStateRepository) {
         this.eventRepository = eventRepository;
         this.packageStateRepository = packageStateRepository;
     }
 
-    public ReceptionResult receive(
-            DeviceEventMetadata metadata,
-            ImageClassificationResult classification,
-            String snapshotFilename,
-            String visionJson,
-            Instant receivedAt
-    ) {
-        validateInput(
-                metadata,
-                classification,
-                snapshotFilename,
-                receivedAt
-        );
+    public ReceptionResult receive(DeviceEventMetadata metadata,
+                                   ImageClassificationResult classification,
+                                   String snapshotFilename, String visionJson, Instant receivedAt) {
+        if (metadata == null || metadata.deviceId() == null || metadata.deviceId().isBlank()
+                || metadata.capturedAt() == null || classification == null
+                || !"A3".equals(classification.ruleId())
+                || classification.packageCount() == null || classification.packageCount() < 1
+                || snapshotFilename == null || snapshotFilename.isBlank() || receivedAt == null) {
+            throw new IllegalArgumentException("장치·촬영 정보와 물품이 있는 A3 판정이 필요합니다.");
+        }
 
-        int detectedCount = classification.packageCount();
+        DevicePackageState state = packageStateRepository.findById(metadata.deviceId()).orElse(null);
 
-        DevicePackageState state = packageStateRepository
-                .findById(metadata.deviceId())
-                .orElse(null);
-
-        // 같은 개수 또는 더 적게 보이면 기존 물품 상태를 유지한다.
-        if (state != null
-                && detectedCount <= state.getPackageCount()) {
-
-            Event existingEvent = eventRepository
-                    .findById(state.getPackageEventId())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "물품 상태에 연결된 이벤트를 찾을 수 없습니다."
-                    ));
-
-            if (!metadata.deviceId().equals(existingEvent.getDeviceId())) {
-                throw new IllegalStateException(
-                        "물품 상태와 이벤트의 장치 ID가 일치하지 않습니다."
-                );
+        // 10-23 판정표 A3-2: 개수가 달라져도 존재 상태가 유지되면 다시 알리지 않는다.
+        if (state != null && state.getPackagePresent()) {
+            Event previous = eventRepository.findById(state.getPackageEventId())
+                    .orElseThrow(() -> new IllegalStateException("물품 상태에 연결된 이벤트가 없습니다."));
+            if (!metadata.deviceId().equals(previous.getDeviceId())) {
+                throw new IllegalStateException("물품 상태와 이벤트의 장치 ID가 다릅니다.");
             }
-
             state.markSeen(receivedAt);
             packageStateRepository.save(state);
-
-            return new ReceptionResult(existingEvent, false);
+            return new ReceptionResult(previous, false);
         }
 
-        // 처음 감지했거나 물품 개수가 늘어난 경우 새 이벤트를 만든다.
-        Event event = new Event(
-                metadata.deviceId(),
-                metadata.triggerType(),
-                EventStatus.COMPLETED,
-                metadata.capturedAt().toInstant()
-        );
-
-        event.recordImageReception(
-                receivedAt,
-                detectedCount
-        );
-
+        Event event = new Event(metadata.deviceId(), metadata.triggerType(),
+                EventStatus.COMPLETED, metadata.capturedAt().toInstant());
+        event.recordImageReception(receivedAt, classification.packageCount());
         event.attachSnapshot(snapshotFilename);
-
-        event.recordImageAnalysis(
-                metadata.distanceMm(),
-                visionJson
-        );
-
-        event.applyImageClassification(
-                classification,
-                Instant.now()
-        );
-
-        if (state != null) {
-            String reason = "물품 추가 ("
-                    + state.getPackageCount()
-                    + "개 → "
-                    + detectedCount
-                    + "개)";
-
-            event.applyClassification(
-                    classification.eventType(),
-                    classification.mainCategory(),
-                    classification.subCategory(),
-                    classification.responsePolicy(),
-                    classification.processingStatus(),
-                    reason,
-                    classification.needsReview()
-            );
-        }
-
+        event.recordImageAnalysis(metadata.distanceMm(), visionJson);
+        event.applyImageClassification(classification, Instant.now());
         Event saved = eventRepository.saveAndFlush(event);
 
-        if (state == null) {
-            state = new DevicePackageState(
-                    metadata.deviceId(),
-                    detectedCount,
-                    saved.getEventId(),
-                    receivedAt
-            );
-        } else {
-            state.recordAdditionalPackages(
-                    detectedCount,
-                    saved.getEventId(),
-                    receivedAt
-            );
-        }
-
-        packageStateRepository.save(state);
-
+        packageStateRepository.save(new DevicePackageState(
+                metadata.deviceId(), saved.getEventId(), receivedAt));
         return new ReceptionResult(saved, true);
+    }
+
+    public void observePresentIfKnown(String deviceId, Instant receivedAt) {
+        DevicePackageState state = packageStateRepository.findById(deviceId).orElse(null);
+        if (state != null && state.getPackagePresent()) {
+            state.markSeen(receivedAt);
+            packageStateRepository.save(state);
+        }
+    }
+
+    public void observeMissing(String deviceId) {
+        DevicePackageState state = packageStateRepository.findById(deviceId).orElse(null);
+        if (state == null || !state.getPackagePresent()) return;
+        if (state.recordMissing()) {
+            packageStateRepository.delete(state);
+        } else {
+            packageStateRepository.save(state);
+        }
+    }
+
+    // 음성 또는 종료 판정과 같은 트랜잭션에서 호출한다.
+    public void rememberCompletedEvent(Event event, Instant receivedAt) {
+        if (event == null || event.getEventId() == null
+                || event.getStatus() != EventStatus.COMPLETED || receivedAt == null) {
+            throw new IllegalArgumentException("저장된 완료 이벤트와 물품 확인 시각이 필요합니다.");
+        }
+        if (!event.getPackageSeen()) return;
+
+        DevicePackageState state = packageStateRepository.findById(event.getDeviceId()).orElse(null);
+        if (state == null || !state.getPackagePresent()) {
+            state = new DevicePackageState(event.getDeviceId(), event.getEventId(), receivedAt);
+        } else {
+            // 새 응대 세션을 이미 알렸으므로 이후 재알림은 이 세션에 연결한다.
+            state.rememberSession(event.getEventId(), receivedAt);
+        }
+        packageStateRepository.save(state);
     }
 
     public void clearForDevice(String deviceId) {
         packageStateRepository.deleteById(deviceId);
     }
 
-    private void validateInput(
-            DeviceEventMetadata metadata,
-            ImageClassificationResult classification,
-            String snapshotFilename,
-            Instant receivedAt
-    ) {
-        if (metadata == null
-                || metadata.deviceId() == null
-                || metadata.deviceId().isBlank()
-                || metadata.capturedAt() == null) {
-            throw new IllegalArgumentException(
-                    "장치 ID와 촬영 시각이 필요합니다."
-            );
-        }
-
-        if (classification == null
-                || !"A3".equals(classification.ruleId())
-                || classification.packageCount() == null
-                || classification.packageCount() < 1) {
-            throw new IllegalArgumentException(
-                    "물품 수가 1 이상인 A3 판정 결과가 필요합니다."
-            );
-        }
-
-        if (snapshotFilename == null
-                || snapshotFilename.isBlank()
-                || receivedAt == null) {
-            throw new IllegalArgumentException(
-                    "사진 파일 이름과 수신 시각이 필요합니다."
-            );
-        }
-    }
-
-    public record ReceptionResult(
-            Event event,
-            boolean created
-    ) {
-    }
+    public record ReceptionResult(Event event, boolean created) { }
 }
