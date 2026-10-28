@@ -1,0 +1,71 @@
+# Standalone Spring + MySQL + mock model, based on the app branch's stack.
+# Run from this directory: docker compose -f docker-compose.server.yml up -d --build --wait
+name: datacat-week9
+
+services:
+  api:
+    image: datacat/week9-server:local
+    build:
+      context: ../server
+    environment:
+      DB_URL: jdbc:mysql://db:3306/datacat?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      DB_USERNAME: datacat
+      DB_PASSWORD: ${DATACAT_TEST_DB_PASSWORD:-datacat-week9-local}
+      MODEL_SERVICE_URL: http://model:8000
+      MODEL_AUDIO_READ_TIMEOUT_MS: ${DATACAT_TEST_AUDIO_TIMEOUT_MS:-5000}
+      SNAPSHOT_DIR: /data/snapshots
+      FCM_ENABLED: "false"
+      TZ: Asia/Seoul
+    ports:
+      - "${DATACAT_TEST_API_PORT:-18080}:8080"
+    volumes:
+      - spring-snapshots:/data/snapshots
+    depends_on:
+      db:
+        condition: service_healthy
+      model:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: datacat
+      MYSQL_USER: datacat
+      MYSQL_PASSWORD: ${DATACAT_TEST_DB_PASSWORD:-datacat-week9-local}
+      MYSQL_ROOT_PASSWORD: ${DATACAT_TEST_DB_ROOT_PASSWORD:-datacat-week9-root-local}
+      TZ: Asia/Seoul
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "127.0.0.1:${DATACAT_TEST_DB_PORT:-13306}:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_PASSWORD}\" mysql --host=127.0.0.1 --user=\"$${MYSQL_USER}\" --database=\"$${MYSQL_DATABASE}\" --execute='SELECT 1' --silent > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  model:
+    image: datacat/week9-model-mock:local
+    build:
+      context: ../model-service
+      dockerfile: Dockerfile.mock
+    environment:
+      MOCK_DELAY_MS: "0"
+    ports:
+      - "127.0.0.1:${DATACAT_TEST_MODEL_PORT:-18000}:8000"
+    volumes:
+      - type: bind
+        source: ./smoke_server.py
+        target: /opt/datacat-tests/smoke_server.py
+        read_only: true
+        bind:
+          create_host_path: false
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  spring-snapshots:

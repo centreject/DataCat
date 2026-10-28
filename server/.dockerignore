@@ -1,0 +1,13 @@
+# Only inputs needed for bootJar enter the build context.
+*
+!gradlew
+!build.gradle
+!settings.gradle
+!gradle/
+!gradle/**
+!src/
+!src/main/
+!src/main/**
+src/main/resources/application-local.*
+src/main/resources/*service-account*.json
+src/main/resources/secrets/
