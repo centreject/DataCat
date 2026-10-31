@@ -1,0 +1,212 @@
+{
+ "units": "mm",
+ "overall_WxHxD": [
+  124.0,
+  192.0,
+  42.0
+ ],
+ "parts": {
+  "01_front_shell": {
+   "valid": true,
+   "volume_cm3": 94.69,
+   "bbox": [
+    -62.0,
+    62.0,
+    -0.0,
+    192.0,
+    -0.0,
+    42.0
+   ]
+  },
+  "02_lcd_pi_chassis": {
+   "valid": true,
+   "volume_cm3": 11.15,
+   "bbox": [
+    -40.0,
+    40.0,
+    43.05,
+    136.95,
+    14.0,
+    33.5
+   ]
+  },
+  "03_wall_plate": {
+   "valid": true,
+   "volume_cm3": 64.2,
+   "bbox": [
+    -60.0,
+    60.0,
+    0.4,
+    189.1,
+    -0.0,
+    11.0
+   ]
+  },
+  "04_black_visor": {
+   "valid": true,
+   "volume_cm3": 1.63,
+   "bbox": [
+    -35.85,
+    35.85,
+    149.15,
+    172.85,
+    40.8,
+    42.0
+   ]
+  },
+  "05_led_light_pipe": {
+   "valid": true,
+   "volume_cm3": 0.2,
+   "bbox": [
+    -10.2,
+    10.2,
+    134.3,
+    139.7,
+    38.3,
+    42.0
+   ]
+  },
+  "06_camera_holder": {
+   "valid": true,
+   "volume_cm3": 9.82,
+   "bbox": [
+    -36.46,
+    -6.0,
+    142.56,
+    179.93,
+    20.12,
+    40.75
+   ]
+  }
+ },
+ "components": {},
+ "interference_mm3": {},
+ "screw_bite_mm3 (정상)": {
+  "01_front_shell ∩ M3 인서트": 48.433,
+  "01_front_shell ∩ M2.5x6 태핑 (스피커)": 17.719,
+  "02_lcd_pi_chassis ∩ M2.5x6 태핑 (Pi)": 20.376,
+  "03_wall_plate ∩ M3x16 (바닥 잠금)": 14.903,
+  "06_camera_holder ∩ M2x5 태핑 (카메라)": 9.55
+ },
+ "component_outside_envelope_mm3": {
+  "Raspberry Pi 4": 0.0,
+  "USB-C L형 플러그": 0.0,
+  "3.5인치 HDMI LCD": 0.0,
+  "Camera Module 3 Wide": 0.0,
+  "VL53L5CX ToF": 0.0,
+  "USB 핀마이크": 0.0,
+  "USB 사운드카드 스틱": 0.0,
+  "스피커 70x31 (4Ω 3W)": 0.0,
+  "16mm 호출벨": 0,
+  "상태 LED": 0.0,
+  "M3x10 (섀시)": 0.0,
+  "M3 인서트": 0.0,
+  "M2.5x6 태핑 (Pi)": 0.0,
+  "M2x5 태핑 (카메라)": 0.0,
+  "M2.5x6 태핑 (스피커)": 0.0
+ },
+ "mounting_path_collision_mm3": {
+  "dy=+7.4, dz=+12.0": 0.0,
+  "dy=+7.4, dz=+8.0": 0.0,
+  "dy=+7.4, dz=+4.0": 0.0,
+  "dy=+7.4, dz=+2.0": 0.0,
+  "dy=+7.4, dz=+0.0": 0.0,
+  "dy=+6.0, dz=+0.0": 0.0,
+  "dy=+4.5, dz=+0.0": 0.0,
+  "dy=+3.0, dz=+0.0": 0.0,
+  "dy=+1.5, dz=+0.0": 0.0,
+  "dy=+0.0, dz=+0.0": 0.0
+ },
+ "fov_blocked_mm3": {
+  "tof_47x47": 0.0
+ },
+ "camera_target_rays": {
+  "얼굴 160cm, 0.6m 앞": {
+   "in_fov": true,
+   "h_deg": 18.1,
+   "v_deg": 39.0,
+   "blocked_mm3": 0.0
+  },
+  "정수리 175cm, 0.6m 앞": {
+   "in_fov": false,
+   "h_deg": 20.1,
+   "v_deg": 51.1,
+   "blocked_mm3": 0.0
+  },
+  "바닥 0.5m 앞": {
+   "in_fov": true,
+   "h_deg": 7.9,
+   "v_deg": -51.0,
+   "blocked_mm3": 0.0
+  },
+  "문 앞 바닥 (옆 0.6, 앞 0.4m)": {
+   "in_fov": true,
+   "h_deg": -25.7,
+   "v_deg": -48.8,
+   "blocked_mm3": 0.0
+  },
+  "문 앞 바닥 (옆 0.9, 앞 0.5m)": {
+   "in_fov": true,
+   "h_deg": -32.7,
+   "v_deg": -42.9,
+   "blocked_mm3": 0.0
+  },
+  "바닥 (옆 0.6, 앞 0.8m)": {
+   "in_fov": true,
+   "h_deg": -15.4,
+   "v_deg": -36.5,
+   "blocked_mm3": 0.0
+  }
+ },
+ "camera": {
+  "tilt_down_deg": 20.0,
+  "yaw_deg": -15.0,
+  "roll_deg": 90.0,
+  "view_dir": [
+   -0.243,
+   -0.342,
+   0.908
+  ]
+ },
+ "screw_engagement_mm": {
+  "M3x10 섀시 → 인서트(L4)": 4.0,
+  "M3x10 끝 ~ 인서트 구멍 바닥 여유": 0.5,
+  "M2.5x6 Pi → 스탠드오프": 4.6,
+  "M2.5x6 스피커 → 보스 (앞판 2 가정)": 4.0,
+  "M2x5 카메라 → 홀더": 4.0,
+  "M3x16 바닥 → 브래킷 보스": 6.9,
+  "M3x16 끝 ~ 보스 구멍 바닥 여유": 2.5
+ },
+ "screen": {
+  "active_mm": [
+   48.96,
+   73.44
+  ],
+  "window_mm": [
+   49.5,
+   74.0
+  ],
+  "margin_each_side_mm": [
+   0.27,
+   0.28
+  ]
+ },
+ "z_stack_mm": {
+  "front_face": 42.0,
+  "front_inner_face": 39.5,
+  "lcd_glass_front": 39.5,
+  "lcd_pcb_back": 33.5,
+  "chassis": [
+   28.5,
+   33.5
+  ],
+  "pi_component_side": 14.0,
+  "pi_solder_side": 12.6,
+  "wall_plate": [
+   0,
+   3.0
+  ],
+  "camera_lens_front": 39.89538753266026
+ },
+ "build_seconds": 34.4
+}
