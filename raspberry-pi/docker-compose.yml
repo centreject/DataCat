@@ -1,0 +1,20 @@
+# Raspberry Pi 단말 실행
+#   docker compose up -d --build     응대 흐름(main.py --offline) 상시 실행
+#   docker compose logs -f           로그 보기
+#   docker compose run --rm pi python distance_sensor.py --sensor tof   장치별 시험(README 명령 그대로)
+name: datacat-pi
+
+services:
+  pi:
+    build: .
+    image: datacat/pi:local
+    devices:
+      - /dev/i2c-1      # VL53L0X
+      - /dev/gpiomem    # Blinka(RPi.GPIO) 초기화
+      - /dev/video0     # USB 웹캠
+      - /dev/snd        # USB 마이크, 3.5mm 출력
+    volumes:
+      - ./sounds:/app/sounds:ro   # 프리셋 음원(greeting/completion/fallback.wav). 이미지에 넣지 않고 바꿔 끼운다
+    environment:
+      TZ: Asia/Seoul
+    restart: unless-stopped
