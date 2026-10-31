@@ -6,7 +6,7 @@ from app.gpu import GpuSlot
 from app.hub_cache import load_cached_first
 from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
 from app.language.purposes import CATALOG
-from app.language.rules import rule_analyze
+from app.language.rules import correct_subtype, rule_analyze
 from app.schemas import Analysis
 
 def _system_prompt() -> str:
@@ -139,6 +139,7 @@ class QwenLanguage:
         parsed = parse_llm_output(self.generate(build_messages(transcript)))
         if parsed is None:
             return rule_analyze(transcript).model_copy(update={"flags": ["RULES_FALLBACK"]})
+        parsed = correct_subtype(parsed, transcript)
         if not is_grounded(parsed.summary, transcript):
             # Keep the LLM's purpose (97% vs 81% for rules) but never show an invented summary.
             return parsed.model_copy(
