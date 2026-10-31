@@ -1,0 +1,64 @@
+{"id": "h_delivery_01", "purpose": "DELIVERY", "subtype": "PARCEL", "transcript": "소포 왔습니다. 문 앞에 두고 갈게요.", "source": "plan:2"}
+{"id": "h_delivery_02", "purpose": "DELIVERY", "subtype": "MAIL", "transcript": "내용증명 우편입니다. 서명이 필요한데 안 계시면 다시 올게요.", "source": "plan:2"}
+{"id": "h_delivery_03", "purpose": "DELIVERY", "subtype": "FOOD", "transcript": "주문하신 피자 왔습니다.", "source": "plan:2"}
+{"id": "h_delivery_04", "purpose": "DELIVERY", "subtype": "FOOD", "transcript": "커피랑 도시락 배달 왔어요.", "source": "plan:2"}
+{"id": "h_delivery_05", "purpose": "DELIVERY", "subtype": "GROCERY", "transcript": "마트에서 주문하신 식료품 배송 왔습니다.", "source": "plan:2"}
+{"id": "h_delivery_06", "purpose": "DELIVERY", "subtype": "QUICK", "transcript": "퀵 서비스입니다. 서류 전달하러 왔어요.", "source": "plan:2"}
+{"id": "h_delivery_07", "purpose": "DELIVERY", "subtype": "LARGE", "transcript": "주문하신 소파 배송 왔습니다. 커서 같이 들여놔야 해요.", "source": "plan:2"}
+{"id": "h_delivery_08", "purpose": "DELIVERY", "subtype": "GIFT", "transcript": "꽃 배달입니다. 받으실 분 계세요?", "source": "plan:2"}
+{"id": "h_delivery_09", "purpose": "DELIVERY", "subtype": "GIFT", "transcript": "선물 상자 배송 왔어요, 받는 분 성함 확인할게요.", "source": "plan:2"}
+{"id": "h_delivery_10", "purpose": "DELIVERY", "subtype": "GROCERY", "transcript": "새벽 배송 왔습니다. 생필품 문 앞에 둘게요.", "source": "plan:2"}
+{"id": "h_delivery_11", "purpose": "DELIVERY", "subtype": "PARCEL", "transcript": "쿠팡입니다. 물건 문 앞에 놓고 갑니다.", "source": "plan:2 서비스명만"}
+{"id": "h_delivery_12", "purpose": "DELIVERY", "subtype": "QUICK", "transcript": "당일 배송 오토바이 퀵이에요.", "source": "plan:2"}
+{"id": "h_delivery_13", "purpose": "DELIVERY", "subtype": "FOOD", "transcript": "배민 주문하신 치킨 왔습니다. 문 앞에 두고 갈게요.", "source": "mock-api:112"}
+{"id": "h_delivery_14", "purpose": "DELIVERY", "subtype": "PARCEL", "transcript": "택배입니다. 문 앞에 놓고 갈게요.", "source": "mock-api:101"}
+{"id": "h_pickup_01", "purpose": "PICKUP", "subtype": null, "transcript": "교환 신청하신 상품 회수하러 왔습니다.", "source": "plan:3"}
+{"id": "h_pickup_02", "purpose": "PICKUP", "subtype": null, "transcript": "세탁물 수거하러 왔어요. 문 앞에 내놓으신 거 가져갈게요.", "source": "plan:3"}
+{"id": "h_pickup_03", "purpose": "PICKUP", "subtype": null, "transcript": "다 드신 음식 그릇 찾으러 왔습니다.", "source": "plan:3 음식 용기"}
+{"id": "h_pickup_04", "purpose": "PICKUP", "subtype": null, "transcript": "보냉가방 회수하러 왔습니다.", "source": "plan:3"}
+{"id": "h_pickup_05", "purpose": "PICKUP", "subtype": null, "transcript": "폐가전 수거 신청하셔서 왔습니다. 세탁기 가져갈게요.", "source": "plan:3"}
+{"id": "h_pickup_06", "purpose": "PICKUP", "subtype": null, "transcript": "공병 수거합니다.", "source": "plan:3"}
+{"id": "h_pickup_07", "purpose": "PICKUP", "subtype": null, "transcript": "반품 회수하러 왔습니다. 문 앞에 있는 박스 가져갈게요.", "source": "mock-api:104"}
+{"id": "h_personal_01", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "이모야, 근처 왔다가 들렀어.", "source": "plan:4"}
+{"id": "h_personal_02", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "회사 동료 지수예요. 오늘 저녁 약속 때문에 왔어요.", "source": "plan:4"}
+{"id": "h_personal_03", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "아래층 사는 사람인데요, 잠깐 얘기 좀 할 수 있을까요?", "source": "plan:4 이웃"}
+{"id": "h_personal_04", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "서연이 데리러 왔습니다. 서연이 엄마예요.", "source": "plan:4 보호자"}
+{"id": "h_personal_05", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "집주인입니다. 잠깐 뵐 수 있을까요?", "source": "plan:4"}
+{"id": "h_personal_06", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "초대해 줘서 왔어, 집들이 선물도 들고 왔어.", "source": "plan:4 초대"}
+{"id": "h_personal_07", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "민지인데요, 연락이 안 돼서 와봤어. 이따 전화 줘!", "source": "mock-api:108"}
+{"id": "h_service_01", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "관리사무소에서 왔습니다. 소방 시설 점검이에요.", "source": "plan:5"}
+{"id": "h_service_02", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "전기 검침하러 왔습니다.", "source": "plan:5"}
+{"id": "h_service_03", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "도어록 수리 요청하셔서 왔어요.", "source": "plan:5"}
+{"id": "h_service_04", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "에어컨 설치 기사입니다.", "source": "plan:5"}
+{"id": "h_service_05", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "해충 방역 소독하러 왔습니다.", "source": "plan:5"}
+{"id": "h_service_06", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "가사 도우미 업체에서 청소하러 왔어요.", "source": "plan:5"}
+{"id": "h_service_07", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "이삿짐센터입니다. 짐 옮기러 왔어요.", "source": "plan:5"}
+{"id": "h_service_08", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "부동산에서 집 보러 왔습니다.", "source": "plan:5"}
+{"id": "h_service_09", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "도배 공사 견적 보러 왔어요.", "source": "plan:5"}
+{"id": "h_service_10", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "안녕하세요, 도시가스 안전점검 나왔습니다. 안 계셔서 다음 주 화요일 오전에 다시 방문드릴게요.", "source": "mock-api:110"}
+{"id": "h_emergency_01", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "경찰입니다. 신고 받고 왔습니다. 문 좀 열어 주세요.", "source": "plan:6"}
+{"id": "h_emergency_02", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "구급대원입니다. 이 집에서 응급환자 신고가 들어왔어요.", "source": "plan:6"}
+{"id": "h_emergency_03", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "주민센터에서 나왔습니다. 전입 신고 확인 때문에요.", "source": "plan:6 공공기관"}
+{"id": "h_emergency_04", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "복도에 연기가 차고 있어요! 빨리 대피하세요!", "source": "plan:6"}
+{"id": "h_emergency_05", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "옆집 할머니가 쓰러지셨어요, 도와주세요!", "source": "plan:6"}
+{"id": "h_emergency_06", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "가스 냄새가 많이 나요, 가스 새는 것 같아요.", "source": "plan:6"}
+{"id": "h_solicit_01", "purpose": "SOLICITATION", "subtype": null, "transcript": "안마의자 체험 행사 안내드리러 왔어요.", "source": "plan:7"}
+{"id": "h_solicit_02", "purpose": "SOLICITATION", "subtype": null, "transcript": "새로 연 피자 가게 전단지 드리러 왔어요.", "source": "plan:7 전단지"}
+{"id": "h_solicit_03", "purpose": "SOLICITATION", "subtype": null, "transcript": "교회에서 나왔는데요, 좋은 말씀 전해드리려고요.", "source": "plan:7"}
+{"id": "h_solicit_04", "purpose": "SOLICITATION", "subtype": null, "transcript": "주민 설문조사 하고 있는데 잠깐 시간 괜찮으세요?", "source": "plan:7"}
+{"id": "h_solicit_05", "purpose": "SOLICITATION", "subtype": null, "transcript": "아동 후원 모금 활동 중입니다.", "source": "plan:7"}
+{"id": "h_solicit_06", "purpose": "SOLICITATION", "subtype": null, "transcript": "기호 2번 후보 인사드리러 왔습니다.", "source": "plan:7"}
+{"id": "h_solicit_07", "purpose": "SOLICITATION", "subtype": null, "transcript": "안녕하세요, 이번에 이 동 인터넷 바꾸시면 석 달 무료로 해드리고 있어서요. 전단지 꽂아두고 갈게요.", "source": "mock-api:107"}
+{"id": "h_wrong_01", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "여기 김철수 씨 댁 아닌가요? 아, 잘못 찾아왔네요.", "source": "plan:8"}
+{"id": "h_wrong_02", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "전에 살던 분 찾아왔는데 이사 가셨나 보네요.", "source": "plan:8 이전 거주자"}
+{"id": "h_wrong_03", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "택배 주소를 잘못 봤네요, 옆 동이었어요.", "source": "plan:2 충돌 조건"}
+{"id": "h_wrong_04", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "어머, 우리 집인 줄 알았어요. 죄송합니다.", "source": "plan:8"}
+{"id": "h_wrong_05", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "아 죄송합니다, 503호가 아니라 505호네요.", "source": "mock-api:102"}
+{"id": "h_safety_01", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "당장 문 열어, 안 열면 문 따고 들어간다.", "source": "plan:9 강제 진입"}
+{"id": "h_safety_02", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "너 거기 있는 거 다 알아, 가만 안 둬.", "source": "plan:9 협박"}
+{"id": "h_safety_03", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "이 도어록 다 부숴버릴 거야.", "source": "plan:9 파손"}
+{"id": "h_safety_04", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "돈 갚을 때까지 매일 찾아올 거야, 각오해.", "source": "plan:9 협박"}
+{"id": "h_unknown_01", "purpose": "UNKNOWN", "subtype": null, "transcript": "음... 아니에요.", "source": "plan:10"}
+{"id": "h_unknown_02", "purpose": "UNKNOWN", "subtype": null, "transcript": "여보세요? 들리세요?", "source": "plan:10"}
+{"id": "h_unknown_03", "purpose": "UNKNOWN", "subtype": null, "transcript": "아 이거 어떻게 하는 거지?", "source": "plan:10"}
+{"id": "h_unknown_04", "purpose": "UNKNOWN", "subtype": null, "transcript": "잠깐만, 전화 좀 받고요.", "source": "plan:10"}

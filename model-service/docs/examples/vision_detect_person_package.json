@@ -1,0 +1,13 @@
+{
+  "detections": [
+    {
+      "label": "person",
+      "confidence": 0.91
+    },
+    {
+      "label": "package",
+      "confidence": 0.78
+    }
+  ],
+  "flags": []
+}

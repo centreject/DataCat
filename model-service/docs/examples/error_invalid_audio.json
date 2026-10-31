@@ -1,0 +1,4 @@
+{
+  "code": "INVALID_AUDIO",
+  "message": "지원하지 않는 음성 형식입니다: PCM 16-bit, 2ch, 44100Hz → PCM 16-bit, mono, 16000Hz 필요."
+}
