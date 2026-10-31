@@ -162,7 +162,7 @@ arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && a
 
 서버 요청 대기는 10초. 이벤트 생성·음성 전송이 실패하면(연결 실패, 503 등) 오류 안내(presetId 3)를 재생하고, 종료 알림 실패는 로그만 남긴다.
 
-`--offline`의 서버 응답은 `main.py`의 `OfflineServer`가 명세의 정상 응답을 흉내 낸 것이다. 프리셋 음원(`sounds/greeting.wav`, `completion.wav`, `fallback.wav`)이 없으면 삐 소리로 대신한다.
+`--offline`의 서버 응답은 `main.py`의 `OfflineServer`가 명세의 정상 응답을 흉내 낸 것이다. 프리셋 음원(`sounds/greeting.wav`, `completion.wav`, `fallback.wav`)은 `model-service/preset-audio/final/`의 정식 음원(팀 합의)을 복사한 것이다. 파일이 없으면 삐 소리로 대신한다.
 
 ## 판정 규칙
 

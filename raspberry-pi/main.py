@@ -48,7 +48,7 @@ class OfflineServer:
         log(f"  [서버 흉내] 이벤트 {event_id} 음성 수신 {len(wav)} bytes → 녹음 다시 듣기")
         self.out.play_wav_bytes(wav)
         return {"eventId": event_id, "status": "COMPLETED", "action": "PLAY_PRESET",
-                "preset": {"presetId": 2, "text": "전달했습니다. 감사합니다."}}
+                "preset": {"presetId": 2, "text": "접수되었습니다."}}
 
     def end_event(self, event_id, reason, ended_at):
         log(f"  [서버 흉내] 이벤트 {event_id} 종료: {reason}")
