@@ -1,6 +1,6 @@
 # AI 모델 서비스 한눈에 보기
 
-팀원용 요약. 실행 방법·API 세부는 [`README.md`](../README.md), 정확도 기록은 [`eval/README.md`](../eval/README.md), 계약은 [`API_v1_5.md`](../../API_v1_5.md) 7장.
+팀원용 요약. 실행 방법·API 세부는 [`README.md`](../README.md), 정확도 기록은 [`eval/README.md`](../eval/README.md), 계약은 [`API_v1_6.md`](../../API_v1_6.md) 7장.
 
 ## 하는 일
 
