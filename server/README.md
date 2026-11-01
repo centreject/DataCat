@@ -22,7 +22,7 @@ Java 21 · Spring Boot 4.1.1 · Gradle Wrapper · MySQL
 
 2차 사진의 `POST /api/v1/device/events/{eventId}/snapshot`은 아직 구현하지 않았다.
 현재 `/end`는 `application/json`만 받으며 선택 사진을 포함한 multipart는 지원하지 않는다.
-상세 요청·응답 계약은 [API 명세 v1.5](../API_v1_5.md)를 따른다.
+상세 요청·응답 계약은 [API 명세 v1.6](../API_v1_6.md)를 따른다.
 
 ## 로컬 실행
 

@@ -1,6 +1,6 @@
 # DataCat 모델 서비스
 
-Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_5.md`](../API_v1_5.md) 7장(직전 버전 `API_v1_4.md`도 함께 둠).
+Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_6.md`](../API_v1_6.md) 7장(직전 버전 `API_v1_5.md`도 함께 둠).
 
 진행 현황: [`PROGRESS.md`](PROGRESS.md) · 정확도: [`eval/README.md`](eval/README.md) · 속도: [`bench/results/`](bench/results/)
 
@@ -103,7 +103,7 @@ docker run -p 8000:8000 datacat-model-mock
 | `POST /internal/v1/audio/process` | multipart `audio` | `{"transcript","purpose","subtype","summary","flags"}` — Spring이 실제로 쓰는 음성 경로 |
 | `GET /health` | — | `{"status":"loading"\|"ok"\|"degraded"\|"error","profile":"lite"\|"full"\|"mock"}` |
 
-`purpose` 9개 값과 배송 `subtype`은 [`app/language/purposes.json`](app/language/purposes.json)(덕민님 분류 기획 반영)이 원본이고, 명세 [`API_v1_5.md`](../API_v1_5.md) 7.6에 표로 있다. 분류를 바꿀 때는 이 파일만 고친다.
+`purpose` 9개 값과 배송 `subtype`은 [`app/language/purposes.json`](app/language/purposes.json)(덕민님 분류 기획 반영)이 원본이고, 명세 [`API_v1_6.md`](../API_v1_6.md) 7.6에 표로 있다. 분류를 바꿀 때는 이 파일만 고친다.
 
 `flags` — 언어: `NO_SPEECH`(발화 없음), `SUMMARY_FROM_TRANSCRIPT`(요약이 말한 내용과 달라 전사문 사용), `RULES_FALLBACK`(LLM 실패로 키워드 규칙). 비전: `LOW_VISIBILITY`(화면에 질감이 거의 없음 — 렌즈 가림. 사람이 보이면 붙지 않음. "카메라 가림" 판단은 Spring이 ToF와 함께).
 
