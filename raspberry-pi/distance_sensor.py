@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""HC-SR04 또는 VL53L0X 거리 측정. 감지 거리는 실행 옵션으로 지정한다."""
+
+import argparse
+import math
+import time
+
+from tof_sensor import TOF_MAX_MM, TofSensor
+
+
+TRIG_PIN = 24  # BCM 번호, 물리 핀 18
+ECHO_PIN = 23  # BCM 번호, 물리 핀 16. 분압 회로를 거쳐 연결한다.
+ECHO_TIMEOUT = 0.03
+POLL_INTERVAL = 0.1
+
+
+def measure_distance(gpio):
+    """거리(cm)를 반환한다. 응답 지연이나 측정 범위 이탈은 None이다."""
+    # 이전 펄스가 남아 있다면 이번 측정은 건너뛴다.
+    if gpio.input(ECHO_PIN):
+        return None
+
+    gpio.output(TRIG_PIN, True)
+    time.sleep(0.00001)
+    gpio.output(TRIG_PIN, False)
+
+    deadline = time.monotonic() + ECHO_TIMEOUT
+    while not gpio.input(ECHO_PIN):
+        if time.monotonic() >= deadline:
+            return None
+    pulse_start = time.monotonic()
+
+    deadline = pulse_start + ECHO_TIMEOUT
+    while gpio.input(ECHO_PIN):
+        if time.monotonic() >= deadline:
+            return None
+    pulse_end = time.monotonic()
+
+    distance = (pulse_end - pulse_start) * 34300 / 2
+    return distance if 2 <= distance <= 400 else None
+
+
+class ProximityDetector:
+    """연속 측정으로 접근/이탈을 확인하고 같은 접근의 중복 출력을 막는다.
+
+    clear_samples를 지정하면 이탈 확인에 그만큼 연속 측정이 필요하다(기획서의 복귀 안정화 시간).
+    """
+
+    def __init__(self, threshold_cm, release_cm, samples=3, clear_samples=None):
+        if not (2 <= threshold_cm < release_cm <= 400):
+            raise ValueError("2 <= 감지 거리 < 해제 거리 <= 400 조건이 필요합니다.")
+        if samples < 1 or (clear_samples is not None and clear_samples < 1):
+            raise ValueError("연속 측정 횟수는 1 이상이어야 합니다.")
+        self.threshold_cm = threshold_cm
+        self.release_cm = release_cm
+        self.samples = samples
+        self.clear_samples = samples if clear_samples is None else clear_samples
+        self.active = False
+        self.count = 0
+
+    def update(self, distance):
+        if distance is None or not math.isfinite(distance) or not 2 <= distance <= 400:
+            self.count = 0
+            return None
+
+        crossed = (distance >= self.release_cm if self.active
+                   else distance <= self.threshold_cm)
+        self.count = self.count + 1 if crossed else 0
+        if self.count < (self.clear_samples if self.active else self.samples):
+            return None
+
+        self.active = not self.active
+        self.count = 0
+        return "APPROACH" if self.active else "CLEAR"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sensor", choices=("hcsr04", "tof"), default="hcsr04",
+                        help="거리 센서 종류(기본: hcsr04). tof는 VL53L0X(I2C)")
+    parser.add_argument("--threshold-cm", type=float, help="접근 감지 거리(cm)")
+    parser.add_argument("--release-cm", type=float, help="감지 해제 거리(cm), 감지 거리보다 크게 지정")
+    parser.add_argument("--samples", type=int, default=3, help="접근 확인에 필요한 연속 측정 횟수(기본: 3)")
+    parser.add_argument("--clear-s", type=float, default=3.0,
+                        help="이탈 확인에 필요한 해제 거리 유지 시간(초, 기본: 3). 기획서 권장 3~5초")
+    args = parser.parse_args()
+    if (args.threshold_cm is None) != (args.release_cm is None):
+        parser.error("--threshold-cm과 --release-cm을 함께 지정하세요.")
+    if args.samples < 1:
+        parser.error("--samples는 1 이상이어야 합니다.")
+    if args.clear_s < POLL_INTERVAL:
+        parser.error(f"--clear-s는 {POLL_INTERVAL}초 이상이어야 합니다.")
+    if args.threshold_cm is not None:
+        if not (2 <= args.threshold_cm < args.release_cm <= 400):
+            parser.error("2 <= 감지 거리 < 해제 거리 <= 400 조건이 필요합니다.")
+        if args.sensor == "tof" and args.release_cm >= TOF_MAX_MM / 10:
+            # 대상 없음은 최대 거리로 들어오므로 해제 거리가 그 안쪽이어야 이탈을 확인할 수 있다.
+            parser.error(f"tof 센서의 해제 거리는 {TOF_MAX_MM / 10:g}cm보다 작아야 합니다.")
+    return args
+
+
+def open_hcsr04():
+    """(거리 측정 함수, 정리 함수)를 반환한다."""
+    try:
+        import RPi.GPIO as GPIO
+    except (ImportError, RuntimeError) as exc:
+        raise RuntimeError(f"GPIO를 사용할 수 없습니다: {exc}\n"
+                           "Raspberry Pi에서 python3-rpi.gpio 설치와 실행 환경을 확인하세요.")
+    configured_pins = []
+    try:
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(TRIG_PIN, GPIO.OUT, initial=GPIO.LOW)
+        configured_pins.append(TRIG_PIN)
+        GPIO.setup(ECHO_PIN, GPIO.IN)
+        configured_pins.append(ECHO_PIN)
+        time.sleep(0.1)
+    except (RuntimeError, OSError):
+        if configured_pins:
+            GPIO.cleanup(configured_pins)
+        raise
+    return (lambda: measure_distance(GPIO)), (lambda: GPIO.cleanup(configured_pins))
+
+
+def open_tof():
+    try:
+        sensor = TofSensor()
+    except (ImportError, ValueError) as exc:  # 라이브러리 없음, I2C 장치 없음
+        raise RuntimeError(f"VL53L0X를 사용할 수 없습니다: {exc}")
+    return sensor.read_cm, (lambda: None)
+
+
+def main():
+    args = parse_args()
+    detector = (ProximityDetector(args.threshold_cm, args.release_cm, args.samples,
+                                  clear_samples=round(args.clear_s / POLL_INTERVAL))
+                if args.threshold_cm is not None else None)
+    try:
+        read_distance, cleanup = open_tof() if args.sensor == "tof" else open_hcsr04()
+    except (RuntimeError, OSError) as exc:
+        print(f"센서 초기화 실패: {exc}")
+        return 1
+
+    try:
+        if detector:
+            print(f"접근 <= {args.threshold_cm:g}cm, 연속 {args.samples}회 / "
+                  f"해제 >= {args.release_cm:g}cm, {args.clear_s:g}초 유지")
+        else:
+            print("거리 측정 모드: 감지 기준이 지정되지 않았습니다.")
+        print("종료: Ctrl+C", flush=True)
+
+        while True:
+            distance = read_distance()
+            if distance is None:
+                print("측정 실패: 응답 없음 또는 측정 범위 밖", flush=True)
+            else:
+                print(f"거리: {distance:.1f} cm", flush=True)
+            if detector:
+                event = detector.update(distance)
+                if event:
+                    print(f"{event}: {distance:.1f} cm", flush=True)
+            time.sleep(POLL_INTERVAL)
+    except KeyboardInterrupt:
+        print("\n측정 종료")
+    except (RuntimeError, OSError) as exc:
+        print(f"센서 오류: {exc}")
+        return 1
+    finally:
+        cleanup()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
