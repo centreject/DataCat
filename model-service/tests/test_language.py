@@ -1,7 +1,7 @@
 import pytest
 
 from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
-from app.language.rules import rule_analyze
+from app.language.rules import correct_subtype, rule_analyze
 from app.pipeline import analyze_transcript
 from app.schemas import Analysis
 from tests.conftest import ready_client
@@ -146,6 +146,29 @@ def test_rules_expanded_keywords(transcript, purpose):
 
 def test_rules_summary_is_truncated_transcript():
     assert rule_analyze("가" * 30).summary == "가" * 19 + "…"
+
+
+@pytest.mark.parametrize(
+    "transcript,llm_subtype,expected",
+    [
+        # 2026-10-26 PR #9 real-model test: LLM said QUICK for a plain Coupang drop-off.
+        ("쿠팡입니다. 문 앞에 두고 갑니다.", "QUICK", "PARCEL"),
+        # the LLM's own subtype keyword was said → keep it
+        ("퀵으로 쿠팡 물건 가져왔어요", "QUICK", "QUICK"),
+        # no subtype keyword said → keep the LLM's guess
+        ("물건 왔습니다", "GIFT", "GIFT"),
+        # agreement → unchanged
+        ("치킨 배달 왔습니다", "FOOD", "FOOD"),
+    ],
+)
+def test_correct_subtype(transcript, llm_subtype, expected):
+    a = Analysis(summary="x", purpose="DELIVERY", subtype=llm_subtype)
+    assert correct_subtype(a, transcript).subtype == expected
+
+
+def test_correct_subtype_ignores_purposes_without_subtypes():
+    a = Analysis(summary="x", purpose="PICKUP")
+    assert correct_subtype(a, "쿠팡 반품 회수하러 왔어요") == a
 
 
 # --- analyze_transcript -----------------------------------------------------
