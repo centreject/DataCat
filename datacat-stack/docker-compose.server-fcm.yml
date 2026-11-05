@@ -1,0 +1,13 @@
+# Add this file only for Android push testing with an existing service account file.
+services:
+  api:
+    environment:
+      FCM_ENABLED: "true"
+      FCM_CREDENTIALS_FILE: /run/secrets/datacat-firebase.json
+    volumes:
+      - type: bind
+        source: ${DATACAT_TEST_FCM_KEY_FILE:?Set DATACAT_TEST_FCM_KEY_FILE to an existing Firebase service account JSON file}
+        target: /run/secrets/datacat-firebase.json
+        read_only: true
+        bind:
+          create_host_path: false

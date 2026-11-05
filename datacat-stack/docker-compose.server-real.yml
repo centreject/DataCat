@@ -1,0 +1,23 @@
+# Add after docker-compose.server.yml on the NVIDIA test PC.
+services:
+  model:
+    image: datacat/week10-model-real:local
+    build:
+      context: ../model-service
+      dockerfile: Dockerfile
+      args:
+        BUILD_COMMIT: ${DATACAT_MODEL_BUILD_COMMIT:-unknown}
+    environment:
+      MODEL_PROFILE: ${DATACAT_MODEL_PROFILE:-lite}
+    volumes:
+      - model-weights:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  model-weights:
