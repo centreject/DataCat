@@ -2,6 +2,8 @@
 
 기준: main c681ace, PR #9 병합 이후. 2026-10-28.
 
+실제 모델과 Pi를 연결하는 절차는 [10주차 실장비 통합 시험](week10-integration.md)을 따른다.
+
 ## 구성과 출처
 
 feature/app-design의 datacat-stack (db99369)의 api/db/model 구성과 MySQL 8.4·사진 Volume 설계를 바탕으로 한다. 현재 main에 Flutter 앱 폴더가 없으므로 `docker-compose.server.yml` 하나로 서버 세 부분을 먼저 실행한다. 기존 앱용 docker-compose.yml 및 docker-compose.spring.yml과 함께 합쳐 실행하는 파일이 아니다. 향후 앱 브랜치 통합 때 이 서버 구성을 앱 스택에 연결한다.
@@ -94,6 +96,6 @@ FCM을 켠 상태의 이후 up/stop 명령에는 두 -f 파일을 함께 사용�
 - Python 시험 스크립트 문법 검사 완료. 실제 실행 결과는 함께 제공하는 검증 기록을 따른다.
 - Java 21의 Spring 실행 JAR·모의 모델·임시 H2 파일 DB로 위 시험 스크립트의 run과 서버 재시작 후 verify가 모두 PASS였다. 이 결과는 HTTP 흐름과 시험 스크립트 검증이며, Docker의 MySQL·Volume 검증은 1~3번으로 진행한다.
 - 사용자 PC의 Docker 이미지 빌드·MySQL·Volume 재생성 시험은 위 명령으로 확인해야 한다. 파일 전달만으로 Docker 실행 완료로 기록하지 않는다.
-- 실제 Pi·실제 모델·스피커 재생은 별도 단계다. 이번 구성은 모의 모델만 사용한다.
+- 이 문서의 기본 구성은 모의 모델을 사용한다. 실제 Pi와 스피커 재생은 [10주차 실장비 통합 시험](week10-integration.md)에서 확인한다.
 
 참고: https://docs.docker.com/compose/how-tos/startup-order/ · https://docs.docker.com/compose/how-tos/project-name/
