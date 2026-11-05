@@ -1,0 +1,11 @@
+# 비밀값
+.env
+
+# Flutter / Dart 빌드 산출물과 IDE 설정 (각자 PC에서 자동으로 다시 생김)
+app/datacat_frontdoor/build/
+app/datacat_frontdoor/.dart_tool/
+app/datacat_frontdoor/.idea/
+*.iml
+
+# 기타
+__pycache__/

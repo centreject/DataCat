@@ -1,0 +1,106 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Brightness, ThemeMode;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../data/api.dart';
+import '../data/demo_api.dart';
+
+/// 서버 주소, 데모 모드, 화면 테마. 기기에 저장해 두고 앱을 다시 열어도 유지한다.
+class AppSettings extends ChangeNotifier {
+  AppSettings();
+
+  static const _kBaseUrl = 'server.baseUrl';
+  static const _kDemo = 'app.demoMode';
+  static const _kTheme = 'app.themeMode';
+
+  static const bool _hasBuildUrl = bool.hasEnvironment('DATACAT_API');
+  /// 웹 빌드에서 `--dart-define=DATACAT_API=same-origin`이면 앱을 연 주소를 서버로 쓴다.
+  /// (도커의 nginx가 /api/ 요청을 API 컨테이너로 넘겨 준다)
+  static String get defaultBaseUrl {
+    const v = String.fromEnvironment('DATACAT_API', defaultValue: 'http://localhost:8080');
+    if (v == 'same-origin' && kIsWeb) return Uri.base.origin;
+    return v;
+  }
+
+  SharedPreferences? _prefs;
+  String _baseUrl = defaultBaseUrl;
+  bool _demoMode = !_hasBuildUrl;
+  ThemeMode _themeMode = ThemeMode.system;
+
+  String get baseUrl => _baseUrl;
+  bool get demoMode => _demoMode;
+
+  /// 시스템 설정을 따를지, 라이트/다크로 고정할지
+  ThemeMode get themeMode => _themeMode;
+
+  /// 이 값이 바뀌면 서버 연결을 새로 만들어야 한다.
+  String get connectionKey => _demoMode ? 'demo' : _baseUrl;
+
+  Future<void> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _prefs = prefs;
+      _baseUrl = prefs.getString(_kBaseUrl) ?? _baseUrl;
+      _demoMode = prefs.getBool(_kDemo) ?? _demoMode;
+      _themeMode = switch (prefs.getString(_kTheme)) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+    } catch (e) {
+      // 저장소를 못 쓰는 환경이어도 기본값으로 앱은 뜬다. 원인은 설정 화면에 보여 준다.
+      storageError = '$e';
+      debugPrint('설정을 불러오지 못했어요: $e');
+    }
+  }
+
+  /// 휴대폰 저장소를 열거나 쓰다가 난 마지막 오류. 없으면 null.
+  String? storageError;
+
+  /// 저장소에 쓴다. 앱을 켤 때 저장소를 못 열었으면 여기서 다시 연다. 실패하면 false.
+  Future<bool> _persist(Future<bool> Function(SharedPreferences p) write) async {
+    try {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      final ok = await write(prefs);
+      storageError = ok ? null : '저장소가 쓰기를 거부했어요';
+      return ok;
+    } catch (e) {
+      storageError = '$e';
+      debugPrint('설정을 저장하지 못했어요: $e');
+      return false;
+    }
+  }
+
+  /// 휴대폰에 저장까지 됐으면 true. false면 앱을 다시 켤 때 예전 주소로 돌아간다.
+  Future<bool> setBaseUrl(String value) async {
+    final v = value.trim();
+    if (v.isEmpty) return false;
+    if (v != _baseUrl) {
+      _baseUrl = v;
+      notifyListeners();
+    }
+    // 같은 주소여도 다시 써 둔다 (이전 저장이 실패했을 수 있다)
+    return _persist((p) => p.setString(_kBaseUrl, v));
+  }
+
+  Future<void> setDemoMode(bool value) async {
+    if (value == _demoMode) return;
+    _demoMode = value;
+    notifyListeners();
+    await _persist((p) => p.setBool(_kDemo, value));
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (mode == _themeMode) return;
+    _themeMode = mode;
+    notifyListeners();
+    await _persist((p) => p.setString(_kTheme, mode.name));
+  }
+
+  /// 해/달 버튼: 지금 보이는 밝기의 반대로 고정한다.
+  Future<void> toggleTheme(Brightness current) =>
+      setThemeMode(current == Brightness.dark ? ThemeMode.light : ThemeMode.dark);
+
+  DataCatApi createApi() =>
+      _demoMode ? DemoDataCatApi() : HttpDataCatApi(_baseUrl);
+}
