@@ -34,9 +34,12 @@ public class DeviceSessionAudioService {
         this.packageReceptionService = packageReceptionService;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Preparation prepare(Long eventId, String audioHash, Instant receivedAt) {
         Event event = findAcceptableEvent(eventId, audioHash, receivedAt);
+        if (event.getStatus() == EventStatus.WAITING_AUDIO) {
+            event.recordSessionActivity(receivedAt);
+        }
         return new Preparation(event, alreadyProcessed(event, audioHash));
     }
 

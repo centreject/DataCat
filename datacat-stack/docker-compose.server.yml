@@ -13,6 +13,9 @@ services:
       DB_PASSWORD: ${DATACAT_TEST_DB_PASSWORD:-datacat-week9-local}
       MODEL_SERVICE_URL: http://model:8000
       MODEL_AUDIO_READ_TIMEOUT_MS: ${DATACAT_TEST_AUDIO_TIMEOUT_MS:-5000}
+      SESSION_EXPIRY_ENABLED: ${DATACAT_TEST_SESSION_EXPIRY_ENABLED:-true}
+      SESSION_IDLE_TIMEOUT_MS: ${DATACAT_TEST_SESSION_IDLE_TIMEOUT_MS:-120000}
+      SESSION_EXPIRY_CHECK_MS: ${DATACAT_TEST_SESSION_EXPIRY_CHECK_MS:-5000}
       SNAPSHOT_DIR: /data/snapshots
       FCM_ENABLED: "false"
       TZ: Asia/Seoul
@@ -61,6 +64,12 @@ services:
       - type: bind
         source: ./smoke_server.py
         target: /opt/datacat-tests/smoke_server.py
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./check_session_safety.py
+        target: /opt/datacat-tests/check_session_safety.py
         read_only: true
         bind:
           create_host_path: false
