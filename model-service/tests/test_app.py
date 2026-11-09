@@ -45,6 +45,16 @@ def test_health_degraded_when_a_model_failed():
     assert body == {"status": "degraded", "profile": "lite", "build": "dev", "failed": ["language"]}
 
 
+def test_health_degraded_when_package_model_fell_back_to_zero_shot():
+    vision = type("V", (), {"package_mode": "zero-shot"})()
+    registry = ModelRegistry(vision=vision, stt=object(), language=object(), ready=True)
+    app = create_app(lambda s: registry)
+    with TestClient(app) as client:
+        app.state.loader.join(timeout=5)
+        body = client.get("/health").json()
+    assert body["status"] == "degraded" and body["package_model"] == "zero-shot"
+
+
 def test_health_error_when_every_model_failed():
     registry = ModelRegistry(
         vision=None, stt=None, language=None, ready=True, failed=("vision", "stt", "language")
