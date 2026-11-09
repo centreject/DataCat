@@ -9,10 +9,10 @@
 | `distance_sensor.py` | 거리 측정, 접근(`APPROACH`)·이탈(`CLEAR`) 판정. `--sensor hcsr04\|tof` |
 | `tof_sensor.py` | VL53L0X(I2C) 측정. 범위 밖은 최대 거리, 통신 오류만 측정 실패로 넘긴다 |
 | `gate.py` | 재확인 게이트. 안내 재생 직전 방문객이 아직 있는지 판단(명세 5.3) |
-| `camera.py` | USB 웹캠 JPEG 촬영(메모리로 반환) |
+| `camera.py` | JPEG 촬영(메모리로 반환). Camera Module 3(`rpicam-still`) 또는 USB 웹캠, `DATACAT_CAMERA=auto\|csi\|usb` |
 | `audio_output.py` | 안내 음성 출력(ALSA). `presetId` → `sounds/*.wav`, 재생이 끝나야 반환 |
 | `audio_input.py` | VAD 녹음. 16kHz/16bit/mono WAV를 메모리로 반환, 파일 저장 안 함 |
-| `cam_preview.py` | 웹캠 실시간 미리보기(설치 각도 맞추기용) |
+| `cam_preview.py` | USB 웹캠 실시간 미리보기(설치 각도 맞추기용) |
 | `SERVER_SETUP.md` | Raspberry Pi 4 환경 설정과 RTX 3090 서버 연동 구성 |
 
 ## 장비
@@ -22,7 +22,8 @@
 | 보드 | Raspberry Pi 4, Ubuntu 22.04, Python 3.10 | |
 | 거리 센서 | VL53L0X ToF 모듈(VL53LXX-V2), I2C | 동작 확인 |
 | 거리 센서(이전) | HC-SR04 초음파 | 코드 유지(`--sensor hcsr04`) |
-| 카메라 | USB 웹캠(GEMBIRD AX2311), 640×480 | 동작 확인 |
+| 카메라 | Camera Module 3 Wide(imx708), 2304×1296 | 동작 확인(2026-11-10), 아래 "Camera Module 3" 참고 |
+| 카메라(이전) | USB 웹캠(GEMBIRD AX2311), 640×480 | 코드 유지(`--camera usb`) |
 | 마이크 | USB 핀마이크(JMTek) | 동작 확인 |
 | 스피커 | 3.5mm 이어폰(임시) | 동작 확인 |
 | 스피커(예정) | MAX98357A I2S 앰프 | 납땜 손상 의심으로 보류 |
@@ -123,14 +124,16 @@ docker compose run --rm pi python distance_sensor.py --sensor tof  # 장치별 �
 # 장치 확인
 i2cdetect -y 1                      # VL53L0X: 29
 arecord -l; aplay -l                # 마이크: USB Audio Device, 이어폰: bcm2835 Headphones
-ls /dev/video*                      # 웹캠: /dev/video0
+rpicam-hello --list-cameras        # Camera Module 3: imx708_wide
+ls /dev/video*                      # USB 웹캠(CSI 카메라를 달면 video0은 unicam이 차지)
 
 # 거리 센서: 거리만 출력 / 접근·이탈 판정
 .venv/bin/python distance_sensor.py --sensor tof
 .venv/bin/python distance_sensor.py --sensor tof --threshold-cm 30 --release-cm 50
 
-# 웹캠: 한 장 저장 / 실시간 미리보기(브라우저 http://localhost:8090, VSCode가 포트 연결)
+# 카메라: 한 장 저장(기본 auto) / USB 웹캠 강제 / USB 웹캠 실시간 미리보기(브라우저 http://localhost:8090)
 .venv/bin/python camera.py cam_test.jpg
+.venv/bin/python camera.py --camera usb --device 1 cam_test.jpg
 .venv/bin/python cam_preview.py
 
 # 스피커: 삐 소리 / WAV 파일 / 프리셋(sounds/ 음원 필요)
@@ -220,3 +223,14 @@ Pi 4 → 3090 서버(Spring `feature/image-upload` + 실제 모델 `lite` + MySQ
 3. 설치 위치에서 감지·해제 거리 결정
 4. MAX98357A 복구 시 `audio_output.py`의 `DEFAULT_DEVICE`만 I2S 카드로 변경
 5. 촬영 지연 단축(실서버 시험에서 접근 후 촬영까지 약 2초, 카메라를 미리 열어 두는 방식 검토)
+
+## Camera Module 3 (Ubuntu 22.04)
+
+Ubuntu 22.04의 5.15 커널에는 imx708 드라이버가 없어 OS를 바꾸지 않고 따로 넣었다(2026-11-10, Pi 4 실기 확인).
+
+- 드라이버: 라즈베리파이 커널 `rpi-5.15.y`의 `imx708.c`, `dw9807-vcm.c`(오토포커스)를 DKMS(`imx708/1.0`, 소스 `/usr/src/imx708-1.0`)로 설치. 커널이 바뀌면 자동으로 다시 빌드된다.
+- 오버레이: 같은 브랜치의 `imx708-overlay.dts`를 컴파일해 `/boot/firmware/overlays/imx708.dtbo`에 넣음(사본 `/usr/local/share/imx708/`). `config.txt`는 `camera_auto_detect=0`, `dtoverlay=imx708`.
+- 사용자 공간: `raspberrypi/libcamera`(rpi/vc4만)와 `rpicam-apps`를 소스 빌드해 `/usr/local`에 설치.
+- 확인: `rpicam-hello --list-cameras`에 `imx708_wide`, `python3 camera.py`가 약 1.3초에 2304×1296 JPEG 저장.
+- 렌즈 방향: `DATACAT_CAMERA_ROTATION=180`(0/180만 가능). 해상도는 `DATACAT_CAMERA_WIDTH`/`HEIGHT`.
+- Docker 이미지에는 libcamera가 없어 컨테이너에서는 아직 CSI 카메라를 쓸 수 없다. 당분간 가상환경으로 실행한다.
