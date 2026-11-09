@@ -30,7 +30,7 @@ for k, v in parts.items():
 # 3) 전체 조립 STEP (실제 부품 포함, 색 지정)
 col = {
     '01_front_shell': (0.93, 0.91, 0.87), '02_lcd_pi_chassis': (0.49, 0.51, 0.54), '03_wall_plate': (0.85, 0.83, 0.78),
-    '04_black_visor': (0.06, 0.06, 0.07), '05_led_light_pipe': (1.0, 0.7, 0.3), '06_camera_cradle': (0.3, 0.32, 0.35),
+    '04_black_visor': (0.06, 0.06, 0.07), '05_led_light_pipe': (1.0, 0.7, 0.3), '06_camera_cradle': (0.3, 0.32, 0.35), '07_camera_cover': (0.06, 0.06, 0.07),
 }
 assy = cq.Assembly(name='DataCat_doorbell_RevF2')
 for k, v in parts.items():

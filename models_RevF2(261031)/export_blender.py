@@ -23,6 +23,7 @@ items = [
     ('04_black_visor', parts['04_black_visor'], (0.02, 0.02, 0.025, 1), P, 'gloss'),
     ('05_led_light_pipe', parts['05_led_light_pipe'], (1.0, 0.75, 0.4, 1), P, 'glow'),
     ('06_camera_cradle', parts['06_camera_cradle'], (0.3, 0.32, 0.35, 1), P, 'plastic'),
+    ('07_camera_cover', parts['07_camera_cover'], (0.02, 0.02, 0.025, 1), P, 'plastic'),
     ('REF_raspberry_pi_4', comps['Raspberry Pi 4'], (0.12, 0.38, 0.2, 1), R, 'pcb'),
     ('REF_usbc_plug', comps['USB-C L형 플러그'], (0.05, 0.05, 0.05, 1), R, 'plastic'),
     ('REF_hdmi_lcd_3p5in', comps['3.5인치 HDMI LCD'], (0.03, 0.03, 0.03, 1), R, 'plastic'),

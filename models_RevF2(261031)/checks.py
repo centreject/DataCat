@@ -144,7 +144,7 @@ def run():
         "M2x5 카메라 → 보스": round(5.0 - M.CAM["pcb"], 2),
         "M3x16 바닥 → 브래킷 보스": round(1.2 + 16.0 - (M.T + M.CLEAR + M.SLIDE), 2),
         "M3x16 끝 ~ 보스 구멍 바닥 여유": round((M.T + M.CLEAR + M.SLIDE - 0.1 + 9.5) - (1.2 + 16.0), 2),
-        "M2x5 카메라 → 크래들 받침": round(5.0 - M.CAM["pcb"], 2),
+        "M2x5 카메라 → 크래들 받침 (덮개 0.4 지남)": round(5.0 - M.CAM["pcb"] - M.COVER["seat"], 2),
         "M2x6 회전축 핀 → 쉘 귀": round(M.PIVOT_EAR_X[1] - max(M.PIVOT_EAR_X[0], M.CRADLE_HUB_X[1] - 6.0), 2),
         "M2x8 서보 날개 → 기둥": round(min(M.servo_tab_x()[0] + 8.0, M.servo_tab_x()[1] + M.SERVO_POST_T) - M.servo_tab_x()[1], 2),
     }

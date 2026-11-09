@@ -8,7 +8,7 @@
  "parts": {
   "01_front_shell": {
    "valid": true,
-   "volume_cm3": 96.4,
+   "volume_cm3": 96.18,
    "bbox": [
     -62.0,
     62.0,
@@ -77,6 +77,18 @@
     16.02,
     37.46
    ]
+  },
+  "07_camera_cover": {
+   "valid": true,
+   "volume_cm3": 0.74,
+   "bbox": [
+    -37.22,
+    -10.83,
+    150.23,
+    179.33,
+    20.45,
+    36.99
+   ]
   }
  },
  "components": {},
@@ -88,7 +100,7 @@
   "01_front_shell ∩ M2x8 태핑 (서보 고정)": 6.566,
   "02_lcd_pi_chassis ∩ M2.5x6 태핑 (Pi)": 20.376,
   "03_wall_plate ∩ M3x16 (바닥 잠금)": 14.903,
-  "06_camera_cradle ∩ M2x5 태핑 (카메라)": 9.55
+  "06_camera_cradle ∩ M2x5 태핑 (카메라)": 8.595
  },
  "component_outside_envelope_mm3": {
   "Raspberry Pi 4": 0.0,
@@ -267,7 +279,7 @@
   "M2x5 카메라 → 보스": 4.0,
   "M3x16 바닥 → 브래킷 보스": 6.9,
   "M3x16 끝 ~ 보스 구멍 바닥 여유": 2.5,
-  "M2x5 카메라 → 크래들 받침": 4.0,
+  "M2x5 카메라 → 크래들 받침 (덮개 0.4 지남)": 3.6,
   "M2x6 회전축 핀 → 쉘 귀": 3.2,
   "M2x8 서보 날개 → 기둥": 5.5
  },
@@ -313,5 +325,5 @@
   ],
   "camera_lens_front": 39.45779110245426
  },
- "build_seconds": 1793436467.8
+ "build_seconds": 1793854583.3
 }

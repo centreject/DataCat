@@ -105,6 +105,7 @@ const shell = await load('01_front_shell', M.shell); groups.shell.add(shell);
 groups.shell.add(await load('04_black_visor', M.visor));
 groups.shell.add(await load('05_led_light_pipe', M.pipe));
 groups.shell.add(await load('06_camera_cradle', M.chassis));
+groups.shell.add(await load('07_camera_cover', M.visor));
 for (const [n, m] of [['c_servo', M.servoBlue], ['c_horn', M.white], ['c_scr_pin', M.metal], ['c_scr_servo', M.metal]])
   groups.shell.add(await load(n, m));
 groups.shell.add(await load('c_btn', M.metal));

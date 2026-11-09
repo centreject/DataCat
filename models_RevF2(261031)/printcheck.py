@@ -6,7 +6,7 @@ from cadquery import Vector as V
 import model as M
 
 ORIENT = {'01_front_shell': True, '02_lcd_pi_chassis': True, '03_wall_plate': False,
-          '04_black_visor': True, '05_led_light_pipe': False, '06_camera_cradle': 'cradle'}
+          '04_black_visor': True, '05_led_light_pipe': False, '06_camera_cradle': 'cradle', '07_camera_cover': 'cradle'}
 
 
 def to_bed(shape, flip):

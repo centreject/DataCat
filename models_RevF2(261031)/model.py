@@ -326,6 +326,10 @@ def build_shell() -> cq.Shape:
 
     # ── 카메라 렌즈 구멍 (기울어진 축을 따라 원통 + 화각 원뿔) ──
     shell = shell.cut(lens_cut())
+    # F.2: 렌즈 둘레 쉘 창을 바이저 안쪽까지 넓힘 → 렌즈 구멍 안에 흰 쉘 단면이 안 보이고 바이저(검정) 가장자리만 보임
+    _v = VISOR
+    shell = shell.cut(pill(_v["w"] - 3.0, _v["h"] - 3.0, Z_IN - 1.0, D + 1.0, _v["cx"], _v["cy"]).intersect(
+        box(-60, -16.0, 0, H, Z_IN - 2.0, D + 2.0)))
 
     # ── ToF 창 (화각 30°로 벌어지는 사각 창) ──
     tx, ty = TOF_POS
@@ -661,6 +665,35 @@ def build_cradle(tilt: float | None = None) -> cq.Shape:
     return tilt_about_pivot(w.clean(), tilt)
 
 
+COVER = dict(t=1.2, seat=0.4, margin=1.5, block=9.6)      # 07 카메라 덮개: 기판 앞면을 덮는 검은 판
+
+
+def build_cam_cover(tilt: float | None = None, shell: cq.Shape | None = None) -> cq.Shape:
+    """07 카메라 덮개 (검정 출력, 두께 1.2): 기판 앞면을 덮어 렌즈 구멍으로 초록 기판이 안 보이게 한다.
+    카메라 나사(M2 x 5)가 덮개 → 기판 → 크래들 받침 순서로 지나가며 같이 고정. 크래들과 같이 돈다"""
+    top, m = CAM["lens_from_top"], COVER["margin"]
+    c = box(-CAM["w"] / 2 - m, CAM["w"] / 2 + m, top - CAM["h"] - m, top + m, 0.0, COVER["t"])
+    b = COVER["block"]
+    c = c.cut(box(-b / 2, b / 2, -b / 2, b / 2, -1, COVER["t"] + 1))          # 렌즈 받침 자리
+    for hx, hy in cam_holes_local():
+        c = c.cut(cq.Solid.makeCylinder(1.15, 5, V(hx, hy, -1), V(0, 0, 1)))  # 나사 통과 ø2.3
+        c = c.cut(cq.Solid.makeCylinder(2.1, 5, V(hx, hy, COVER["seat"]), V(0, 0, 1)))  # 나사 머리 자리 ø4.2 (머리가 거의 안 올라옴)
+    w = cam_place(c).cut(build_cradle())
+    wi, hi, ri = plan(-T - 2.0)
+    w = w.intersect(rrect(wi, hi, ri, -1, D, cy=H / 2).val())
+    # 10~30° 어느 각도에서도 쉘에 닿지 않게: 쉘을 반대로 돌려 가며 0.5° 간격 + 끝 각도 여유 1°로 빼 낸다
+    if shell is not None:
+        py, pz = PIVOT
+        for k in range(0, 49):
+            t = CAM["tilt_min"] - 1.0 + (CAM["tilt_max"] - CAM["tilt_min"] + 2.0) * k / 48
+            w = w.cut(shell.rotate(V(0, py, pz), V(1, py, pz), CAM["tilt"] - t))
+    return tilt_about_pivot(w.clean(), tilt)
+
+
+def cover_to_print(shape: cq.Shape) -> cq.Shape:
+    return cradle_to_print(shape)
+
+
 def _horn_dir():
     """혼 날개 방향(YZ): 회전축에서 크래들 오른쪽 귀 쪽 (기판 뒤 방향)"""
     c = cam_place(box(-6.0, 6.0, CAM["lens_from_top"], CAM["lens_from_top"] + 2.6, -6.5, -4.0)).Center()
@@ -858,7 +891,7 @@ def _screw(d, length, head_d, head_h, at: V, axis: V) -> cq.Shape:
 
 # 나사가 정상적으로 파고드는 상대 부품 (간섭 검사에서 제외, 대신 물림 길이를 따로 보고)
 # 서보 각도에 따라 같이 움직이는 것 (나머지는 고정)
-MOVING_PARTS = ("06_camera_cradle",)
+MOVING_PARTS = ("06_camera_cradle", "07_camera_cover")
 MOVING_COMPS = ("Camera Module 3 Wide", "M2x5 태핑 (카메라)", "서보 혼")
 
 SCREW_HOSTS = {
@@ -887,7 +920,7 @@ def fasteners() -> dict[str, cq.Shape]:
         out["M2.5x6 태핑 (Pi)"].append(_screw(2.5, 6.0, *f["m25_head"], V(x, y, PI_BOTTOM), V(0, 0, 1)))
     for hx, hy in cam_holes_local():
         # Rev F: 기판 앞에서 뒤로, 크래들 받침에 박힘
-        out["M2x5 태핑 (카메라)"].append(cam_place(_screw(2.0, 5.0, *f["m2_head"], V(hx, hy, 0), V(0, 0, -1))))
+        out["M2x5 태핑 (카메라)"].append(cam_place(_screw(2.0, 5.0, *f["m2_head"], V(hx, hy, COVER["seat"]), V(0, 0, -1))))  # F.2: 덮개 머리 자리 0.4 위
     py, pz = PIVOT
     out["M2x6 (회전축 핀)"].append(_screw(2.0, 6.0, *f["m2_head"], V(CRADLE_HUB_X[1], py, pz), V(-1, 0, 0)))
     for hy in servo_hole_ys():
@@ -911,12 +944,14 @@ def fasteners() -> dict[str, cq.Shape]:
 
 
 def build_all():
+    shell = build_shell()
     parts = {
-        "01_front_shell": build_shell(),
+        "01_front_shell": shell,
         "02_lcd_pi_chassis": build_frame(),
         "03_wall_plate": build_plate(),
         "04_black_visor": build_visor(),
         "05_led_light_pipe": build_light_pipe(),
         "06_camera_cradle": build_cradle(),
+        "07_camera_cover": build_cam_cover(shell=shell),
     }
     return parts, components()
