@@ -64,6 +64,9 @@ public class Event {
 
     private Instant lastImageReceivedAt;
 
+    // 서버가 받은 마지막 세션 활동. Pi 시계와 무관하게 만료 시간을 계산한다.
+    private Instant lastSessionActivityAt;
+
     // 적용된 사진 판정표의 행: A0, A1, A2, A3, A4, A5
     @Column(length = 10)
     private String imageRuleId;
@@ -178,6 +181,11 @@ public class Event {
 
     public Instant getLastImageReceivedAt() {
         return lastImageReceivedAt;
+    }
+
+    public void recordSessionActivity(Instant receivedAt) {
+        if (receivedAt == null) throw new IllegalArgumentException("수신 시각이 필요합니다.");
+        this.lastSessionActivityAt = receivedAt;
     }
 
     public String getImageRuleId() {
@@ -328,6 +336,7 @@ public class Event {
         }
 
         this.lastImageReceivedAt = receivedAt;
+        recordSessionActivity(receivedAt);
 
         // null은 모델 장애 등으로 물품 수를 모르는 경우다.
         if (packageCount != null) {

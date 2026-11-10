@@ -172,6 +172,16 @@ public class DeviceEventService {
         );
     }
 
+    // 접수·모델 호출과 같은 잠금이다. 정상 분석 도중 타이머가 방문을 닫지 않는다.
+    public synchronized int expireInactiveSessions(long inactivityMs) {
+        if (inactivityMs <= 0) throw new IllegalArgumentException("세션 만료 시간은 양수여야 합니다.");
+        Instant now = Instant.now();
+        var expired = deviceSessionEndService.expireInactive(now.minusMillis(inactivityMs), now);
+        // 별도 서비스의 저장 트랜잭션이 커밋된 뒤에만 알림을 보낸다.
+        expired.forEach(visitPushService::notifyVisit);
+        return expired.size();
+    }
+
     private String audioHash(MultipartFile audio) {
         byte[] buffer = new byte[8_192];
         try (InputStream input = audio.getInputStream()) {

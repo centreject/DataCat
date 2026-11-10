@@ -171,11 +171,14 @@ Spring은 `/internal/v1/audio/process`를 호출해 전사문·용건·배송 �
 }
 ```
 
-- reason은 VISITOR_LEFT 또는 TIMEOUT이다. DEVICE_CANCELLED는 예약 값으로 현재 400이다.
+- reason은 VISITOR_LEFT, TIMEOUT 또는 DEVICE_CANCELLED이다. 마지막 값은 11주차 추가 구현 제안으로, 장치 오류에 의한 중단을 알린다.
 - endedAt은 필수이며 방문 발생 시각보다 빠르면 400이다.
 - 세션 사진에 물품이 있으면 물품만 있음, 없으면 기타·판단 불가로 무응답 종료한다.
 - 유효한 요청으로 이미 완료된 방문을 조회하면 기존 분류·종료 시각을 유지하고 200 END_SESSION을 반환한다.
-- 서버 자체의 자동 세션 만료 타이머는 아직 없다.
+- 서버는 마지막 사진·음성 수신 후 기본 120초 지난 WAITING_AUDIO를 5초마다 최대 100건 자동 종료한다. 기존 기록의 빈 수신 시각은 사진 수신·발생 시각으로 보완한다. 모델 처리 중에는 접수와 같은 잠금을 사용해 만료를 대기시킨다.
+- DEVICE_CANCELLED·서버 만료는 단말 확인 필요/needsReview=true로 기록하고 커밋 뒤 알림을 갱신한다. 이미 완료된 결과는 보존하며 만료 뒤 음성은 새 방문으로 접수한다. 만료로 현재 물품 상태를 추정하거나 수정하지 않는다.
+- SESSION_EXPIRY_ENABLED(기본 true), SESSION_IDLE_TIMEOUT_MS(기본 120000), SESSION_EXPIRY_CHECK_MS(기본 5000)로 조정한다. 시간 값은 양수이며 120초는 실측 전 시작값이다. 한 서버 MVP의 잠금이므로 여러 서버 인스턴스를 동시에 실행하는 구성은 별도 설계가 필요하다.
+- 실행 시 기존 DB에 last_session_activity_at 열을 추가한다(현재 개발용 ddl-auto=update). 기존 대기 기록도 서버 시작 후 첫 점검부터 만료 대상이 된다. 세부 시험은 [11주차 계획](docs/week11-plan.md)을 따른다.
 
 음성 세부 동작은 [음성 구현](docs/audio-implementation.md)을 따른다.
 

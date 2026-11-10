@@ -488,7 +488,9 @@ DB 저장 실패는 결과를 롤백하고 성공 해시·푸시를 남기지 �
 
 ## 6.4 세션 종료 알림
 
-Pi가 방문객 이탈 또는 무발화 대기 종료를 알려, 음성이 없는 접수를 끝내는 API다.
+Pi가 방문객 이탈, 무발화 대기 종료 또는 장치 오류를 알려 접수를 끝내는 API다.
+
+> 11주차 추가 구현 제안(2026-11-08): 예약 값 DEVICE_CANCELLED 지원과 서버의 대기 방문 자동 만료를 추가한다. 기존 VISITOR_LEFT·TIMEOUT 형식은 유지한다. Pi 담당·명세 담당의 연동 검토 대상이다.
 
 | 항목 | 현재 계약 |
 |---|---|
@@ -513,10 +515,10 @@ Pi가 방문객 이탈 또는 무발화 대기 종료를 알려, 음성이 없�
 |---|---|
 | VISITOR_LEFT | Pi의 ToF 재확인에서 방문객 이탈을 확인 |
 | TIMEOUT | 발화 없이 Pi의 대기 시간이 초과 |
-| DEVICE_CANCELLED | 예약 값. 현재 서버는 400으로 거절 |
+| DEVICE_CANCELLED | 안내 음원 재생 실패 또는 마이크 오류로 Pi가 응대를 중단. 11주차 추가 구현 제안 |
 
 endedAt은 시간대가 있는 ISO-8601이며 occurredAt보다 빠르면 400이다.
-현재 서버 자체의 방문 만료 타이머는 구현하지 않았다.
+서버는 마지막 사진·음성 수신 이후 기본 120초 동안 후속 요청이 없는 WAITING_AUDIO 방문을 5초마다 최대 100건 종료한다. 서버 수신 시각을 사용하고, 기존 기록은 마지막 사진 수신 시각·발생 시각 순으로 보완한다. 실제 모델 호출 중에는 같은 단일 서버 잠금으로 만료를 대기시킨다. 120초는 실장비에서 재확인할 시작값이며 서버 모델 읽기 5초·Pi HTTP 대기 10초·무발화 대기 5초와는 별개다.
 
 ### 처리 순서
 
@@ -533,6 +535,8 @@ endedAt은 시간대가 있는 ISO-8601이며 occurredAt보다 빠르면 400이�
 
 reason은 VISITOR_LEFT이면 `안내 전 이탈`, TIMEOUT이면 `발화 없이 시간 초과`다.
 사진 단계 needsReview는 유지한다. 이미 음성으로 완료된 방문의 늦은 /end는 음성 결과를 보존한다.
+
+DEVICE_CANCELLED와 서버 만료는 위 표의 eventType·mainCategory를 유지하되 responsePolicy=`장애 안내`, processingStatus=`단말 확인 필요`, needsReview=true로 기록한다. reason은 각각 `단말에서 장치 오류로 응대를 중단함`, `후속 요청 없이 세션 대기 시간 초과`다. 만료는 통신 중단을 추정하는 정리 정책이며 실제 스피커 고장이나 Pi 전원 상태를 판별한 결과가 아니다. 서버 만료는 현재 물품의 재관측이 아니므로 잔류 물품 상태를 수정하지 않는다. 만료 이후 /audio는 409로 거절하고 새 방문을 사용한다. 알림은 저장 커밋 후 한 번 갱신한다.
 
 ### 성공 응답
 
@@ -555,7 +559,7 @@ reason은 VISITOR_LEFT이면 `안내 전 이탈`, TIMEOUT이면 `발화 없이 �
 ```json
 {
   "code": "INVALID_REQUEST",
-  "message": "reason은 VISITOR_LEFT 또는 TIMEOUT이어야 합니다."
+  "message": "reason은 VISITOR_LEFT, TIMEOUT 또는 DEVICE_CANCELLED이어야 합니다."
 }
 ```
 

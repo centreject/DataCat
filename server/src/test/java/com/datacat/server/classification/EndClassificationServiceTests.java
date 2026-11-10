@@ -67,10 +67,10 @@ class EndClassificationServiceTests {
     }
 
     @Test
-    void reservedEndReasonIsRejected() {
+    void unknownEndReasonIsRejected() {
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
-                () -> service.classify("DEVICE_CANCELLED", 0)
+                () -> service.classify("UNKNOWN", 0)
         );
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
