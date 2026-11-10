@@ -182,8 +182,11 @@ def create_app(
             body["failed"] = list(registry.failed)
         if stuck:
             body["stuck"] = stuck
-        if getattr(registry.vision, "package_mode", None):
-            body["package_model"] = registry.vision.package_mode
-        return {"status": "degraded" if registry.failed or stuck else "ok", **body}
+        package_mode = getattr(registry.vision, "package_mode", None)
+        if package_mode:
+            body["package_model"] = package_mode
+        # zero-shot = the fine-tuned package weights failed to load (e.g. download 504): still serving, weaker boxes.
+        degraded = registry.failed or stuck or package_mode == "zero-shot"
+        return {"status": "degraded" if degraded else "ok", **body}
 
     return app

@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import time
 from pathlib import Path
 
 import torch
@@ -52,8 +53,16 @@ def fetch_verified(path: Path, url: str | None = None) -> None:
         raise RuntimeError(f"{path.name}: checksum mismatch")
 
 
-def fetch_package_ft(path: Path) -> None:
-    fetch_verified(path, PACKAGE_FT_URL)
+def fetch_package_ft(path: Path, waits: tuple[float, ...] = (10.0, 30.0)) -> None:
+    """GitHub Releases can 504 for a minute; safe_download's own retries are back-to-back, so wait and retry."""
+    for wait in (*waits, None):
+        try:
+            return fetch_verified(path, PACKAGE_FT_URL)
+        except OSError:  # download errors (ConnectionError); a checksum mismatch raises at once
+            if wait is None:
+                raise
+            log.warning("package weights download failed; retrying in %.0f s", wait, exc_info=True)
+            time.sleep(wait)
 
 
 COCO_PERSON = 0

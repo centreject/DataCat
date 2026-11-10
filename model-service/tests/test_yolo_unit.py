@@ -121,3 +121,25 @@ def test_without_fine_tuned_weights_zero_shot_still_finds_packages():
     vision = stub_vision([], packages=[0.6])
     vision.package_ft_model = None
     assert vision.detect(Image.new("RGB", (200, 200))) == [Detection(label="package", confidence=0.6)]
+
+
+def test_package_weights_download_retries_after_a_transient_failure(monkeypatch, tmp_path):
+    calls = []
+
+    def flaky(path, url=None):
+        calls.append(url)
+        if len(calls) == 1:
+            raise ConnectionError("504 Gateway Timeout")
+
+    monkeypatch.setattr(yolo, "fetch_verified", flaky)
+    yolo.fetch_package_ft(tmp_path / "w.pt", waits=(0,))
+    assert calls == [yolo.PACKAGE_FT_URL] * 2
+
+
+def test_package_weights_download_gives_up_after_the_last_retry(monkeypatch, tmp_path):
+    def down(path, url=None):
+        raise ConnectionError("504 Gateway Timeout")
+
+    monkeypatch.setattr(yolo, "fetch_verified", down)
+    with pytest.raises(ConnectionError):
+        yolo.fetch_package_ft(tmp_path / "w.pt", waits=(0, 0))
