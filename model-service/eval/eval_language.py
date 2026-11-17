@@ -6,6 +6,7 @@ Usage (from model-service/):
   python -m eval.eval_language                  # real LLM (MODEL_PROFILE picks lite/full)
   python -m eval.eval_language --audio tts_snr10   # end to end: data/audio/<folder>/<id>.wav → STT → LLM
   python -m eval.eval_language --cases heldout     # held-out set: milestones only, never tune on it
+  python -m eval.eval_language --cases deokmin     # second held-out set (김덕민, 45), same rule
 """
 
 import argparse
@@ -23,7 +24,10 @@ CRITICAL = {"PUBLIC_EMERGENCY", "SAFETY_REVIEW"}
 EVAL = Path(__file__).resolve().parent
 # dev: tune prompts and rules on it. heldout: sentences from the classification plan and the app
 # mock data, measured only at milestones so the numbers stay honest (decided 2026-10-04).
-CASE_FILES = {"dev": EVAL / "purpose_cases.jsonl", "heldout": EVAL / "heldout_cases.jsonl"}
+# deokmin: 45 sentences written by 김덕민 (9 purposes × 5), received 2026-11-17 after all tuning so far;
+# a second held-out set with the same rule — measure, never tune on it.
+CASE_FILES = {"dev": EVAL / "purpose_cases.jsonl", "heldout": EVAL / "heldout_cases.jsonl",
+              "deokmin": EVAL / "deokmin_cases.jsonl"}
 
 
 def main() -> None:
