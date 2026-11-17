@@ -234,3 +234,12 @@ def test_analyze_route_empty_transcript():
 )
 def test_rules_threat_keywords(transcript, purpose):
     assert rule_analyze(transcript).purpose == purpose
+
+
+def test_correct_subtype_keeps_large_item_with_a_signature():
+    # Gemini review 2026-11-17: "서명" alone moved a large delivery to MAIL.
+    from app.language.rules import correct_subtype
+    from app.schemas import Analysis
+
+    llm = Analysis(summary="에어컨 배송", purpose="DELIVERY", subtype="LARGE")
+    assert correct_subtype(llm, "에어컨 배송 왔습니다, 서명 부탁드려요").subtype == "LARGE"

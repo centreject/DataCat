@@ -42,15 +42,22 @@ log = logging.getLogger(__name__)
 
 
 def fetch_verified(path: Path, url: str | None = None) -> None:
-    """Download if missing (Ultralytics' release, or `url`), then refuse anything but the tested file."""
-    if not path.exists():
-        if url:
-            safe_download(url=url, file=path, min_bytes=1e5)
-        else:
-            attempt_download_asset(path)
-    if hashlib.sha256(path.read_bytes()).hexdigest() != SHA256[path.name]:
-        path.unlink()  # never load an unexpected pickle; the next start downloads it again
-        raise RuntimeError(f"{path.name}: checksum mismatch")
+    """Download if missing (Ultralytics' release, or `url`), then refuse anything but the tested file.
+
+    A file left half-written by an interrupted start fails the checksum; it is deleted and fetched once
+    more right away, instead of failing this start (review 2026-11-17).
+    """
+    for _ in range(2):
+        if not path.exists():
+            if url:
+                safe_download(url=url, file=path, min_bytes=1e5)
+            else:
+                attempt_download_asset(path)
+        with path.open("rb") as f:
+            if hashlib.file_digest(f, "sha256").hexdigest() == SHA256[path.name]:
+                return
+        path.unlink()  # never load an unexpected pickle
+    raise RuntimeError(f"{path.name}: checksum mismatch")
 
 
 def fetch_package_ft(path: Path, waits: tuple[float, ...] = (10.0, 30.0)) -> None:

@@ -172,6 +172,8 @@ def create_app(
         registry = app.state.registry
         body = {"profile": settings.model_profile, "build": os.environ.get("BUILD_COMMIT", "dev")}
         if app.state.load_failed or (registry is not None and len(registry.failed) == 3):
+            if registry is not None and registry.failed:
+                body["failed"] = list(registry.failed)
             return {"status": "error", **body}
         if registry is None or not registry.ready:
             return {"status": "loading", **body}
