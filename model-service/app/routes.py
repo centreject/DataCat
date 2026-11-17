@@ -1,7 +1,7 @@
 from fastapi import APIRouter, File, Request, UploadFile
 
 from app.errors import ApiError
-from app.media import decode_jpeg, decode_wav
+from app.media import decode_jpeg, decode_wav, read_upload
 from app.pipeline import analyze_transcript, process_audio
 from app.registry import ModelRegistry
 from app.schemas import (
@@ -34,7 +34,7 @@ def require_loaded(registry: ModelRegistry | None) -> ModelRegistry:
 def detect(request: Request, image: UploadFile = File(...)):
     # Sync handler: FastAPI runs it in a worker thread, so GPU inference doesn't block the event loop.
     model = require(request.app.state.registry, "vision")
-    picture = decode_jpeg(image.file.read())
+    picture = decode_jpeg(read_upload(image))
     detections = model.detect(picture)
     # If a person is seen, the camera is evidently not blocked, however dark the frame.
     seen_person = any(d.label == "person" for d in detections)
@@ -45,14 +45,14 @@ def detect(request: Request, image: UploadFile = File(...)):
 @router.post("/speech/transcribe", response_model=TranscribeResponse)
 def transcribe(request: Request, audio: UploadFile = File(...)):
     model = require(request.app.state.registry, "stt")
-    return TranscribeResponse(transcript=model.transcribe(decode_wav(audio.file.read())))
+    return TranscribeResponse(transcript=model.transcribe(decode_wav(read_upload(audio))))
 
 
 @router.post("/audio/process", response_model=AudioProcessResponse)
 def audio_process(request: Request, audio: UploadFile = File(...)):
     registry = request.app.state.registry
     require(registry, "stt")  # the LLM is optional: keyword rules stand in if it failed to load
-    return process_audio(registry, audio.file.read())
+    return process_audio(registry, read_upload(audio))
 
 
 @router.post("/language/analyze", response_model=Analysis)

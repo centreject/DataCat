@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.formparsers import MultiPartParser
 
 from app.config import Settings
-from app.errors import error_body, install_error_handlers
+from app.errors import REQUEST_ID, error_body, install_error_handlers
 from app.registry import ModelRegistry, load_registry
 from app.routes import router
 
@@ -22,7 +22,9 @@ log = logging.getLogger(__name__)
 # Uploads are spooled in memory up to this size; Starlette's default (1 MB ≈ 31 s of 16 kHz audio)
 # would roll longer utterances over to a temp file on disk, breaking Zero-Storage (API v1.3 §6.3).
 # Larger requests are rejected before parsing.
-MAX_UPLOAD_BYTES = 16 * 1024 * 1024
+# Spring accepts a 16MB file in a 17MB request (multipart overhead); match the request size here and
+# check each file against 16MB in app.media.read_upload (Gemini review 2026-11-17).
+MAX_UPLOAD_BYTES = 17 * 1024 * 1024
 MultiPartParser.spool_max_size = MAX_UPLOAD_BYTES
 
 
@@ -42,7 +44,7 @@ class UploadLimit:
 
     @staticmethod
     def _too_large() -> JSONResponse:
-        message = f"업로드가 너무 큽니다(최대 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)."
+        message = f"요청이 너무 큽니다(전체 최대 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)."
         return JSONResponse(status_code=400, content=error_body("INVALID_REQUEST", message))
 
     async def __call__(self, scope, receive, send):
@@ -101,6 +103,7 @@ class RequestLog:
         # Caller-supplied, so keep it to a safe charset and length (it goes into logs and a header).
         rid = REQUEST_ID_UNSAFE.sub("", headers.get(b"x-request-id", b"").decode("latin-1"))[:64]
         rid = rid or uuid.uuid4().hex[:12]
+        REQUEST_ID.set(rid)
         start, status = time.perf_counter(), [0]
 
         async def send_with_id(message):
@@ -153,7 +156,9 @@ def create_app(
         app.state.loader.start()
         yield
 
-    app = FastAPI(title="DataCat model service", lifespan=lifespan)
+    # With an API key the service is meant to be closed: don't publish its docs either.
+    docs = {} if not settings.model_api_key else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    app = FastAPI(title="DataCat model service", lifespan=lifespan, **docs)
     app.state.settings = settings
     app.state.registry = None
     app.state.load_failed = False
@@ -191,4 +196,17 @@ def create_app(
         degraded = registry.failed or stuck or package_mode == "zero-shot"
         return {"status": "degraded" if degraded else "ok", **body}
 
+    # Validation errors are answered as 400 {code, message} (app.errors), not FastAPI's 422: say so in the docs.
+    default_openapi = app.openapi
+
+    def openapi_with_400() -> dict:
+        schema = default_openapi()
+        for operations in schema.get("paths", {}).values():
+            for op in operations.values():
+                responses = op.get("responses", {})
+                if responses.pop("422", None) is not None:
+                    responses["400"] = {"description": "요청·파일 형식 오류: {code: INVALID_REQUEST | INVALID_IMAGE | INVALID_AUDIO, message}"}
+        return schema
+
+    app.openapi = openapi_with_400
     return app

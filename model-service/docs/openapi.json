@@ -30,15 +30,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "400": {
+            "description": "요청·파일 형식 오류: {code: INVALID_REQUEST | INVALID_IMAGE | INVALID_AUDIO, message}"
           }
         }
       }
@@ -68,15 +61,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "400": {
+            "description": "요청·파일 형식 오류: {code: INVALID_REQUEST | INVALID_IMAGE | INVALID_AUDIO, message}"
           }
         }
       }
@@ -106,15 +92,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "400": {
+            "description": "요청·파일 형식 오류: {code: INVALID_REQUEST | INVALID_IMAGE | INVALID_AUDIO, message}"
           }
         }
       }
@@ -144,15 +123,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "400": {
+            "description": "요청·파일 형식 오류: {code: INVALID_REQUEST | INVALID_IMAGE | INVALID_AUDIO, message}"
           }
         }
       }
@@ -377,6 +349,8 @@
           },
           "confidence": {
             "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
             "title": "Confidence"
           }
         },

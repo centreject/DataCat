@@ -1,7 +1,15 @@
+import contextvars
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+log = logging.getLogger(__name__)
+# Set by the RequestLog middleware, so an unexpected error's traceback can be matched to its access line.
+REQUEST_ID: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
 
 class ApiError(Exception):
@@ -40,6 +48,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unexpected(request: Request, exc: Exception):
+        log.error("rid=%s unexpected error on %s", REQUEST_ID.get(), request.url.path, exc_info=exc)
         return JSONResponse(
             status_code=500,
             content=error_body("INFERENCE_FAILED", "모델 추론 중 오류가 발생했습니다."),

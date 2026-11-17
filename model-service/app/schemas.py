@@ -14,9 +14,16 @@ Purpose = Literal[CATALOG.ids]  # type: ignore[valid-type]
 Flag = Literal["NO_SPEECH", "SUMMARY_FROM_TRANSCRIPT", "RULES_FALLBACK"]
 
 
+def _check_subtype(model):
+    allowed = CATALOG.subtypes(model.purpose)
+    if model.subtype is not None and model.subtype not in allowed:
+        raise ValueError(f"subtype {model.subtype!r} is not valid for {model.purpose}")
+    return model
+
+
 class Detection(BaseModel):
     label: Literal["person", "package", "animal"]
-    confidence: float
+    confidence: float = Field(ge=0, le=1)
 
 
 class DetectResponse(BaseModel):
@@ -41,10 +48,7 @@ class Analysis(BaseModel):
 
     @model_validator(mode="after")
     def _subtype_belongs_to_purpose(self):
-        allowed = CATALOG.subtypes(self.purpose)
-        if self.subtype is not None and self.subtype not in allowed:
-            raise ValueError(f"subtype {self.subtype!r} is not valid for {self.purpose}")
-        return self
+        return _check_subtype(self)
 
 
 class AudioProcessResponse(BaseModel):
@@ -53,3 +57,7 @@ class AudioProcessResponse(BaseModel):
     subtype: str | None = None
     summary: str
     flags: list[Flag] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _subtype_belongs_to_purpose(self):
+        return _check_subtype(self)

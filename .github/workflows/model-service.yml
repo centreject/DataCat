@@ -24,7 +24,8 @@ jobs:
       - name: Install (CPU torch, no CUDA-only packages)
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
-          pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
+          # Same torch/torchvision versions as requirements.txt, CPU wheels.
+          pip install $(grep -E '^(torch|torchvision)==' requirements.txt) --index-url https://download.pytorch.org/whl/cpu
           grep -vE '^(torch|torchvision|bitsandbytes|nvidia-)' requirements.txt > /tmp/requirements-ci.txt
           pip install -r /tmp/requirements-ci.txt pytest httpx
       - run: python -m pytest -q

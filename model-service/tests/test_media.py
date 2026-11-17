@@ -150,3 +150,16 @@ def test_boost_quiet_leaves_loud_audio_silence_and_caps_the_gain():
     assert boost_quiet(silent) is silent
     tiny = np.array([1e-6], dtype=np.float32)
     assert np.isclose(boost_quiet(tiny)[0], 1e-6 * QUIET_MAX_BOOST)
+
+
+
+def test_decode_jpeg_applies_exif_orientation():
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    exif = Image.Exif()
+    exif[0x0112] = 6  # stored sideways: rotate 90° to view
+    Image.new("RGB", (40, 20)).save(buf, "JPEG", exif=exif)
+    assert decode_jpeg(buf.getvalue()).size == (20, 40)
