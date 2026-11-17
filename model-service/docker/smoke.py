@@ -1,7 +1,7 @@
 """Smoke-test a running model service (e.g. the Docker container) over HTTP.
 
 Usage (from model-service/):  python docker/smoke.py [--url http://localhost:8000] [--wait 900]
-Waits for /health to report "ok", then calls every endpoint once with sample data and checks
+Waits for /health to report "ok" or "degraded", then calls every endpoint once with sample data and checks
 the response shape against API v1.3. Exit code 0 = all good. Standard library only, so it runs
 with any Python 3.11 (teammates don't need the model venv).
 """
@@ -66,17 +66,19 @@ def main() -> None:
     base = args.url.rstrip("/")
 
     deadline = time.time() + args.wait
-    status = None
+    status, health = None, {}
     while time.time() < deadline:
         try:
-            status = request(f"{base}/health")[1].get("status")
+            health = request(f"{base}/health")[1]
+            status = health.get("status")
         except (urllib.error.URLError, ConnectionError):
             status = "unreachable"
-        if status in ("ok", "error"):
+        if status in ("ok", "degraded", "error"):
             break
         time.sleep(5)
-    print(f"/health: {status}")
-    if status != "ok":
+    print(f"/health: {status} {json.dumps(health, ensure_ascii=False)}")
+    # degraded = still serving (e.g. zero-shot package fallback); only a stuck model fails the smoke test.
+    if status not in ("ok", "degraded") or health.get("stuck"):
         sys.exit(1)
 
     failures = []

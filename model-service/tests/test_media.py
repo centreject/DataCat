@@ -132,3 +132,21 @@ def test_unreadable_image_is_400_even_with_ultralytics_patched_open(monkeypatch)
     with pytest.raises(ApiError) as err:
         decode_jpeg(b"not an image at all")
     assert err.value.status == 400 and err.value.code == "INVALID_IMAGE"
+
+
+def test_boost_quiet_raises_a_quiet_recording_to_the_target_peak():
+    from app.media import QUIET_PEAK_TARGET, boost_quiet
+
+    quiet = np.array([0.0, 0.01, -0.02], dtype=np.float32)
+    assert np.isclose(np.max(np.abs(boost_quiet(quiet))), QUIET_PEAK_TARGET)
+
+
+def test_boost_quiet_leaves_loud_audio_silence_and_caps_the_gain():
+    from app.media import QUIET_MAX_BOOST, boost_quiet
+
+    loud = np.array([0.0, 0.8, -0.3], dtype=np.float32)
+    assert boost_quiet(loud) is loud
+    silent = np.zeros(4, dtype=np.float32)
+    assert boost_quiet(silent) is silent
+    tiny = np.array([1e-6], dtype=np.float32)
+    assert np.isclose(boost_quiet(tiny)[0], 1e-6 * QUIET_MAX_BOOST)

@@ -31,6 +31,7 @@ from faster_whisper import WhisperModel  # noqa: E402
 from app.config import Settings  # noqa: E402
 from app.gpu import GpuSlot  # noqa: E402
 from app.hub_cache import load_cached_first  # noqa: E402
+from app.media import boost_quiet  # noqa: E402
 from app.speech.filters import clean_segments  # noqa: E402
 
 # Domain words bias decoding toward what visitors actually say at the door.
@@ -64,7 +65,7 @@ class WhisperSpeech:
     def transcribe(self, audio: np.ndarray) -> str:
         with self.slot():
             segments, _ = self.model.transcribe(
-                audio,
+                boost_quiet(audio),
                 language="ko",
                 beam_size=1,
                 vad_filter=True,

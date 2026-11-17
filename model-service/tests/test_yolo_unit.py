@@ -85,12 +85,24 @@ def test_fine_tuned_model_uses_its_own_threshold():
     assert vision.package_ft_model.kwargs["conf"] == Settings().package_ft_conf
 
 
-def test_fine_tuned_weights_with_wrong_checksum_are_deleted(tmp_path):
+def test_fine_tuned_weights_with_wrong_checksum_are_deleted(monkeypatch, tmp_path):
     bad = tmp_path / yolo.PACKAGE_FT_WEIGHTS
     bad.write_bytes(b"not the released file")
+    monkeypatch.setattr(yolo, "safe_download", lambda url, file, **kw: file.write_bytes(b"still not it"))
     with pytest.raises(RuntimeError, match="checksum"):
         yolo.fetch_package_ft(bad)
     assert not bad.exists()
+
+
+def test_half_downloaded_weights_are_fetched_again(monkeypatch, tmp_path):
+    import hashlib
+
+    path = tmp_path / "w.pt"
+    path.write_bytes(b"half a fi")  # left by an interrupted start
+    monkeypatch.setitem(yolo.SHA256, "w.pt", hashlib.sha256(b"whole file").hexdigest())
+    monkeypatch.setattr(yolo, "safe_download", lambda url, file, **kw: file.write_bytes(b"whole file"))
+    yolo.fetch_verified(path, "https://example.invalid/w.pt")
+    assert path.read_bytes() == b"whole file"
 
 
 def test_person_model_uses_person_threshold():

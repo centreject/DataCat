@@ -1,0 +1,45 @@
+{"id": "d_delivery_01", "purpose": "DELIVERY", "subtype": "PARCEL", "transcript": "로젠택배요. 상자 하나 현관 앞에 내려놓을게요.", "source": "deokmin"}
+{"id": "d_delivery_02", "purpose": "DELIVERY", "subtype": "FOOD", "transcript": "요기요 주문하신 떡볶이 왔어요. 안 나오셔서 문고리에 걸어 둘게요.", "source": "deokmin"}
+{"id": "d_delivery_03", "purpose": "DELIVERY", "subtype": "MAIL", "transcript": "우체국에서 등기 왔습니다. 본인 서명이 필요해서요, 안 계시면 안내문 붙여 놓을게요.", "source": "deokmin"}
+{"id": "d_delivery_04", "purpose": "DELIVERY", "subtype": "LARGE", "transcript": "침대 매트리스 배송이요. 두 명이서 들고 왔는데 문 좀 열어 주시겠어요?", "source": "deokmin"}
+{"id": "d_delivery_05", "purpose": "DELIVERY", "subtype": "QUICK", "transcript": "퀵이요, 사무실에서 보낸 서류 봉투 왔어요.", "source": "deokmin"}
+{"id": "d_pickup_01", "purpose": "PICKUP", "subtype": null, "transcript": "반납하신 렌탈 정수기 가지러 왔습니다.", "source": "deokmin"}
+{"id": "d_pickup_02", "purpose": "PICKUP", "subtype": null, "transcript": "헌 옷 수거 신청하셨죠? 내놓으신 봉투 가져갈게요.", "source": "deokmin"}
+{"id": "d_pickup_03", "purpose": "PICKUP", "subtype": null, "transcript": "아까 배달한 중국집인데요, 그릇 찾으러 왔어요.", "source": "deokmin"}
+{"id": "d_pickup_04", "purpose": "PICKUP", "subtype": null, "transcript": "반품 접수하셔서 기사 왔습니다. 상자 어디 있나요?", "source": "deokmin"}
+{"id": "d_pickup_05", "purpose": "PICKUP", "subtype": null, "transcript": "대형 폐기물 스티커 붙인 의자 가져가러 왔습니다.", "source": "deokmin"}
+{"id": "d_personal_visit_01", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "어머님, 저 며느리예요. 김치 담근 거 가져왔어요.", "source": "deokmin"}
+{"id": "d_personal_visit_02", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "옆집이에요. 지난번에 빌려 간 사다리 돌려드리러 왔어요.", "source": "deokmin"}
+{"id": "d_personal_visit_03", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "형, 문 열어. 나 도착했어. 전화를 안 받네.", "source": "deokmin"}
+{"id": "d_personal_visit_04", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "아저씨, 저 태윤이랑 같은 반인데요, 태윤이 집에 있어요?", "source": "deokmin"}
+{"id": "d_personal_visit_05", "purpose": "PERSONAL_VISIT", "subtype": null, "transcript": "301호예요. 아이 생일이라 떡 좀 나눠 드리려고 왔어요.", "source": "deokmin"}
+{"id": "d_service_visit_01", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "케이블TV 셋톱박스 교체 기사입니다. 오후 두 시 방문으로 잡혀 있어서요.", "source": "deokmin"}
+{"id": "d_service_visit_02", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "보일러 점검 나왔습니다. 관리실에서 공지 붙였던 거요.", "source": "deokmin"}
+{"id": "d_service_visit_03", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "수도 계량기 교체 작업 때문에 왔어요. 십 분이면 끝나요.", "source": "deokmin"}
+{"id": "d_service_visit_04", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "에어컨 청소 예약하셔서 왔습니다.", "source": "deokmin"}
+{"id": "d_service_visit_05", "purpose": "SERVICE_VISIT", "subtype": null, "transcript": "관리사무소입니다. 엘리베이터 공사 때문에 세대마다 안내드리고 있어요.", "source": "deokmin"}
+{"id": "d_public_emergency_01", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "소방서에서 나왔습니다. 아랫집 화재경보기가 울려서 확인 중입니다.", "source": "deokmin"}
+{"id": "d_public_emergency_02", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "지하 주차장에 불났대요! 다들 밖으로 나가래요!", "source": "deokmin"}
+{"id": "d_public_emergency_03", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "경찰입니다. 이 근처에서 실종 신고가 들어와서 집집마다 여쭤보고 있습니다.", "source": "deokmin"}
+{"id": "d_public_emergency_04", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "엘리베이터에 사람 갇혔다고 해서 출동했습니다, 119예요.", "source": "deokmin"}
+{"id": "d_public_emergency_05", "purpose": "PUBLIC_EMERGENCY", "subtype": null, "transcript": "앞집 사람인데요, 이 집에서 타는 냄새가 나요! 안에 누구 계세요?", "source": "deokmin"}
+{"id": "d_solicitation_01", "purpose": "SOLICITATION", "subtype": null, "transcript": "정수기 무료 점검 행사 중인데요, 잠깐 설명 드려도 될까요?", "source": "deokmin"}
+{"id": "d_solicitation_02", "purpose": "SOLICITATION", "subtype": null, "transcript": "신문 구독하시면 상품권 드리고 있어요.", "source": "deokmin"}
+{"id": "d_solicitation_03", "purpose": "SOLICITATION", "subtype": null, "transcript": "성당에서 왔어요. 이번 주 바자회 안내지 드리려고요.", "source": "deokmin"}
+{"id": "d_solicitation_04", "purpose": "SOLICITATION", "subtype": null, "transcript": "불우이웃 돕기 성금 모으고 있습니다. 조금이라도 도와주시면 감사하겠습니다.", "source": "deokmin"}
+{"id": "d_solicitation_05", "purpose": "SOLICITATION", "subtype": null, "transcript": "새로 생긴 헬스장 오픈 이벤트 전단지 놓고 갈게요.", "source": "deokmin"}
+{"id": "d_wrong_visit_01", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "어, 여기 702호 아니에요? 아 6층이구나, 죄송해요.", "source": "deokmin"}
+{"id": "d_wrong_visit_02", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "박 사장님 사무실 찾는데요, 여기 가정집이네요. 실례했습니다.", "source": "deokmin"}
+{"id": "d_wrong_visit_03", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "치킨 시키신 분… 아 주소가 101동이네요, 잘못 왔어요.", "source": "deokmin"}
+{"id": "d_wrong_visit_04", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "누나 집인 줄 알고 눌렀어요. 동을 헷갈렸네요.", "source": "deokmin"}
+{"id": "d_wrong_visit_05", "purpose": "WRONG_VISIT", "subtype": null, "transcript": "죄송합니다, 친구네 집이 이 라인인 줄 알았는데 아닌가 봐요.", "source": "deokmin"}
+{"id": "d_safety_review_01", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "끝까지 숨어 있어 봐라, 언젠가는 나오겠지.", "source": "deokmin"}
+{"id": "d_safety_review_02", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "너 이 집 사는 거 알아냈다. 밤에 다시 올게.", "source": "deokmin"}
+{"id": "d_safety_review_03", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "불 켜져 있는 거 다 봤어. 계속 무시하면 후회할 거다.", "source": "deokmin"}
+{"id": "d_safety_review_04", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "이 문 발로 차서라도 열고 말 거예요.", "source": "deokmin"}
+{"id": "d_safety_review_05", "purpose": "SAFETY_REVIEW", "subtype": null, "transcript": "당신 차 번호도 다 알아. 조심하는 게 좋을 거야.", "source": "deokmin"}
+{"id": "d_unknown_01", "purpose": "UNKNOWN", "subtype": null, "transcript": "아… 네… 그… 아닙니다.", "source": "deokmin"}
+{"id": "d_unknown_02", "purpose": "UNKNOWN", "subtype": null, "transcript": "이거 카메라예요? 신기하네.", "source": "deokmin"}
+{"id": "d_unknown_03", "purpose": "UNKNOWN", "subtype": null, "transcript": "음, 뭐라고 말해야 되지… 나중에 다시 올게요.", "source": "deokmin"}
+{"id": "d_unknown_04", "purpose": "UNKNOWN", "subtype": null, "transcript": "어 녹음되는 거예요? 아 됐어요.", "source": "deokmin"}
+{"id": "d_unknown_05", "purpose": "UNKNOWN", "subtype": null, "transcript": "저기요… 아니다, 됐습니다.", "source": "deokmin"}

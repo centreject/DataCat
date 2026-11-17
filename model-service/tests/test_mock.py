@@ -87,3 +87,16 @@ def test_mock_starts_without_ml_libraries():
 def test_api_docs_are_up_to_date():
     stale = [path.name for path, text in render().items() if not path.exists() or path.read_text("utf-8") != text]
     assert not stale, f"run `python docs/make_api_docs.py` (stale: {stale})"
+
+
+def test_specific_scenarios_win_over_delivery_in_file_names():
+    assert scenario_for("food_delivery.wav") == "food"
+    assert scenario_for("delivery_emergency.wav") == "emergency"
+    assert scenario_for("delivery.wav") == "delivery"
+
+
+def test_mock_language_analyze_answers_and_can_be_busy(client):
+    ok = client.post("/internal/v1/language/analyze", json={"transcript": "문 안 열면 부숴버린다."})
+    assert ok.status_code == 200 and ok.json()["purpose"] == "SAFETY_REVIEW"
+    busy = client.post("/internal/v1/language/analyze", json={"transcript": "busy"})
+    assert busy.status_code == 503 and busy.json()["code"] == "MODEL_BUSY"
