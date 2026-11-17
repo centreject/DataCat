@@ -78,3 +78,19 @@ def decode_wav(data: bytes) -> np.ndarray:
     # (240 s took ~6.4 s on the 3060 Ti) and hold the STT lock for the next visitor.
     samples = samples[: MAX_AUDIO_SECONDS * AUDIO_RATE * 2]
     return np.frombuffer(samples, dtype="<i2").astype(np.float32) / 32768.0
+
+
+QUIET_PEAK_TARGET = 0.5
+QUIET_MAX_BOOST = 100.0  # 40 dB: enough for a mic left at low gain, without lifting pure noise further
+
+
+def boost_quiet(audio: np.ndarray) -> np.ndarray:
+    """Raise a quiet recording so its peak reaches QUIET_PEAK_TARGET; louder audio is left as is.
+
+    Whisper itself copes with level, but a quiet mic over its own noise floor is not: at -40 dB with a
+    -60 dBFS floor the TTS test set went from 14.8% to 10.1% CER with this boost (eval/eval_low_volume.py).
+    """
+    peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+    if peak <= 0 or peak >= QUIET_PEAK_TARGET:
+        return audio
+    return audio * min(QUIET_PEAK_TARGET / peak, QUIET_MAX_BOOST)
