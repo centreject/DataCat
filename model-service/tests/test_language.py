@@ -214,3 +214,23 @@ def test_analyze_route_empty_transcript():
     with ready_client(language=FakeLanguage(error=AssertionError())) as client:
         response = client.post(URL, json={"transcript": ""})
     assert response.json() == {"summary": "", "purpose": "UNKNOWN", "subtype": None, "flags": ["NO_SPEECH"]}
+
+
+# Q3 (2026-11-17): threat words for the keyword fallback. Sentences below are new (not in the dev or
+# held-out sets); the benign ones guard against the new words firing on ordinary visits.
+@pytest.mark.parametrize(
+    "transcript, purpose",
+    [
+        ("다음에 또 이러면 그땐 끝장이야", "SAFETY_REVIEW"),
+        ("문 안 열면 후회할 거다", "SAFETY_REVIEW"),
+        ("집에 불 질러 버린다", "SAFETY_REVIEW"),
+        ("이번엔 가만두지 않겠어", "SAFETY_REVIEW"),
+        ("반드시 복수할 거야", "SAFETY_REVIEW"),
+        ("택배 문 앞에 두고 갈게요", "DELIVERY"),
+        ("밤길 조심해서 들어가세요, 엄마", "PERSONAL_VISIT"),
+        ("내일 다시 찾아올게요, 검침입니다", "SERVICE_VISIT"),
+        ("공사 끝나고 다시 올게요, 관리실입니다", "SERVICE_VISIT"),
+    ],
+)
+def test_rules_threat_keywords(transcript, purpose):
+    assert rule_analyze(transcript).purpose == purpose
