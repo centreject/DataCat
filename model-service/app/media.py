@@ -4,7 +4,7 @@ import io
 import struct
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from app.errors import ApiError
 
@@ -14,6 +14,15 @@ PCM, FLOAT, EXTENSIBLE = 1, 3, 0xFFFE
 REQUIRED = "PCM 16-bit, mono, 16000Hz"
 # Camera Module 3 full resolution is 4608x2592 ≈ 12 MP; allow headroom, refuse absurd sizes.
 MAX_IMAGE_PIXELS = 40_000_000
+MAX_FILE_BYTES = 16 * 1024 * 1024  # per uploaded file (API v1.6 §7.2)
+
+
+def read_upload(upload) -> bytes:
+    """The uploaded file's bytes, refusing more than MAX_FILE_BYTES (400 INVALID_REQUEST)."""
+    data = upload.file.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        raise ApiError(400, "INVALID_REQUEST", f"업로드가 너무 큽니다(최대 {MAX_FILE_BYTES // (1024 * 1024)}MB).")
+    return data
 
 
 def decode_jpeg(data: bytes) -> Image.Image:
@@ -27,10 +36,11 @@ def decode_jpeg(data: bytes) -> Image.Image:
             raise ApiError(
                 400, "INVALID_IMAGE", f"이미지 해상도가 너무 큽니다({width}x{height}, 최대 {MAX_IMAGE_PIXELS // 1_000_000}MP)."
             )
-        return image.convert("RGB")
+        # Phone-style EXIF orientation: detect on the picture as seen, not as stored sideways.
+        return ImageOps.exif_transpose(image).convert("RGB")
     # Not only UnidentifiedImageError (an OSError): Ultralytics patches Image.open and, on a bad file,
     # tries to import pi_heif (not installed) → ModuleNotFoundError (2026-10-22). MemoryError etc. stay 500.
-    except (OSError, ValueError, ImportError, Image.DecompressionBombError):
+    except (OSError, EOFError, ValueError, ImportError, Image.DecompressionBombError):
         raise ApiError(400, "INVALID_IMAGE", "이미지를 읽을 수 없습니다. JPEG 파일이어야 합니다.")
 
 

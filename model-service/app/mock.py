@@ -20,7 +20,7 @@ from fastapi import APIRouter, File, Request, UploadFile
 from app.config import Settings
 from app.errors import ApiError
 from app.language.rules import rule_analyze
-from app.media import decode_jpeg, decode_wav
+from app.media import decode_jpeg, decode_wav, read_upload
 from app.pipeline import analyze_transcript
 from app.registry import ModelRegistry
 from app.schemas import Analysis, AnalyzeRequest, AudioProcessResponse, Detection, DetectResponse, TranscribeResponse
@@ -92,7 +92,7 @@ def _pause(request: Request, filename: str | None) -> None:
 
 @mock_router.post("/vision/detect", response_model=DetectResponse)
 def detect(request: Request, image: UploadFile = File(...)):
-    picture = decode_jpeg(image.file.read())
+    picture = decode_jpeg(read_upload(image))
     _pause(request, image.filename)
     detections = detections_for(image.filename)
     seen_person = any(d.label == "person" for d in detections)
@@ -102,14 +102,14 @@ def detect(request: Request, image: UploadFile = File(...)):
 
 @mock_router.post("/speech/transcribe", response_model=TranscribeResponse)
 def transcribe(request: Request, audio: UploadFile = File(...)):
-    decode_wav(audio.file.read())
+    decode_wav(read_upload(audio))
     _pause(request, audio.filename)
     return TranscribeResponse(transcript=SCENARIOS[scenario_for(audio.filename)][0])
 
 
 @mock_router.post("/audio/process", response_model=AudioProcessResponse)
 def audio_process(request: Request, audio: UploadFile = File(...)):
-    decode_wav(audio.file.read())
+    decode_wav(read_upload(audio))
     _pause(request, audio.filename)
     transcript = SCENARIOS[scenario_for(audio.filename)][0]
     analysis = analyze_transcript(MockLanguage(), transcript)
