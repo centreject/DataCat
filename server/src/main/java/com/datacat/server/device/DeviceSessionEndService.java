@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.List;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 public class DeviceSessionEndService {
@@ -72,7 +74,7 @@ public class DeviceSessionEndService {
                 classification.responsePolicy(),
                 classification.processingStatus(),
                 classification.reason(),
-                event.getNeedsReview()
+                event.getNeedsReview() || "DEVICE_CANCELLED".equals(request.reason())
         );
 
         event.complete(endedAt);
@@ -95,13 +97,31 @@ public class DeviceSessionEndService {
         }
 
         if (!"VISITOR_LEFT".equals(request.reason())
-                && !"TIMEOUT".equals(request.reason())) {
-            throw badRequest("reason은 VISITOR_LEFT 또는 TIMEOUT이어야 합니다.");
+                && !"TIMEOUT".equals(request.reason())
+                && !"DEVICE_CANCELLED".equals(request.reason())) {
+            throw badRequest("reason은 VISITOR_LEFT, TIMEOUT 또는 DEVICE_CANCELLED이어야 합니다.");
         }
 
         if (request.endedAt() == null) {
             throw badRequest("endedAt이 필요합니다.");
         }
+    }
+
+    @Transactional
+    public List<Event> expireInactive(Instant cutoff, Instant expiredAt) {
+        List<Event> expired = eventRepository.findInactiveSessions(
+                EventStatus.WAITING_AUDIO, cutoff, PageRequest.of(0, 100));
+        for (Event event : expired) {
+            EndClassificationResult classification = endClassificationService.interrupted(
+                    event.getPackageSeen(), "후속 요청 없이 세션 대기 시간 초과");
+            event.applyClassification(classification.eventType(), classification.mainCategory(), null,
+                    classification.responsePolicy(), classification.processingStatus(),
+                    classification.reason(), true);
+            event.complete(expiredAt.isBefore(event.getOccurredAt()) ? event.getOccurredAt() : expiredAt);
+        }
+        eventRepository.flush();
+        // 현재 물품의 존재를 재관측한 것이 아니므로 잔류 물품 상태는 바꾸지 않는다.
+        return expired;
     }
 
     private ResponseStatusException badRequest(String message) {
