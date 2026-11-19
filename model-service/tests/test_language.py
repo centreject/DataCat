@@ -144,6 +144,15 @@ def test_rules_expanded_keywords(transcript, purpose):
     assert rule_analyze(transcript).purpose == purpose
 
 
+@pytest.mark.parametrize(
+    "transcript",
+    ["배민입니다, 문 앞에 놔둘게요", "요기요입니다", "로켓프레시 왔어요", "배달의민족에서 왔습니다"],
+)
+def test_rules_delivery_app_names(transcript):
+    # 2026-11-19 review I-4: these were UNKNOWN when the LLM was down
+    assert rule_analyze(transcript).purpose == "DELIVERY"
+
+
 def test_rules_summary_is_truncated_transcript():
     assert rule_analyze("가" * 30).summary == "가" * 19 + "…"
 
@@ -159,6 +168,10 @@ def test_rules_summary_is_truncated_transcript():
         ("물건 왔습니다", "GIFT", "GIFT"),
         # agreement → unchanged
         ("치킨 배달 왔습니다", "FOOD", "FOOD"),
+        # 2026-11-19 review I-4: "박스" is packaging, not a parcel — keep the LLM's kind
+        ("딸기 한 박스 배달 왔어요", "GROCERY", "GROCERY"),
+        ("건조기 박스 배송 왔습니다", "LARGE", "LARGE"),
+        ("택배 박스 문 앞에 뒀어요", "QUICK", "PARCEL"),
     ],
 )
 def test_correct_subtype(transcript, llm_subtype, expected):

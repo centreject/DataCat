@@ -28,6 +28,23 @@ def test_bad_rows_are_refused_with_their_line_numbers(tmp_path):
     assert "2행" in message and "3행" in message and "4행" in message
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        ",photo,empty,,,,day,test",  # no file: would open data/real/ itself
+        "voice/c.wav,voice,DELIVERY,,,20,,test",  # no text: the error rate would be meaningless
+        "voice/c.wav,voice,DELIVERY,PIZZA,x,20,,test",  # not a DELIVERY subtype
+        "voice/c.wav,voice,PICKUP,PARCEL,x,20,,test",  # PICKUP has no subtypes
+        "photo/a.jpg,photo,package,PARCEL,,,day,test",  # photos carry no subtype
+    ],
+)
+def test_rows_the_evaluation_would_miscount_are_refused(tmp_path, line):
+    p = tmp_path / "labels.csv"
+    p.write_text(HEADER + line + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="2행"):
+        real_data.load_labels(p)
+
+
 def test_sheet_reads_the_held_out_sentences_as_test_at_every_distance():
     sheet, labels = real_data.make_sheet([20, 100])
     test = [r for r in labels if r["split"] == "test"]
