@@ -48,8 +48,11 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unexpected(request: Request, exc: Exception):
-        log.error("rid=%s unexpected error on %s", REQUEST_ID.get(), request.url.path, exc_info=exc)
+        rid = REQUEST_ID.get()
+        log.error("rid=%s unexpected error on %s", rid, request.url.path, exc_info=exc)
+        # Starlette answers unhandled errors outside RequestLog, so its header hook never runs here.
         return JSONResponse(
             status_code=500,
             content=error_body("INFERENCE_FAILED", "모델 추론 중 오류가 발생했습니다."),
+            headers={"X-Request-ID": rid} if rid != "-" else None,
         )

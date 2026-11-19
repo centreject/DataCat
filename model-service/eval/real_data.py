@@ -4,6 +4,7 @@ Everything lives in data/real/ (git-ignored: faces, unit numbers and voices neve
 
   python -m eval.real_data sheet [--distances 20,50,100]   # writes data/real/recording_sheet.md + labels.csv
   python -m eval.real_data eval [--split test|tune|all]    # runs the real models over labels.csv (GPU)
+  python -m eval.real_data eval --split tune --errors      # also lists the wrong voice files
 
 labels.csv (one row per file, paths relative to data/real/):
   file          photo/....jpg or voice/....wav (WAV: 16 kHz mono 16-bit, as the Pi uploads)
@@ -65,6 +66,13 @@ def load_labels(path: Path) -> list[Row]:
                 problems.append(f"{n}행: 사진 truth는 person/package/animal을 +로 잇거나 empty")
             elif row.kind == "voice" and row.truth not in {p["id"] for p in CATALOG.purposes}:
                 problems.append(f"{n}행: 음성 truth는 용건 id여야 함({row.truth!r})")
+            elif row.kind == "voice" and not row.text:
+                problems.append(f"{n}행: 음성 text(읽은 문장)가 비어 있음")
+            elif row.subtype and (row.kind != "voice"
+                                  or row.subtype not in {e["id"] for e in CATALOG.get(row.truth).get("subtypes", [])}):
+                problems.append(f"{n}행: subtype {row.subtype!r}은 이 용건의 세부 유형이 아님")
+            if not row.file:
+                problems.append(f"{n}행: file이 비어 있음")
             if row.split not in ("tune", "test"):
                 problems.append(f"{n}행: split은 tune 또는 test")
             rows.append(row)
@@ -105,30 +113,35 @@ def _rate(hits: int, n: int) -> str:
 
 
 def eval_photos(rows: list[Row]) -> list[str]:
-    from PIL import Image
-
     from app.config import Settings
+    from app.media import decode_jpeg
     from app.vision.yolo import YoloVision
 
     vision = YoloVision(Settings())
     groups: dict[str, list[tuple[set[str], set[str]]]] = defaultdict(list)
     for r in rows:
-        found = {d.label for d in vision.detect(Image.open(REAL / r.file).convert("RGB"))}
+        # Same decoding as the service (EXIF rotation), so phone photos are seen upright.
+        found = {d.label for d in vision.detect(decode_jpeg((REAL / r.file).read_bytes()))}
         for key in ("전체", f"빛 {r.light or '?'}", f"거리 {r.distance_cm or '?'}cm"):
             groups[key].append((r.photo_labels(), found))
-    out = ["| 묶음 | 사람 찾음 | 물품 찾음 | 빈 사진에서 무엇이든(오탐) |", "|---|---:|---:|---:|"]
+    out = ["| 묶음 | 사람 찾음 | 물품 찾음 | 동물 찾음 | 사람 없는 사진에서 '사람'(오탐) "
+           "| 물품 없는 사진에서 '물품'(오탐) | 빈 사진에서 무엇이든 |",
+           "|---|---:|---:|---:|---:|---:|---:|"]
     for key, pairs in groups.items():
         cells = []
-        for label in ("person", "package"):
+        for label in ("person", "package", "animal"):
             have = [f for t, f in pairs if label in t]
             cells.append(_rate(sum(label in f for f in have), len(have)))
+        for label in ("person", "package"):
+            without = [f for t, f in pairs if label not in t]
+            cells.append(_rate(sum(label in f for f in without), len(without)))
         empty = [f for t, f in pairs if not t]
         cells.append(_rate(sum(bool(f) for f in empty), len(empty)))
         out.append(f"| {key} | " + " | ".join(cells) + " |")
     return out
 
 
-def eval_voices(rows: list[Row]) -> list[str]:
+def eval_voices(rows: list[Row], show_errors: bool = False) -> list[str]:
     from app.config import Settings
     from app.language.qwen import QwenLanguage
     from app.media import decode_wav
@@ -138,20 +151,30 @@ def eval_voices(rows: list[Row]) -> list[str]:
 
     settings = Settings()
     stt, llm = WhisperSpeech(settings), QwenLanguage(settings)
-    groups: dict[str, list[tuple[Row, str, str]]] = defaultdict(list)
+    groups: dict[str, list[tuple[Row, str, object]]] = defaultdict(list)
     for r in rows:
         transcript = stt.transcribe(decode_wav((REAL / r.file).read_bytes()))
-        purpose = analyze_transcript(llm, transcript).purpose
+        got = analyze_transcript(llm, transcript)
         for key in ("전체", f"거리 {r.distance_cm or '?'}cm"):
-            groups[key].append((r, transcript, purpose))
-    out = ["| 묶음 | 건수 | 글자 오류율 | 빈 받아쓰기 | 용건 정확도 | 긴급·위협 찾음 |", "|---|---:|---:|---:|---:|---:|"]
+            groups[key].append((r, transcript, got))
+    out = ["| 묶음 | 건수 | 글자 오류율 | 빈 받아쓰기 | 용건 정확도 | 배송 세부 유형 | 긴급·위협 찾음 |",
+           "|---|---:|---:|---:|---:|---:|---:|"]
     for key, items in groups.items():
         n = len(items)
         mean_cer = sum(cer(r.text, t) for r, t, _ in items) / n
-        critical = [(r, p) for r, _, p in items if r.truth in CRITICAL]
+        critical = [g for r, _, g in items if r.truth in CRITICAL]
+        typed = [(r, g) for r, _, g in items if r.subtype and r.truth == g.purpose]
         out.append(f"| {key} | {n} | {mean_cer:.1%} | {sum(not t for _, t, _ in items)} | "
-                   f"{_rate(sum(r.truth == p for r, _, p in items), n)} | "
-                   f"{_rate(sum(p in CRITICAL for _, p in critical), len(critical))} |")
+                   f"{_rate(sum(r.truth == g.purpose for r, _, g in items), n)} | "
+                   f"{_rate(sum(r.subtype == g.subtype for r, g in typed), len(typed))} | "
+                   f"{_rate(sum(g.purpose in CRITICAL for g in critical), len(critical))} |")
+    if show_errors:
+        out += ["", "#### 틀린 것 (tune만)", "", "| 파일 | 정답 | 결과 | 받아쓰기 |", "|---|---|---|---|"]
+        for r, t, g in groups["전체"]:
+            if r.truth != g.purpose or (r.subtype and r.subtype != g.subtype):
+                want = r.truth + (f"/{r.subtype}" if r.subtype else "")
+                have = g.purpose + (f"/{g.subtype}" if g.subtype else "")
+                out.append(f"| {r.file} | {want} | {have} | {t or '(빈 받아쓰기)'} |")
     return out
 
 
@@ -162,7 +185,10 @@ def main() -> None:
     s.add_argument("--distances", default="20,50,100")
     e = sub.add_parser("eval")
     e.add_argument("--split", choices=("test", "tune", "all"), default="test")
+    e.add_argument("--errors", action="store_true", help="틀린 음성 파일 목록 (tune에서만: test는 보고 고치지 않는다)")
     args = parser.parse_args()
+    if getattr(args, "errors", False) and args.split != "tune":
+        parser.error("--errors는 --split tune에서만 쓴다")
 
     if args.cmd == "sheet":
         sheet, labels = make_sheet([int(d) for d in args.distances.split(",")])
@@ -187,7 +213,7 @@ def main() -> None:
     if photos := [r for r in present if r.kind == "photo"]:
         print("### 사진\n\n" + "\n".join(eval_photos(photos)) + "\n")
     if voices := [r for r in present if r.kind == "voice"]:
-        print("### 음성\n\n" + "\n".join(eval_voices(voices)))
+        print("### 음성\n\n" + "\n".join(eval_voices(voices, args.errors)))
 
 
 if __name__ == "__main__":

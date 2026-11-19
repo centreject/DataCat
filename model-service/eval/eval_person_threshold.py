@@ -2,7 +2,8 @@
 
 Runs the service's person model once per photo at a low threshold, keeps the highest person score,
 then sweeps the threshold. Positives: data/images/person. Negatives: every other folder (empty
-hallways, packages, animals) — a "person" there would wrongly start a reception.
+hallways, packages, animals) — a "person" there would wrongly start a reception. hard_negative is left
+out: about 21% of it shows real people carrying bags (eval/README.md, Q4).
 
 Usage (from model-service/, GPU):  python -m eval.eval_person_threshold
 """
@@ -13,6 +14,7 @@ from app.config import DATA_DIR, Settings
 
 THRESHOLDS = (0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5)
 FLOOR = 0.05
+NOT_NEGATIVE = ("person", "hard_negative")
 
 
 def best_person_scores(vision, files) -> list[float]:
@@ -33,7 +35,7 @@ def main() -> None:
     vision = YoloVision(settings)
     images = DATA_DIR / "images"
     pos = best_person_scores(vision, sorted((images / "person").glob("*.jpg")))
-    neg_files = sorted(f for d in images.iterdir() if d.is_dir() and d.name != "person" for f in d.glob("*.jpg"))
+    neg_files = sorted(f for d in images.iterdir() if d.is_dir() and d.name not in NOT_NEGATIVE for f in d.glob("*.jpg"))
     neg = best_person_scores(vision, neg_files)
 
     print(f"## 사람 기준값 곡선 — 사람 사진 {len(pos)}장, 사람 없는 사진 {len(neg)}장 (지금 기준값 {settings.person_conf})\n")

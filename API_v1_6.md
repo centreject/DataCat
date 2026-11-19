@@ -26,7 +26,7 @@
 | Android 토큰 등록·커밋 후 비동기 FCM (11장) | 구현. 10-25 수정 APK로 접수 중·배송 결과 알림 수신 및 22번 방문 상세·사진 확인 |
 | 2차 사진 업로드 (6.2), 종료 요청의 선택 사진 | 미구현. 현재 종료 요청은 JSON |
 | 실제 모델 시험 | 10/26 실제 모델(lite) + PR #9로 사진 → 음성 → 조회·종료: 용건 24/25, 음성 API p95 1.66초, 재전송·장애 복구 정상([통합 시험 4차](docs/integration-test.md)) |
-| Docker 통합 환경 | Spring·MySQL 8.4·모의 모델 compose와 검증 도구(PR #11, 병합 대기). 실제 모델용 [GPU Compose 설정](datacat-stack/docker-compose.server-real.yml) 포함 |
+| Docker 통합 환경 | Spring·MySQL 8.4·모의 모델 compose와 검증 도구(PR #11, 11/19 병합). 실제 모델용 [GPU Compose 설정](datacat-stack/docker-compose.server-real.yml) 포함 |
 | Pi 연동 (PR #6) | 3090에서 PR #11 구성과 사진·음성·종료·오류 흐름 확인(모의 모델, 헤드셋 출력). 정식 안내 음원 연결 |
 | 실제 Pi 마이크·스피커·새 부품 시험 | 11/10 기존 장비와 실제 모델로 1차 시험. 새 부품과 11주차 오류 처리의 최종 통합은 일정 확정 후 진행([통합 시험 기록](docs/integration-test.md) 2026-11-10) |
 

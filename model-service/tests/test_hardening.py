@@ -190,6 +190,7 @@ def test_unexpected_error_is_still_logged_with_its_request_id(caplog):
             headers={"X-Request-ID": "ev-9"},
         )
     assert r.status_code == 500 and r.json()["code"] == "INFERENCE_FAILED"
+    assert r.headers["X-Request-ID"] == "ev-9"
     assert any("ev-9" in rec.getMessage() and " 500 " in rec.getMessage() for rec in caplog.records if rec.name == "app.access")
 
 
