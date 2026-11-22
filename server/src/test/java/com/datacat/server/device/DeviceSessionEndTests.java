@@ -160,11 +160,25 @@ class DeviceSessionEndTests {
     @Test
     void invalidReasonReturnsBadRequestWithoutChangingEvent() throws Exception {
         Event event = waitingEvent(0, false);
-        end(event.getEventId(), "DEVICE_CANCELLED", endedAt)
+        end(event.getEventId(), "UNKNOWN", endedAt)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         assertEquals(EventStatus.WAITING_AUDIO, reload(event).getStatus());
         verifyNoInteractions(visitPushService);
+    }
+
+    @Test
+    void deviceCancellationIsReviewableAndIdempotent() throws Exception {
+        Event event = waitingEvent(1, false);
+        end(event.getEventId(), "DEVICE_CANCELLED", endedAt).andExpect(status().isOk());
+        Event saved = reload(event);
+        assertEquals("단말 확인 필요", saved.getProcessingStatus());
+        assertEquals("장애 안내", saved.getResponsePolicy());
+        assertTrue(saved.getNeedsReview());
+        assertEquals("UNATTENDED_DELIVERY", saved.getEventType());
+        end(event.getEventId(), "DEVICE_CANCELLED", endedAt.plusSeconds(2)).andExpect(status().isOk());
+        assertEquals(endedAt, reload(event).getEndedAt());
+        verify(visitPushService, times(1)).notifyVisit(any(Event.class));
     }
 
     @Test

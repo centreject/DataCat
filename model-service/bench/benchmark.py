@@ -63,6 +63,10 @@ def inputs() -> tuple[list[bytes], list[bytes]]:
 
     images = [p.read_bytes() for p in sorted((DATA_DIR / "images" / "person").glob("*.jpg"))]
     wavs = [p.read_bytes() for p in sorted((DATA_DIR / "audio" / "tts").glob("*.wav"))]
+    # Without eval audio, use the repo's own Korean voice prompts: a pure tone is dropped by the VAD,
+    # so audio_process would stop at NO_SPEECH and never time the LLM.
+    presets = Path(__file__).resolve().parent.parent / "preset-audio" / "final"
+    wavs = wavs or [p.read_bytes() for p in sorted(presets.glob("*.wav"))]
     return images or [noisy_jpeg(1280, 720)], wavs or [tone_wav(5)]
 
 
@@ -100,7 +104,7 @@ def main() -> None:
     jpegs, wavs = inputs()
     # Real transcripts for the language step: the eval sentences, in the same order as the audio.
     cases = Path(__file__).resolve().parent.parent / "eval" / "purpose_cases.jsonl"
-    transcripts = [json.loads(line)["transcript"] for line in cases.read_text().splitlines() if line.strip()]
+    transcripts = [json.loads(line)["transcript"] for line in cases.read_text("utf-8").splitlines() if line.strip()]
 
     stats = {
         "vision": timed(lambda jpeg: registry.vision.detect(decode_jpeg(jpeg)), jpegs, args.runs),
@@ -109,6 +113,10 @@ def main() -> None:
         "audio_process": timed(lambda wav: process_audio(registry, wav), wavs, args.runs),
     }
     verdicts = judge(args.profile, stats)
+    # Checked after timing so the "first" request numbers stay cold.
+    silent = sum("NO_SPEECH" in process_audio(registry, wav).flags for wav in wavs)
+    if silent:
+        print(f"경고: 음성 {silent}/{len(wavs)}개가 NO_SPEECH — audio_process가 LLM 없이 끝나 실제보다 빠르게 나온다\n")
     result = {
         "gpu": gpu,
         "total_mib": total_mib,
@@ -138,7 +146,7 @@ def main() -> None:
 
     RESULTS.mkdir(exist_ok=True)
     out = RESULTS / f"{re.sub(r'[^A-Za-z0-9]+', '-', gpu).strip('-')}_{args.profile}.json"
-    out.write_text(json.dumps(result, ensure_ascii=False, indent=2))
+    out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n→ {out.relative_to(RESULTS.parent.parent)}")
 
 

@@ -4,7 +4,7 @@ import io
 import struct
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from app.errors import ApiError
 
@@ -14,6 +14,15 @@ PCM, FLOAT, EXTENSIBLE = 1, 3, 0xFFFE
 REQUIRED = "PCM 16-bit, mono, 16000Hz"
 # Camera Module 3 full resolution is 4608x2592 ≈ 12 MP; allow headroom, refuse absurd sizes.
 MAX_IMAGE_PIXELS = 40_000_000
+MAX_FILE_BYTES = 16 * 1024 * 1024  # per uploaded file (API v1.6 §7.2)
+
+
+def read_upload(upload) -> bytes:
+    """The uploaded file's bytes, refusing more than MAX_FILE_BYTES (400 INVALID_REQUEST)."""
+    data = upload.file.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        raise ApiError(400, "INVALID_REQUEST", f"업로드가 너무 큽니다(최대 {MAX_FILE_BYTES // (1024 * 1024)}MB).")
+    return data
 
 
 def decode_jpeg(data: bytes) -> Image.Image:
@@ -27,10 +36,11 @@ def decode_jpeg(data: bytes) -> Image.Image:
             raise ApiError(
                 400, "INVALID_IMAGE", f"이미지 해상도가 너무 큽니다({width}x{height}, 최대 {MAX_IMAGE_PIXELS // 1_000_000}MP)."
             )
-        return image.convert("RGB")
+        # Phone-style EXIF orientation: detect on the picture as seen, not as stored sideways.
+        return ImageOps.exif_transpose(image).convert("RGB")
     # Not only UnidentifiedImageError (an OSError): Ultralytics patches Image.open and, on a bad file,
     # tries to import pi_heif (not installed) → ModuleNotFoundError (2026-10-22). MemoryError etc. stay 500.
-    except (OSError, ValueError, ImportError, Image.DecompressionBombError):
+    except (OSError, EOFError, ValueError, ImportError, Image.DecompressionBombError):
         raise ApiError(400, "INVALID_IMAGE", "이미지를 읽을 수 없습니다. JPEG 파일이어야 합니다.")
 
 
@@ -78,3 +88,19 @@ def decode_wav(data: bytes) -> np.ndarray:
     # (240 s took ~6.4 s on the 3060 Ti) and hold the STT lock for the next visitor.
     samples = samples[: MAX_AUDIO_SECONDS * AUDIO_RATE * 2]
     return np.frombuffer(samples, dtype="<i2").astype(np.float32) / 32768.0
+
+
+QUIET_PEAK_TARGET = 0.5
+QUIET_MAX_BOOST = 100.0  # 40 dB: enough for a mic left at low gain, without lifting pure noise further
+
+
+def boost_quiet(audio: np.ndarray) -> np.ndarray:
+    """Raise a quiet recording so its peak reaches QUIET_PEAK_TARGET; louder audio is left as is.
+
+    Whisper itself copes with level, but a quiet mic over its own noise floor is not: at -40 dB with a
+    -60 dBFS floor the TTS test set went from 14.8% to 10.1% CER with this boost (eval/eval_low_volume.py).
+    """
+    peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+    if peak <= 0 or peak >= QUIET_PEAK_TARGET:
+        return audio
+    return audio * min(QUIET_PEAK_TARGET / peak, QUIET_MAX_BOOST)

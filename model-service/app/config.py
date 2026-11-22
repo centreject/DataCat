@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     llm_max_new_tokens: int = Field(64, ge=1, le=256)
     # Longest wait for a model busy with another request before answering 503 MODEL_BUSY. A busy LLM
     # falls back to keyword rules. /audio/process waits for STT then the LLM, so its worst case is
-    # stt_wait + STT run (≤0.5 s) + llm_wait + LLM run (≤2 s on the 3060 Ti) ≈ 8.5 s < Spring's 10 s.
+    # stt_wait + STT run (≤0.5 s) + llm_wait + LLM run (≤2 s on the 3060 Ti) ≈ 8.5 s. Spring reads audio for
+    # 5 s (API v1.6 §12, MODEL_AUDIO_READ_TIMEOUT_MS) but sends one request at a time, so it never waits behind itself.
     vision_wait_s: float = Field(3.0, gt=0)  # + ~0.1 s run < Spring's 5 s
     stt_wait_s: float = Field(4.0, gt=0)
     llm_wait_s: float = Field(2.0, gt=0)

@@ -1,7 +1,7 @@
 import pytest
 
 from app.language.normalize import is_grounded, parse_llm_output, truncate_summary
-from app.language.rules import rule_analyze
+from app.language.rules import correct_subtype, rule_analyze
 from app.pipeline import analyze_transcript
 from app.schemas import Analysis
 from tests.conftest import ready_client
@@ -144,8 +144,44 @@ def test_rules_expanded_keywords(transcript, purpose):
     assert rule_analyze(transcript).purpose == purpose
 
 
+@pytest.mark.parametrize(
+    "transcript",
+    ["배민입니다, 문 앞에 놔둘게요", "요기요입니다", "로켓프레시 왔어요", "배달의민족에서 왔습니다"],
+)
+def test_rules_delivery_app_names(transcript):
+    # 2026-11-19 review I-4: these were UNKNOWN when the LLM was down
+    assert rule_analyze(transcript).purpose == "DELIVERY"
+
+
 def test_rules_summary_is_truncated_transcript():
     assert rule_analyze("가" * 30).summary == "가" * 19 + "…"
+
+
+@pytest.mark.parametrize(
+    "transcript,llm_subtype,expected",
+    [
+        # 2026-10-26 PR #9 real-model test: LLM said QUICK for a plain Coupang drop-off.
+        ("쿠팡입니다. 문 앞에 두고 갑니다.", "QUICK", "PARCEL"),
+        # the LLM's own subtype keyword was said → keep it
+        ("퀵으로 쿠팡 물건 가져왔어요", "QUICK", "QUICK"),
+        # no subtype keyword said → keep the LLM's guess
+        ("물건 왔습니다", "GIFT", "GIFT"),
+        # agreement → unchanged
+        ("치킨 배달 왔습니다", "FOOD", "FOOD"),
+        # 2026-11-19 review I-4: "박스" is packaging, not a parcel — keep the LLM's kind
+        ("딸기 한 박스 배달 왔어요", "GROCERY", "GROCERY"),
+        ("건조기 박스 배송 왔습니다", "LARGE", "LARGE"),
+        ("택배 박스 문 앞에 뒀어요", "QUICK", "PARCEL"),
+    ],
+)
+def test_correct_subtype(transcript, llm_subtype, expected):
+    a = Analysis(summary="x", purpose="DELIVERY", subtype=llm_subtype)
+    assert correct_subtype(a, transcript).subtype == expected
+
+
+def test_correct_subtype_ignores_purposes_without_subtypes():
+    a = Analysis(summary="x", purpose="PICKUP")
+    assert correct_subtype(a, "쿠팡 반품 회수하러 왔어요") == a
 
 
 # --- analyze_transcript -----------------------------------------------------
@@ -191,3 +227,32 @@ def test_analyze_route_empty_transcript():
     with ready_client(language=FakeLanguage(error=AssertionError())) as client:
         response = client.post(URL, json={"transcript": ""})
     assert response.json() == {"summary": "", "purpose": "UNKNOWN", "subtype": None, "flags": ["NO_SPEECH"]}
+
+
+# Q3 (2026-11-17): threat words for the keyword fallback. Sentences below are new (not in the dev or
+# held-out sets); the benign ones guard against the new words firing on ordinary visits.
+@pytest.mark.parametrize(
+    "transcript, purpose",
+    [
+        ("다음에 또 이러면 그땐 끝장이야", "SAFETY_REVIEW"),
+        ("문 안 열면 후회할 거다", "SAFETY_REVIEW"),
+        ("집에 불 질러 버린다", "SAFETY_REVIEW"),
+        ("이번엔 가만두지 않겠어", "SAFETY_REVIEW"),
+        ("반드시 복수할 거야", "SAFETY_REVIEW"),
+        ("택배 문 앞에 두고 갈게요", "DELIVERY"),
+        ("밤길 조심해서 들어가세요, 엄마", "PERSONAL_VISIT"),
+        ("내일 다시 찾아올게요, 검침입니다", "SERVICE_VISIT"),
+        ("공사 끝나고 다시 올게요, 관리실입니다", "SERVICE_VISIT"),
+    ],
+)
+def test_rules_threat_keywords(transcript, purpose):
+    assert rule_analyze(transcript).purpose == purpose
+
+
+def test_correct_subtype_keeps_large_item_with_a_signature():
+    # Gemini review 2026-11-17: "서명" alone moved a large delivery to MAIL.
+    from app.language.rules import correct_subtype
+    from app.schemas import Analysis
+
+    llm = Analysis(summary="에어컨 배송", purpose="DELIVERY", subtype="LARGE")
+    assert correct_subtype(llm, "에어컨 배송 왔습니다, 서명 부탁드려요").subtype == "LARGE"

@@ -190,6 +190,7 @@ def test_unexpected_error_is_still_logged_with_its_request_id(caplog):
             headers={"X-Request-ID": "ev-9"},
         )
     assert r.status_code == 500 and r.json()["code"] == "INFERENCE_FAILED"
+    assert r.headers["X-Request-ID"] == "ev-9"
     assert any("ev-9" in rec.getMessage() and " 500 " in rec.getMessage() for rec in caplog.records if rec.name == "app.access")
 
 
@@ -245,3 +246,47 @@ def test_mock_answers_model_busy_for_busy_file_names(monkeypatch):
         r = client.post("/internal/v1/vision/detect", files={"image": ("busy.jpg", tiny_jpeg(), "image/jpeg")})
         a = client.post("/internal/v1/audio/process", files={"audio": ("busy.wav", tone_wav(1), "audio/wav")})
     assert r.status_code == a.status_code == 503 and r.json()["code"] == "MODEL_BUSY"
+
+
+
+# ── Gemini review 2026-11-17 (Q7) ───────────────────────────────────────────
+
+
+def test_file_over_16mb_is_refused_even_inside_a_17mb_request():
+    big = b"\xff\xd8" + b"\x00" * (16 * 1024 * 1024)
+    with ready_client(vision=Sees()) as client:
+        r = client.post("/internal/v1/vision/detect", files={"image": ("a.jpg", big, "image/jpeg")})
+    assert r.status_code == 400 and r.json()["code"] == "INVALID_REQUEST" and "16MB" in r.json()["message"]
+
+
+def test_response_schemas_refuse_out_of_range_values():
+    from app.schemas import AudioProcessResponse
+
+    with pytest.raises(pydantic.ValidationError):
+        Detection(label="person", confidence=1.5)
+    with pytest.raises(pydantic.ValidationError):
+        AudioProcessResponse(transcript="t", purpose="PICKUP", subtype="PARCEL", summary="s")
+
+
+def test_docs_are_closed_when_an_api_key_is_set(monkeypatch):
+    with ready_client(vision=Sees()) as client:
+        assert client.get("/docs").status_code == 200
+    monkeypatch.setenv("MODEL_API_KEY", "s3cret")
+    with ready_client(vision=Sees()) as client:
+        assert client.get("/docs").status_code == 404 and client.get("/openapi.json").status_code == 404
+
+
+def test_unexpected_error_traceback_carries_the_request_id(caplog):
+    with caplog.at_level(logging.ERROR, logger="app.errors"), ready_client(
+        vision=Crashes(), raise_server_exceptions=False
+    ) as client:
+        client.post("/internal/v1/vision/detect", files={"image": ("a.jpg", tiny_jpeg(), "image/jpeg")},
+                    headers={"X-Request-ID": "ev-42"})
+    assert any("rid=ev-42" in rec.getMessage() and rec.exc_info for rec in caplog.records)
+
+
+def test_openapi_documents_400_not_422():
+    with ready_client(vision=Sees()) as client:
+        doc = client.get("/openapi.json").json()
+    codes = {c for ops in doc["paths"].values() for op in ops.values() for c in op.get("responses", {})}
+    assert "422" not in codes and "400" in codes

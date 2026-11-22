@@ -8,7 +8,8 @@ The answer is picked by a keyword in the uploaded file name:
   image: person, package, animal, empty (combine: "person_package.jpg"); no keyword → person.
          LOW_VISIBILITY is computed from the real image, as in the real service.
   audio: one of SCENARIOS below ("emergency.wav"); no keyword → delivery.
-  "busy" in either name → 503 MODEL_BUSY, as the real service answers when a model is occupied.
+  "busy" in either name (or in an /language/analyze transcript) → 503 MODEL_BUSY, as the real service
+  answers when a model is occupied. MOCK_DELAY_MS applies to every endpoint.
 /language/analyze returns the canned answer for a scenario transcript, keyword rules otherwise.
 """
 
@@ -19,10 +20,10 @@ from fastapi import APIRouter, File, Request, UploadFile
 from app.config import Settings
 from app.errors import ApiError
 from app.language.rules import rule_analyze
-from app.media import decode_jpeg, decode_wav
+from app.media import decode_jpeg, decode_wav, read_upload
 from app.pipeline import analyze_transcript
 from app.registry import ModelRegistry
-from app.schemas import Analysis, AudioProcessResponse, Detection, DetectResponse, TranscribeResponse
+from app.schemas import Analysis, AnalyzeRequest, AudioProcessResponse, Detection, DetectResponse, TranscribeResponse
 from app.vision.quality import low_visibility
 
 # Scenario → (transcript, purpose, subtype, summary, flags). Summaries follow the real model's
@@ -48,7 +49,8 @@ CANNED = {t: Analysis(purpose=p, subtype=s, summary=m, flags=f) for t, p, s, m, 
 
 def scenario_for(filename: str | None) -> str:
     name = (filename or "").lower()
-    return next((key for key in SCENARIOS if key in name), DEFAULT_SCENARIO)
+    # "delivery" is the default and a substring of e.g. "food_delivery.wav": match it last.
+    return next((key for key in SCENARIOS if key != DEFAULT_SCENARIO and key in name), DEFAULT_SCENARIO)
 
 
 def detections_for(filename: str | None) -> list[Detection]:
@@ -90,7 +92,7 @@ def _pause(request: Request, filename: str | None) -> None:
 
 @mock_router.post("/vision/detect", response_model=DetectResponse)
 def detect(request: Request, image: UploadFile = File(...)):
-    picture = decode_jpeg(image.file.read())
+    picture = decode_jpeg(read_upload(image))
     _pause(request, image.filename)
     detections = detections_for(image.filename)
     seen_person = any(d.label == "person" for d in detections)
@@ -100,15 +102,21 @@ def detect(request: Request, image: UploadFile = File(...)):
 
 @mock_router.post("/speech/transcribe", response_model=TranscribeResponse)
 def transcribe(request: Request, audio: UploadFile = File(...)):
-    decode_wav(audio.file.read())
+    decode_wav(read_upload(audio))
     _pause(request, audio.filename)
     return TranscribeResponse(transcript=SCENARIOS[scenario_for(audio.filename)][0])
 
 
 @mock_router.post("/audio/process", response_model=AudioProcessResponse)
 def audio_process(request: Request, audio: UploadFile = File(...)):
-    decode_wav(audio.file.read())
+    decode_wav(read_upload(audio))
     _pause(request, audio.filename)
     transcript = SCENARIOS[scenario_for(audio.filename)][0]
     analysis = analyze_transcript(MockLanguage(), transcript)
     return AudioProcessResponse(transcript=transcript, **analysis.model_dump())
+
+
+@mock_router.post("/language/analyze", response_model=Analysis)
+def analyze(request: Request, body: AnalyzeRequest):
+    _pause(request, body.transcript)  # MOCK_DELAY_MS; "busy" in the transcript -> 503 like the others
+    return analyze_transcript(MockLanguage(), body.transcript)

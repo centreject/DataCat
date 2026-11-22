@@ -20,10 +20,12 @@ def test_heldout_set_does_not_overlap_dev_set_or_few_shots():
     def transcripts(name):
         return [json.loads(line)["transcript"] for line in (EVAL / name).read_text("utf-8").splitlines() if line.strip()]
 
-    heldout = transcripts("heldout_cases.jsonl")
-    assert len(heldout) == len(set(heldout))
     taken = set(transcripts("purpose_cases.jsonl")) | {s["transcript"] for s in CATALOG.few_shots}
-    assert not taken & set(heldout)
+    for name in ("heldout_cases.jsonl", "deokmin_cases.jsonl"):
+        held = transcripts(name)
+        assert len(held) == len(set(held))
+        assert not taken & set(held), name
+        taken |= set(held)  # the two held-out sets must not share sentences either
 
 
 def test_cer_identical_is_zero():

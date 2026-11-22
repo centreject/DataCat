@@ -1,6 +1,6 @@
 # DataCat 모델 서비스
 
-Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_5.md`](../API_v1_5.md) 7장(직전 버전 `API_v1_4.md`도 함께 둠).
+Spring Boot가 호출하는 내부 AI 서비스. 이미지 인식(YOLO11 + YOLOE), STT(faster-whisper), 요약·용건 분류(Qwen3)를 한 FastAPI 프로세스에서 제공한다. 계약은 [`API_v1_6.md`](../API_v1_6.md) 7장(직전 버전 `API_v1_5.md`도 함께 둠).
 
 진행 현황: [`PROGRESS.md`](PROGRESS.md) · 정확도: [`eval/README.md`](eval/README.md) · 속도: [`bench/results/`](bench/results/)
 
@@ -37,16 +37,18 @@ docker run --gpus all -p 8000:8000 -v datacat-models:/models datacat-model
 
 #### 3090에서 `full` 재기 (C6)
 
-저장소 루트에서, 모델 이미지를 빌드해 둔 뒤 실행한다. 가중치는 `lite`와 같은 볼륨을 쓰므로 새로 받지 않는다. 결과는 `model-service/bench/results/`에 JSON으로 남는다.
+저장소 루트에서 실행한다. 3090 PC는 실제 모델 통합 시험([`week10-integration.md`](../datacat-stack/week10-integration.md), `-p datacat-week10-real`)으로 이미지와 가중치 볼륨이 이미 있으니 그대로 쓴다(다른 이름을 쓰면 가중치 약 10GB를 새로 받는다). 결과는 `model-service/bench/results/`에 JSON으로 남는다.
 
 ```bash
-M="docker run --rm --gpus all -v datacat-models:/models -v $PWD/model-service:/w -w /w -e MODEL_PROFILE=full datacat-model"
+M="docker run --rm --gpus all -v datacat-week10-real_model-weights:/models -v $PWD/model-service:/w -w /w -e MODEL_PROFILE=full datacat/week10-model-real:local"
 $M python -m bench.benchmark --profile full --runs 20      # 속도·VRAM (lite와 비교하려면 --profile lite도)
 $M python -m eval.eval_language --cases heldout            # 용건·긴급 정확도 (시험 문장 64개)
+$M python -m eval.eval_language --cases deokmin            # 덕민 시험 문장 45개 (lite: 용건 96%, 긴급·위협 90%)
 ```
 
+- 이미지·볼륨 이름은 `docker images`, `docker volume ls`로 확인한다. 이 시험 환경이 없으면 위 "실행" 절대로 `datacat-model` 이미지와 `datacat-models` 볼륨을 쓴다.
 - 실행 중인 `model` 컨테이너가 있으면 먼저 멈춘다(GPU 메모리를 나눠 쓰면 수치가 틀어짐).
-- 사진·음성 평가 자료(`data/`)는 저장소에 없어 속도는 합성 입력으로 잰다. 정확도는 텍스트 문장으로 잰다.
+- 사진·음성 평가 자료(`data/`)는 저장소에 없어 속도는 합성 사진과 저장소의 안내 음성(`preset-audio/final`)으로 잰다. 받아쓰기가 비면(NO_SPEECH) 경고가 나온다. 정확도는 텍스트 문장으로 잰다.
 - 결과 JSON과 출력 표를 AI 담당에게 보내면 `lite`와 비교해 시연 프로필을 정한다.
 
 ### docker-compose 예시 (덕민님 `datacat-stack/docker-compose.yml`의 `model` 블록 자리)
@@ -103,7 +105,7 @@ docker run -p 8000:8000 datacat-model-mock
 | `POST /internal/v1/audio/process` | multipart `audio` | `{"transcript","purpose","subtype","summary","flags"}` — Spring이 실제로 쓰는 음성 경로 |
 | `GET /health` | — | `{"status":"loading"\|"ok"\|"degraded"\|"error","profile":"lite"\|"full"\|"mock"}` |
 
-`purpose` 9개 값과 배송 `subtype`은 [`app/language/purposes.json`](app/language/purposes.json)(덕민님 분류 기획 반영)이 원본이고, 명세 [`API_v1_5.md`](../API_v1_5.md) 7.6에 표로 있다. 분류를 바꿀 때는 이 파일만 고친다.
+`purpose` 9개 값과 배송 `subtype`은 [`app/language/purposes.json`](app/language/purposes.json)(덕민님 분류 기획 반영)이 원본이고, 명세 [`API_v1_6.md`](../API_v1_6.md) 7.6에 표로 있다. 분류를 바꿀 때는 이 파일만 고친다.
 
 `flags` — 언어: `NO_SPEECH`(발화 없음), `SUMMARY_FROM_TRANSCRIPT`(요약이 말한 내용과 달라 전사문 사용), `RULES_FALLBACK`(LLM 실패로 키워드 규칙). 비전: `LOW_VISIBILITY`(화면에 질감이 거의 없음 — 렌즈 가림. 사람이 보이면 붙지 않음. "카메라 가림" 판단은 Spring이 ToF와 함께).
 
