@@ -34,10 +34,11 @@ echo "== Python 가상환경"
 .venv/bin/pip install -q -r requirements.txt
 
 echo "== 장치 확인"
-if sudo i2cdetect -y 1 | grep -q ' 29'; then echo "   VL53L0X: OK (0x29)"; else echo "   VL53L0X: 안 보임 — 배선 확인"; fi
+if sudo i2cdetect -y 1 | grep -q ' 29'; then echo "   ToF(VL53L5CX/VL53L0X): OK (0x29)"; else echo "   ToF: 안 보임 — 배선 확인"; fi
 if [ -e /dev/video0 ]; then echo "   웹캠: OK (/dev/video0)"; else echo "   웹캠: 없음"; fi
 if sudo arecord -l 2>/dev/null | grep -q 'USB Audio'; then echo "   USB 마이크: OK"; else echo "   USB 마이크: 없음"; fi
-if sudo aplay -l 2>/dev/null | grep -q 'Headphones'; then echo "   3.5mm 출력: OK"; else echo "   3.5mm 출력: 없음"; fi
+if grep -qx '0d8c:0012' /proc/asound/card*/usbid 2>/dev/null; then echo "   USB 스피커: OK"
+elif sudo aplay -l 2>/dev/null | grep -q 'Headphones'; then echo "   USB 스피커 없음 → 3.5mm 출력 사용"; else echo "   스피커: 없음"; fi
 
 echo
 [ -n "${NEED_REBOOT:-}" ] && echo "※ 재부팅하세요: sudo reboot"

@@ -152,6 +152,8 @@ def main():
             time.sleep(POLL_INTERVAL)
     except KeyboardInterrupt:
         log("종료")
+    finally:
+        sensor.close()
     return 0
 
 

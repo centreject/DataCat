@@ -1,9 +1,11 @@
 import struct
 import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
 from audio_input import FRAME_BYTES, FRAME_MS, detect_utterance, to_wav
-from audio_output import AudioOutput
+from audio_output import AudioOutput, usb_card_device
 
 VOICE = b"\x01" * FRAME_BYTES
 QUIET = b"\x00" * FRAME_BYTES
@@ -67,6 +69,20 @@ class AudioOutputTests(unittest.TestCase):
         def run(cmd, **kwargs):
             return subprocess.CompletedProcess(cmd, 1)
         self.assertFalse(AudioOutput(run=run).play_wav_bytes(b"x"))
+
+
+
+class UsbCardTests(unittest.TestCase):
+    def test_finds_card_by_usbid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for n, card_id, usbid in ((3, "Device", "0c76:160a"), (4, "Device_1", "0d8c:0012")):
+                card = Path(tmp) / f"card{n}"
+                card.mkdir()
+                (card / "id").write_text(card_id + "\n")
+                (card / "usbid").write_text(usbid + "\n")
+            self.assertEqual(usb_card_device("0d8c:0012", Path(tmp)), "plughw:CARD=Device_1,DEV=0")
+            self.assertEqual(usb_card_device("0c76:160a", Path(tmp)), "plughw:CARD=Device,DEV=0")
+            self.assertIsNone(usb_card_device("1234:5678", Path(tmp)))
 
 
 if __name__ == "__main__":
