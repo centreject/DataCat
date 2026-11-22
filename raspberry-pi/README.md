@@ -40,7 +40,14 @@
 
 ### VL53L5CX (I2C)
 
-VL53L0X와 같은 I2C 버스(SDA 물리 핀 3, SCL 물리 핀 5)에 연결한다. 주소도 같은 `0x29`다.
+| 센서 | Raspberry Pi |
+| --- | --- |
+| VIN | 3.3V |
+| GND | GND |
+| SDA | GPIO2(SDA), 물리 핀 3 |
+| SCL | GPIO3(SCL), 물리 핀 5 |
+
+VL53L0X와 같은 I2C 버스, 같은 주소 `0x29`다. LCD(SPI)와는 핀이 겹치지 않는다.
 
 ### VL53L0X (I2C, 이전 구성)
 
