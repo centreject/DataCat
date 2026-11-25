@@ -1,0 +1,11 @@
+analyzer:
+  exclude:
+    - build/**
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    prefer_final_locals: true
+    sort_child_properties_last: true
+    use_super_parameters: true

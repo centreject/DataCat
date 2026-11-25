@@ -1,0 +1,62 @@
+# 목업 API 대신 실제 Spring 서버로 띄울 때 덮어쓰는 설정
+#
+#   docker compose -f docker-compose.yml -f docker-compose.spring.yml --profile backend up -d --build
+#   (외부 접속까지: 위 명령에 --profile tunnel 추가)
+#
+# 목업으로 돌아갈 때:
+#   docker compose --profile tunnel up -d --build --remove-orphans
+#
+# Spring 코드(server/)와 모델 서비스(model-service/)가 아직 이 브랜치에 없어서,
+# 다른 폴더에 받아 둔 경로를 .env 의 SPRING_DIR, MODEL_DIR 로 알려 준다. (README "Spring 서버로 테스트")
+# 나중에 모두 main 에 합쳐지면 기본값(../server, ../model-service)으로 그대로 동작한다.
+
+services:
+  api:
+    image: datacat/spring-server:local
+    build:
+      context: ${SPRING_DIR:-../server}
+      # server 폴더에 아직 Dockerfile 이 없어서 여기에 적어 둔다
+      dockerfile_inline: |
+        FROM eclipse-temurin:21-jdk AS build
+        WORKDIR /src
+        COPY . .
+        RUN sed -i 's/\r$$//' gradlew && chmod +x gradlew && ./gradlew --no-daemon bootJar -x test
+        FROM eclipse-temurin:21-jre
+        WORKDIR /app
+        COPY --from=build /src/build/libs/ /tmp/libs/
+        RUN cp "$$(ls /tmp/libs/*.jar | grep -v -- '-plain.jar' | head -n 1)" /app/server.jar && rm -rf /tmp/libs
+        EXPOSE 8080
+        ENTRYPOINT ["java", "-jar", "/app/server.jar"]
+    environment:
+      DB_URL: jdbc:mysql://db:3306/${DB_NAME:-datacat}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      DB_USERNAME: ${DB_USER:-datacat}
+      DB_PASSWORD: ${DB_PASSWORD:-datacat-local}
+      MODEL_SERVICE_URL: http://model:8000
+      SNAPSHOT_DIR: /data/snapshots
+      # dev 프로필: DB가 비어 있으면 예시 방문 3건을 넣는다. 빼려면 .env 에 SPRING_PROFILES= (빈 값)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES-dev}
+    volumes:
+      - spring-snapshots:/data/snapshots
+    healthcheck:
+      # Spring 이미지에는 python 이 없어서 포트가 열렸는지만 본다
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+      model:
+        condition: service_healthy
+
+  # 모델 서비스 (GPU 없이 정해진 답을 주는 모의 버전). 사진 파일 이름으로 결과가 정해진다
+  model:
+    build:
+      context: ${MODEL_DIR:-../model-service}
+      dockerfile: Dockerfile.mock
+    image: datacat/model-mock:local
+    restart: unless-stopped
+
+volumes:
+  spring-snapshots:
