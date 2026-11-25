@@ -9,13 +9,18 @@
 
 import argparse
 import collections
+import os
 import subprocess
 import struct
+
+from audio_output import usb_card_device
 
 RATE = 16000
 FRAME_MS = 30
 FRAME_BYTES = RATE * FRAME_MS // 1000 * 2
-DEFAULT_DEVICE = "plughw:CARD=Device,DEV=0"  # USB 마이크
+MIC_USBID = "0c76:160a"  # JMTek USB 마이크
+DEFAULT_DEVICE = (os.environ.get("DATACAT_AUDIO_IN") or usb_card_device(MIC_USBID)
+                  or "plughw:CARD=Device,DEV=0")
 SILENCE_MS = 800
 NO_SPEECH_TIMEOUT_S = 5.0
 MAX_S = 30.0

@@ -7,12 +7,13 @@
 | `main.py` | 응대 흐름: 접근 감지 → 촬영 → 이벤트 생성 → 재확인 게이트 → 안내 → 녹음 → 완료 안내 |
 | `api_client.py` | Spring 단말 API 클라이언트(명세 6장). 표준 라이브러리만 사용 |
 | `distance_sensor.py` | 거리 측정, 접근(`APPROACH`)·이탈(`CLEAR`) 판정. `--sensor hcsr04\|tof` |
-| `tof_sensor.py` | VL53L0X(I2C) 측정. 범위 밖은 최대 거리, 통신 오류만 측정 실패로 넘긴다 |
+| `tof_sensor.py` | ToF(I2C) 측정. VL53L5CX(기본) 또는 VL53L0X(`DATACAT_TOF=l0x`). 범위 밖은 최대 거리, 통신 오류만 측정 실패로 넘긴다 |
 | `gate.py` | 재확인 게이트. 안내 재생 직전 방문객이 아직 있는지 판단(명세 5.3) |
-| `camera.py` | USB 웹캠 JPEG 촬영(메모리로 반환) |
-| `audio_output.py` | 안내 음성 출력(ALSA). `presetId` → `sounds/*.wav`, 재생이 끝나야 반환 |
+| `camera.py` | JPEG 촬영(메모리로 반환). Camera Module 3(`rpicam-still`) 또는 USB 웹캠, `DATACAT_CAMERA=auto\|csi\|usb` |
+| `audio_output.py` | 안내 음성 출력(ALSA). `presetId` → `sounds/*.wav`, 재생이 끝나야 반환. USB 스피커를 USB ID로 찾는다 |
 | `audio_input.py` | VAD 녹음. 16kHz/16bit/mono WAV를 메모리로 반환, 파일 저장 안 함 |
-| `cam_preview.py` | 웹캠 실시간 미리보기(설치 각도 맞추기용) |
+| `cam_preview.py` | USB 웹캠 실시간 미리보기(설치 각도 맞추기용) |
+| `lcd_eyes.py` | 3.5" LCD(ST7796S) 눈 애니메이션. 단독 실행, `main.py` 상태 연결은 아직 안 함 |
 | `SERVER_SETUP.md` | Raspberry Pi 4 환경 설정과 RTX 3090 서버 연동 구성 |
 
 ## 장비
@@ -20,20 +21,35 @@
 | 항목 | 구성 | 상태(2026-10-18) |
 | --- | --- | --- |
 | 보드 | Raspberry Pi 4, Ubuntu 22.04, Python 3.10 | |
-| 거리 센서 | VL53L0X ToF 모듈(VL53LXX-V2), I2C | 동작 확인 |
+| 거리 센서 | VL53L5CX ToF(8×8 멀티존), I2C 0x29 | 동작 확인(2026-11-22) |
+| 거리 센서(이전) | VL53L0X ToF 모듈(VL53LXX-V2), I2C | 코드 유지(`DATACAT_TOF=l0x`) |
 | 거리 센서(이전) | HC-SR04 초음파 | 코드 유지(`--sensor hcsr04`) |
-| 카메라 | USB 웹캠(GEMBIRD AX2311), 640×480 | 동작 확인 |
+| 카메라 | Camera Module 3 Wide(imx708), 2304×1296 | 동작 확인(2026-11-10), 아래 "Camera Module 3" 참고 |
+| 카메라(이전) | USB 웹캠(GEMBIRD AX2311), 640×480 | 코드 유지(`--camera usb`) |
 | 마이크 | USB 핀마이크(JMTek) | 동작 확인 |
-| 스피커 | 3.5mm 이어폰(임시) | 동작 확인 |
+| 스피커 | USB 스피커(C-Media `0d8c:0012`) | 동작 확인(2026-11-22), 볼륨 60% |
+| 스피커(이전) | 3.5mm 이어폰 | USB 스피커가 없으면 자동으로 사용 |
+| 화면 | 3.5" SPI LCD 480×320(ST7796S) | 단독 동작 확인(2026-11-22) |
 | 스피커(예정) | MAX98357A I2S 앰프 | 납땜 손상 의심으로 보류 |
 
-기획서의 거리 센서는 VL53L5CX(8×8 멀티존)이고, 시제품은 한 점만 재는 VL53L0X를 쓴다. 서버에는 `triggerType=TOF`, 측정한 mm 값을 `distanceMm`으로 보낸다.
+거리 센서는 기획서대로 VL53L5CX(8×8 멀티존)로 바꿨다. 64구역 중 측정 상태가 정상(5, 9)인 구역의 가장 가까운 거리를 한 값으로 쓴다. 서버에는 `triggerType=TOF`, 그 mm 값을 `distanceMm`으로 보낸다.
 
 ## 배선
 
 전원을 끈 상태에서 연결한다.
 
-### VL53L0X (I2C)
+### VL53L5CX (I2C)
+
+| 센서 | Raspberry Pi |
+| --- | --- |
+| VIN | 3.3V |
+| GND | GND |
+| SDA | GPIO2(SDA), 물리 핀 3 |
+| SCL | GPIO3(SCL), 물리 핀 5 |
+
+VL53L0X와 같은 I2C 버스, 같은 주소 `0x29`다. LCD(SPI)와는 핀이 겹치지 않는다.
+
+### VL53L0X (I2C, 이전 구성)
 
 | 센서 | Raspberry Pi |
 | --- | --- |
@@ -43,6 +59,22 @@
 | SCL | GPIO3(SCL), 물리 핀 5 |
 
 `sudo i2cdetect -y 1`에서 `29`가 보이면 인식된 것이다.
+
+### LCD (SPI, ST7796S)
+
+| LCD | Raspberry Pi |
+| --- | --- |
+| VCC | 3.3V, 물리 핀 17 |
+| GND | GND, 물리 핀 9 |
+| BL | GPIO18, 물리 핀 12 (코드에서 켠다) |
+| RST | GPIO27, 물리 핀 13 |
+| MOSI | GPIO10(MOSI), 물리 핀 19 |
+| MISO | GPIO9(MISO), 물리 핀 21 |
+| DC | GPIO25, 물리 핀 22 |
+| SCLK | GPIO11(SCLK), 물리 핀 23 |
+| CS | GPIO8(CE0), 물리 핀 24 |
+
+SPI 활성화(`dtparam=spi=on`)가 필요하다. 실행: `sudo python3 lcd_eyes.py` (apt: `python3-spidev python3-rpi.gpio python3-pil python3-numpy`). 지금은 초당 약 5프레임이다.
 
 ### HC-SR04 (이전 구성)
 
@@ -117,20 +149,23 @@ docker compose run --rm pi python distance_sensor.py --sensor tof  # 장치별 �
 
 ## 장치별 시험
 
-모든 명령은 이 폴더에서 실행한다. 사운드카드 번호는 USB 연결 순서로 바뀔 수 있어 코드에서는 카드 이름(`CARD=Headphones`, `CARD=Device`)을 쓴다.
+모든 명령은 이 폴더에서 실행한다. USB 마이크와 USB 스피커는 둘 다 이름이 "USB Audio Device"라 카드 번호와 이름(`Device`, `Device_1`)이 연결 순서로 바뀔 수 있다. 그래서 코드는 USB ID로 카드를 찾는다(마이크 JMTek `0c76:160a`, 스피커 C-Media `0d8c:0012`). 직접 정하려면 `DATACAT_AUDIO_IN`, `DATACAT_AUDIO_OUT`에 ALSA 장치 이름을 넣는다.
 
 ```bash
 # 장치 확인
-i2cdetect -y 1                      # VL53L0X: 29
-arecord -l; aplay -l                # 마이크: USB Audio Device, 이어폰: bcm2835 Headphones
-ls /dev/video*                      # 웹캠: /dev/video0
+i2cdetect -y 1                      # ToF: 29
+arecord -l; aplay -l                # 마이크·스피커: USB Audio Device
+grep . /proc/asound/card*/usbid     # 0c76:160a 마이크, 0d8c:0012 스피커
+rpicam-hello --list-cameras        # Camera Module 3: imx708_wide
+ls /dev/video*                      # USB 웹캠(CSI 카메라를 달면 video0은 unicam이 차지)
 
 # 거리 센서: 거리만 출력 / 접근·이탈 판정
 .venv/bin/python distance_sensor.py --sensor tof
 .venv/bin/python distance_sensor.py --sensor tof --threshold-cm 30 --release-cm 50
 
-# 웹캠: 한 장 저장 / 실시간 미리보기(브라우저 http://localhost:8090, VSCode가 포트 연결)
+# 카메라: 한 장 저장(기본 auto) / USB 웹캠 강제 / USB 웹캠 실시간 미리보기(브라우저 http://localhost:8090)
 .venv/bin/python camera.py cam_test.jpg
+.venv/bin/python camera.py --camera usb --device 1 cam_test.jpg
 .venv/bin/python cam_preview.py
 
 # 스피커: 삐 소리 / WAV 파일 / 프리셋(sounds/ 음원 필요)
@@ -141,8 +176,11 @@ ls /dev/video*                      # 웹캠: /dev/video0
 # 마이크: VAD 녹음 후 바로 재생(파일로 남기지 않음)
 .venv/bin/python audio_input.py
 
-# ALSA만으로 마이크→이어폰 확인
-arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && aplay -D plughw:CARD=Headphones,DEV=0 /tmp/t.wav
+# LCD 눈 애니메이션
+sudo python3 lcd_eyes.py
+
+# 스피커 볼륨(USB 스피커 60% = -15dB가 현관에서 적당했다). 재부팅 후에도 유지하려면 store
+amixer -c Device_1 sset PCM 60% && sudo alsactl store
 ```
 
 ## 응대 흐름
@@ -164,13 +202,21 @@ arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && a
 
 `--offline`의 서버 응답은 `main.py`의 `OfflineServer`가 명세의 정상 응답을 흉내 낸 것이다. 프리셋 음원(`sounds/greeting.wav`, `completion.wav`, `fallback.wav`)은 `model-service/preset-audio/final/`의 음원을 복사한 것이다. 팀 투표로 완료 안내는 B안(`completion_alt.wav`, blind4 L)을 `completion.wav`로 쓴다. 파일이 없으면 삐 소리로 대신한다.
 
+## VL53L5CX 참고 (2026-11-22)
+
+- 라이브러리: `sparkfun_qwiic_vl53l5cx` 2.0.0. 시작할 때 펌웨어(86KB)를 I2C로 올려 초기화에 약 24초 걸린다(I2C 100kHz).
+- 이 라이브러리는 4×4(16구역)로 바꾸면 데이터가 오지 않아 8×8(64구역)을 쓴다.
+- 15Hz로 설정해도 I2C 100kHz에서는 초당 약 2.7회 읽힌다. `main.py`는 0.1초마다 읽고, 새 값이 없으면 직전 값을 쓴다.
+- 시야가 넓어(대각 약 63°) 센서 옆의 책상·벽도 가까운 값으로 잡힌다. 설치할 때 해제 거리(50cm) 안쪽에 고정물이 없게 둔다.
+- 2026-11-22 서버 연동 확인: 이벤트 33, 26.4cm 접근 → 안내 → "택배였습니다" → 배송 > 택배, 완료 안내.
+
 ## 판정 규칙
 
 - **접근:** 감지 거리 이내 값이 3회 연속(`--samples`) → `APPROACH` 한 번
 - **이탈:** 해제 거리 이상이 3초(`--clear-s`) 이어지면 `CLEAR`. 기획서 복귀 안정화 시간(권장 3~5초)
 - 두 거리 사이에서는 상태 유지. 중간에 한 번이라도 다시 가까워지면 처음부터 센다.
-- **VL53L0X 범위 밖:** 앞이 비면 센서가 약 8190mm를 준다. 이것을 측정 실패로 두면 이탈을 확인하지 못하므로 최대 거리(120cm)로 바꾼다. 그래서 tof의 해제 거리는 120cm보다 작아야 한다.
-- **측정 실패:** I2C 오류, 응답 지연(0.5초), 3cm 미만(VL53L0X) / 응답 없음, 2~400cm 밖(HC-SR04). 실패는 이탈로 보지 않는다.
+- **ToF 범위 밖:** 앞이 비면 VL53L0X는 약 8190mm를 준다. VL53L5CX는 정상 구역이 하나도 없을 때 같은 값으로 바꾼다. 이것을 측정 실패로 두면 이탈을 확인하지 못하므로 최대 거리(120cm)로 바꾼다. 그래서 tof의 해제 거리는 120cm보다 작아야 한다.
+- **측정 실패:** I2C 오류, 응답 지연(VL53L0X 0.5초, VL53L5CX 새 측정 없이 2초), 3cm 미만 / 응답 없음, 2~400cm 밖(HC-SR04). 실패는 이탈로 보지 않는다.
 - **재확인 게이트:** 0.06초 간격 5회 측정, 유효값의 과반이 해제 거리 안쪽이면 방문객 있음. 유효값이 없으면 이탈로 본다.
 
 실측(손, 감지 30cm/해제 50cm): 접근·이탈 모두 정상. 손이 50cm 가까이 멀어지면 가끔 범위 밖(120cm)으로 튀지만 이탈은 30회 연속이 필요해 영향 없음. 사람 몸 기준 감지·해제 거리는 설치 위치에서 다시 정한다.
@@ -192,7 +238,7 @@ arecord -D plughw:CARD=Device,DEV=0 -f S16_LE -r 16000 -c 1 -d 5 /tmp/t.wav && a
 python3 -m unittest -v
 ```
 
-GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리, API 요청 형식을 검사한다(33개). 실제 장치 동작은 위 장치별 시험으로 확인한다.
+GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리, USB 사운드카드 찾기, API 요청 형식을 검사한다(38개). 실제 장치 동작은 위 장치별 시험으로 확인한다.
 
 ## 실서버 연동 시험 (2026-10-18)
 
@@ -220,3 +266,14 @@ Pi 4 → 3090 서버(Spring `feature/image-upload` + 실제 모델 `lite` + MySQ
 3. 설치 위치에서 감지·해제 거리 결정
 4. MAX98357A 복구 시 `audio_output.py`의 `DEFAULT_DEVICE`만 I2S 카드로 변경
 5. 촬영 지연 단축(실서버 시험에서 접근 후 촬영까지 약 2초, 카메라를 미리 열어 두는 방식 검토)
+
+## Camera Module 3 (Ubuntu 22.04)
+
+Ubuntu 22.04의 5.15 커널에는 imx708 드라이버가 없어 OS를 바꾸지 않고 따로 넣었다(2026-11-10, Pi 4 실기 확인).
+
+- 드라이버: 라즈베리파이 커널 `rpi-5.15.y`의 `imx708.c`, `dw9807-vcm.c`(오토포커스)를 DKMS(`imx708/1.0`, 소스 `/usr/src/imx708-1.0`)로 설치. 커널이 바뀌면 자동으로 다시 빌드된다.
+- 오버레이: 같은 브랜치의 `imx708-overlay.dts`를 컴파일해 `/boot/firmware/overlays/imx708.dtbo`에 넣음(사본 `/usr/local/share/imx708/`). `config.txt`는 `camera_auto_detect=0`, `dtoverlay=imx708`.
+- 사용자 공간: `raspberrypi/libcamera`(rpi/vc4만)와 `rpicam-apps`를 소스 빌드해 `/usr/local`에 설치.
+- 확인: `rpicam-hello --list-cameras`에 `imx708_wide`, `python3 camera.py`가 약 1.3초에 2304×1296 JPEG 저장.
+- 렌즈 방향: `DATACAT_CAMERA_ROTATION=180`(0/180만 가능). 해상도는 `DATACAT_CAMERA_WIDTH`/`HEIGHT`.
+- Docker 이미지에는 libcamera가 없어 컨테이너에서는 아직 CSI 카메라를 쓸 수 없다. 당분간 가상환경으로 실행한다.

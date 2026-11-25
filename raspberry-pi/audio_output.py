@@ -2,18 +2,39 @@
 """안내 음성 출력. ALSA aplay로 WAV를 재생하고 재생이 끝날 때까지 기다린다.
 
 마이크는 안내 재생이 끝난 뒤에만 연다(명세 5.3). play_*가 반환된 시점이 재생 종료다.
-출력 장치는 ALSA 장치 이름 하나로 정한다. 지금은 3.5mm 단자이고,
-MAX98357A(I2S)로 바꾸면 그 카드 이름만 지정하면 된다.
+출력 장치는 DATACAT_AUDIO_OUT(ALSA 장치 이름)으로 정할 수 있다. 없으면 USB 스피커
+(C-Media 0d8c:0012)를 USB ID로 찾고, 그것도 없으면 3.5mm 단자로 재생한다.
 """
 
 import argparse
 import math
+import os
 import struct
 import subprocess
 from pathlib import Path
 
-# 카드 번호는 USB 연결 순서에 따라 바뀔 수 있어 카드 이름으로 지정한다.
-DEFAULT_DEVICE = "plughw:CARD=Headphones,DEV=0"
+SPEAKER_USBID = "0d8c:0012"   # C-Media USB 스피커
+HEADPHONES_DEVICE = "plughw:CARD=Headphones,DEV=0"
+
+
+def usb_card_device(usbid, asound=Path("/proc/asound")):
+    """USB ID(vvvv:pppp)가 같은 사운드 카드의 ALSA 장치 이름. 없으면 None.
+
+    USB 마이크와 스피커가 둘 다 "USB Audio Device"라 카드 이름(Device, Device_1)과
+    번호가 연결 순서에 따라 바뀐다. USB ID는 바뀌지 않는다.
+    """
+    for usbid_file in sorted(asound.glob("card*/usbid")):
+        try:
+            if usbid_file.read_text().strip() == usbid:
+                card_id = (usbid_file.parent / "id").read_text().strip()
+                return f"plughw:CARD={card_id},DEV=0"
+        except OSError:
+            continue
+    return None
+
+
+DEFAULT_DEVICE = (os.environ.get("DATACAT_AUDIO_OUT") or usb_card_device(SPEAKER_USBID)
+                  or HEADPHONES_DEVICE)
 SOUNDS_DIR = Path(__file__).with_name("sounds")
 # 명세 10.2: presetId는 단말의 고정 음원 파일에 매핑된다.
 PRESET_FILES = {

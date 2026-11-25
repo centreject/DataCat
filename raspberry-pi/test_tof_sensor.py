@@ -1,8 +1,9 @@
+import time
 import unittest
 
 from distance_sensor import ProximityDetector
 from gate import visitor_present
-from tof_sensor import TOF_MAX_MM, TofSensor
+from tof_sensor import L5CX_STALE_S, TOF_MAX_MM, L5cxDevice, TofSensor
 
 
 class FakeVl53l0x:
@@ -49,6 +50,61 @@ class TofSensorTests(unittest.TestCase):
     def test_gate_sees_empty_doorway_as_left(self):
         sensor = self.sensor([8190] * 5)
         self.assertFalse(visitor_present(sensor.read_cm, 40, sleep=lambda _: None))
+
+
+
+class FakeL5cxData:
+    def __init__(self, distances, statuses):
+        self.distance_mm = distances
+        self.target_status = statuses
+
+
+class FakeL5cx:
+    """qwiic_vl53l5cx 대신 프레임을 하나씩 내준다. None은 새 측정 없음."""
+
+    def __init__(self, frames):
+        self.frames = list(frames)
+        self.pending = None
+
+    def check_data_ready(self):
+        self.pending = self.frames.pop(0)
+        return self.pending is not None
+
+    def get_ranging_data(self):
+        return self.pending
+
+
+class L5cxDeviceTests(unittest.TestCase):
+    def device(self, frames):
+        device = L5cxDevice.__new__(L5cxDevice)
+        device.sensor = FakeL5cx(frames)
+        device.last_mm = L5cxDevice.NO_TARGET_MM
+        device.last_at = time.monotonic()
+        return device
+
+    def test_nearest_valid_zone_wins(self):
+        distances = [900] * 64
+        statuses = [5] * 64
+        distances[10], statuses[10] = 150, 255   # 무효 구역은 무시
+        distances[20] = 400
+        distances[30] = 20                       # 3cm 미만은 무시
+        frame = FakeL5cxData(distances, statuses)
+        self.assertEqual(self.device([frame]).range, 400)
+
+    def test_no_valid_zone_is_no_target(self):
+        frame = FakeL5cxData([500] * 64, [255] * 64)
+        self.assertEqual(self.device([frame]).range, L5cxDevice.NO_TARGET_MM)
+
+    def test_keeps_last_value_until_next_frame(self):
+        frame = FakeL5cxData([600] * 64, [9] * 64)
+        device = self.device([frame, None])
+        self.assertEqual(device.range, 600)
+        self.assertEqual(device.range, 600)
+
+    def test_stale_data_is_failure(self):
+        device = self.device([None])
+        device.last_at -= L5CX_STALE_S + 1
+        self.assertIsNone(TofSensor(device=device).read_cm())
 
 
 if __name__ == "__main__":

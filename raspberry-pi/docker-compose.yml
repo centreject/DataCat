@@ -9,10 +9,10 @@ services:
     build: .
     image: datacat/pi:local
     devices:
-      - /dev/i2c-1      # VL53L0X
+      - /dev/i2c-1      # ToF(VL53L5CX)
       - /dev/gpiomem    # Blinka(RPi.GPIO) 초기화
       - /dev/video0     # USB 웹캠
-      - /dev/snd        # USB 마이크, 3.5mm 출력
+      - /dev/snd        # USB 마이크, USB 스피커
     volumes:
       - ./sounds:/app/sounds:ro   # 프리셋 음원(greeting/completion/fallback.wav). 이미지에 넣지 않고 바꿔 끼운다
     environment:

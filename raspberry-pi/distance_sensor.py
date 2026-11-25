@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HC-SR04 또는 VL53L0X 거리 측정. 감지 거리는 실행 옵션으로 지정한다."""
+"""HC-SR04 또는 ToF(VL53L5CX/VL53L0X) 거리 측정. 감지 거리는 실행 옵션으로 지정한다."""
 
 import argparse
 import math
@@ -77,7 +77,7 @@ class ProximityDetector:
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sensor", choices=("hcsr04", "tof"), default="hcsr04",
-                        help="거리 센서 종류(기본: hcsr04). tof는 VL53L0X(I2C)")
+                        help="거리 센서 종류(기본: hcsr04). tof는 VL53L5CX(I2C), DATACAT_TOF=l0x면 VL53L0X")
     parser.add_argument("--threshold-cm", type=float, help="접근 감지 거리(cm)")
     parser.add_argument("--release-cm", type=float, help="감지 해제 거리(cm), 감지 거리보다 크게 지정")
     parser.add_argument("--samples", type=int, default=3, help="접근 확인에 필요한 연속 측정 횟수(기본: 3)")
@@ -125,8 +125,8 @@ def open_tof():
     try:
         sensor = TofSensor()
     except (ImportError, ValueError) as exc:  # 라이브러리 없음, I2C 장치 없음
-        raise RuntimeError(f"VL53L0X를 사용할 수 없습니다: {exc}")
-    return sensor.read_cm, (lambda: None)
+        raise RuntimeError(f"ToF 센서를 사용할 수 없습니다: {exc}")
+    return sensor.read_cm, sensor.close
 
 
 def main():
