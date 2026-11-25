@@ -23,16 +23,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # 지금은 목업 API. Spring Boot 가 준비되면 build 경로만 Spring 프로젝트로 바꾼다.
-  #   build: ../server           (Spring 프로젝트 폴더, 안에 Dockerfile)
-  #   environment:
-  #     SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${DB_NAME}
-  #     SPRING_DATASOURCE_USERNAME: ${DB_USER}
-  #     SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-  #     MODEL_SERVICE_URL: http://model:8000
-  #     FCM_CREDENTIALS_FILE: /secrets/firebase-service-account.json   # 푸시도 같은 키를 그대로 쓴다
-  #   volumes:
-  #     - ./secrets:/secrets:ro
+  # 데모용 목업 API. 실제 Spring·MySQL·AI 모델로 띄울 때는 이 파일 대신
+  # docker-compose.server.yml 을 쓴다 (설명: README-server.md, 포트 18080).
   api:
     build: ./mock-api
     image: datacat/mock-api:local

@@ -1,5 +1,7 @@
 # datacat-stack — 도커로 한 번에 띄우기
 
+> 실제 서버(Spring·MySQL·AI 모델) 시험은 [`README-server.md`](README-server.md)의 `docker-compose.server.yml`을 씁니다. 이 문서의 `docker-compose.yml`은 목업 API + 웹 앱 데모용입니다.
+
 Flutter 앱(웹)과 API 서버를 도커로 묶은 것입니다. 팀원 PC에서도, 서버 PC에서도 같은 명령으로 돌아갑니다.
 
 ```text
