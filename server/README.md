@@ -261,6 +261,14 @@ Flutter 로컬 시험은 휴대폰과 PC를 같은 네트워크에 연결하고 
 
 ## 자동 테스트와 수동 검증
 
+GitHub Actions의 [`server` 워크플로](../.github/workflows/server.yml)는 `server/**` 또는 워크플로 파일을 바꾸는 main 대상 PR과 main 푸시에서 Java 21로 `./gradlew test --no-daemon`을 실행한다.
+병합 후에는 저장소 Actions → server → Run workflow로 수동 실행할 수도 있다.
+PR의 Checks 또는 Actions 실행 화면에서 `Java 21 tests` 결과를 확인한다.
+실행 화면의 Artifacts에서 `server-test-report`를 내려받으면 HTML 보고서(`index.html`)와 JUnit XML을 볼 수 있다(14일 보관).
+컴파일·다운로드 단계에서 실패하면 보고서가 없을 수 있으므로 실패한 단계의 로그를 확인한다.
+이 CI는 H2와 모의 응답으로 서버 동작을 검사한다. 실제 MySQL·모델·Pi·스피커·휴대폰 푸시 시험은 별도로 수행한다.
+Firebase 키나 DB 비밀번호를 GitHub Secrets에 추가할 필요는 없다.
+
 Java 21을 사용한다. PowerShell에서 실행한다.
 
 ```powershell
