@@ -24,7 +24,7 @@ def main() -> None:
             if not ref_path.exists():
                 continue
             hyp = stt.transcribe(decode_wav(wav.read_bytes()))
-            score = cer(ref_path.read_text().strip(), hyp)
+            score = cer(ref_path.read_text(encoding="utf-8").strip(), hyp)
             scores.append(score)
             worst.append((score, folder.name, wav.stem, hyp))
         if scores:

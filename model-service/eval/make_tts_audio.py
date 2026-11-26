@@ -49,14 +49,14 @@ async def synthesize(text: str, voice: str) -> np.ndarray:
 
 
 async def main() -> None:
-    cases = [json.loads(line) for line in CASES.read_text().splitlines() if line.strip()]
+    cases = [json.loads(line) for line in CASES.read_text(encoding="utf-8").splitlines() if line.strip()]
     for i, case in enumerate(cases):
         speech = await synthesize(case["transcript"], VOICES[i % len(VOICES)])
         variants = {"tts": speech} | {f"tts_snr{snr}": add_noise(speech, snr, seed=i) for snr in NOISE_SNR_DB}
         for folder, samples in variants.items():
             out = DATA_DIR / "audio" / folder
             write_wav(out / f"{case['id']}.wav", samples)
-            (out / f"{case['id']}.txt").write_text(case["transcript"])
+            (out / f"{case['id']}.txt").write_text(case["transcript"], encoding="utf-8")
     print(f"{len(cases)} cases × {1 + len(NOISE_SNR_DB)} variants → {DATA_DIR / 'audio'}")
 
 

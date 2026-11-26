@@ -1,5 +1,7 @@
 """R1 tooling (eval/real_data.py): labels.csv checks and the recording sheet, no GPU."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from eval import real_data
@@ -54,3 +56,32 @@ def test_sheet_reads_the_held_out_sentences_as_test_at_every_distance():
     assert {r["distance_cm"] for r in labels} == {"20", "100"}
     assert "voice/d_delivery_01_20cm.wav" in {r["file"] for r in labels}
     assert "d_delivery_01_<거리>cm.wav" in sheet
+
+
+def test_voice_subtype_denominator_includes_misclassified_purpose():
+    # Matches eval.metrics.subtype_accuracy: a DELIVERY/PARCEL utterance that ends up UNKNOWN
+    # (e.g. NO_SPEECH) must count as a subtype miss (1/2 = 50%), not be dropped (1/1 = 100%).
+    r1 = real_data.Row("voice/a.wav", "voice", "DELIVERY", "PARCEL", "택배 왔습니다", "20", "", "tune")
+    r2 = real_data.Row("voice/b.wav", "voice", "DELIVERY", "PARCEL", "택배 두고 갑니다", "50", "", "tune")
+    g1 = SimpleNamespace(purpose="DELIVERY", subtype="PARCEL")
+    g2 = SimpleNamespace(purpose="UNKNOWN", subtype=None)
+    lines = real_data.format_voice_results([(r1, "택배 왔습니다", g1), (r2, "", g2)], show_errors=True)
+    total_row = next(line for line in lines if line.startswith("| 전체 |"))
+    cells = [c.strip() for c in total_row.strip("|").split("|")]
+    assert cells[4] == "1/2 (50%)"  # 용건 정확도
+    assert cells[5] == "1/2 (50%)"  # 배송 세부 유형
+    assert any("voice/b.wav" in line and "DELIVERY/PARCEL" in line and "(빈 받아쓰기)" in line for line in lines)
+
+
+def test_photo_errors_lists_only_wrong_photos():
+    ok_row = real_data.Row("photo/ok.jpg", "photo", "person+package", "", "", "50", "day", "tune")
+    miss_row = real_data.Row("photo/miss.jpg", "photo", "person", "", "", "100", "night", "tune")
+    fp_row = real_data.Row("photo/fp.jpg", "photo", "empty", "", "", "50", "day", "tune")
+    lines = real_data.format_photo_results(
+        [(ok_row, {"person", "package"}), (miss_row, set()), (fp_row, {"package"})],
+        show_errors=True,
+    )
+    error_lines = lines[lines.index("#### 틀린 사진 (tune만)") :]
+    assert not any("photo/ok.jpg" in line for line in error_lines)
+    assert any("photo/miss.jpg" in line and "| person | empty |" in line for line in error_lines)
+    assert any("photo/fp.jpg" in line and "| empty | package |" in line for line in error_lines)
