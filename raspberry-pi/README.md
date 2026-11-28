@@ -193,14 +193,15 @@ amixer -c Device_1 sset PCM 60% && sudo alsactl store
 1. 감지 거리 안쪽 3회 연속 → `APPROACH`, 웹캠 촬영
 2. 이벤트 생성 → (서버 흉내) `START_RECEPTION`
 3. 재확인 게이트. 방문객이 떠났으면 안내 없이 `VISITOR_LEFT`로 종료
-4. 안내 재생(presetId 1). **재생이 끝난 뒤에만 마이크를 연다**(명세 5.3, 법적 제약)
+4. 안내 재생(presetId 1). **안내 멘트 재생이 성공한 뒤에만 마이크를 연다**(명세 5.3). 실패하면 삐 소리의 성공 여부와 관계없이 녹음하지 않고 `DEVICE_CANCELLED`로 종료한다.
 5. VAD 녹음. 5초 안에 발화가 없으면 `TIMEOUT`으로 종료
 6. 음성 전송 → (서버 흉내) 녹음을 다시 들려줌 → 완료 안내(presetId 2)
 7. 방문객이 떠나 `CLEAR`가 나올 때까지 다음 응대를 하지 않음
 
-서버 요청 대기는 10초. 이벤트 생성·음성 전송이 실패하면(연결 실패, 503 등) 오류 안내(presetId 3)를 재생하고, 종료 알림 실패는 로그만 남긴다.
+서버 요청 대기는 10초. 이벤트 생성·음성 전송이 실패하면(연결 실패, 503 등) 오류 안내(presetId 3)를 재생한다. `/audio`가 409이면 현재 응대를 끝내고, 같은 녹음을 다시 보내거나 완료 안내를 재생하지 않는다. 이후에는 `CLEAR`를 기다리는 기존 감시 흐름으로 돌아간다.
+마이크 `OSError`도 `DEVICE_CANCELLED`로 종료한다. 종료 알림 실패는 로그만 남기며, 서버의 대기 방문 자동 만료가 후속 정리를 맡는다(기본 120초).
 
-`--offline`의 서버 응답은 `main.py`의 `OfflineServer`가 명세의 정상 응답을 흉내 낸 것이다. 프리셋 음원(`sounds/greeting.wav`, `completion.wav`, `fallback.wav`)은 `model-service/preset-audio/final/`의 음원을 복사한 것이다. 팀 투표로 완료 안내는 B안(`completion_alt.wav`, blind4 L)을 `completion.wav`로 쓴다. 파일이 없으면 삐 소리로 대신한다.
+`--offline`의 서버 응답은 `main.py`의 `OfflineServer`가 명세의 정상 응답을 흉내 낸 것이다. 프리셋 음원(`sounds/greeting.wav`, `completion.wav`, `fallback.wav`)은 `model-service/preset-audio/final/`의 음원을 복사한 것이다. 팀 투표로 완료 안내는 B안(`completion_alt.wav`, blind4 L)을 `completion.wav`로 쓴다. 재생 실패 시 삐 소리는 오류 표시용이며, 녹음 안내를 대신하지 않는다.
 
 ## VL53L5CX 참고 (2026-11-22)
 
@@ -238,7 +239,9 @@ amixer -c Device_1 sset PCM 60% && sudo alsactl store
 python3 -m unittest -v
 ```
 
-GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리, USB 사운드카드 찾기, API 요청 형식을 검사한다(38개). 실제 장치 동작은 위 장치별 시험으로 확인한다.
+GPIO·센서 없이 일반 PC에서도 판정 로직, ToF 값 변환, 재확인 게이트, VAD 종료 조건, 음성 출력 오류 처리, USB 사운드카드 찾기, API 요청 형식을 검사한다. 기존 38개에 응대 오류 흐름 13개를 추가해 총 51개다.
+`test_session_safety.py`는 안내 실패 시 녹음 차단, 마이크 오류 종료, 정상 무발화와 구분, HTTP 409 처리를 검사한다. 2개는 로컬 시험용 HTTP 서버와 실제 `SpringClient`를 사용하며, 실제 Spring·DB·하드웨어 시험은 아니다.
+검토 범위·실장비 확인 절차는 [응대 오류 처리 검토안](docs/session-safety-review.md)을 따른다.
 
 ## 실서버 연동 시험 (2026-10-18)
 
@@ -260,9 +263,8 @@ Pi 4 → 3090 서버(Spring `feature/image-upload` + 실제 모델 `lite` + MySQ
 
 ## 다음 작업
 
-1. Spring `/audio`, `/end` 구현 후 연동 확인. 현재 Spring에는 `POST /device/events`(feature/image-upload)만 있어 음성 전송·종료 알림은 404
-   - 2026-10-18 3090 실서버 확인: 사람 감지 → `START_RECEPTION`까지 정상
-2. 프리셋 음원 3개(인사·완료·오류 안내) 준비
+1. 최신 main의 Spring `/audio`·`/end`와 응대 오류 처리 재시험. 서버 구현은 완료됐으며, Pi 수정안의 안내 실패·마이크 오류·409를 [검토 절차](docs/session-safety-review.md)로 확인
+2. 준비된 프리셋 음원 3개(인사·완료·오류 안내)를 실제 스피커에서 청취하고 녹음 순서 확인
 3. 설치 위치에서 감지·해제 거리 결정
 4. MAX98357A 복구 시 `audio_output.py`의 `DEFAULT_DEVICE`만 I2S 카드로 변경
 5. 촬영 지연 단축(실서버 시험에서 접근 후 촬영까지 약 2초, 카메라를 미리 열어 두는 방식 검토)

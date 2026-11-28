@@ -56,12 +56,16 @@ class OfflineServer:
 
 
 def play_preset(out, preset):
-    """프리셋 음원을 재생한다. 음원 파일이 아직 없으면 삐 소리로 대신한다."""
+    """안내 음원 재생 성공 여부를 반환한다. 실패 시 삐 소리는 오류 표시용이다."""
     preset_id = preset["presetId"]
     log(f"  안내 재생: presetId={preset_id} \"{preset.get('text', '')}\"")
-    if not out.play_preset(preset_id):
-        log(f"  (presetId={preset_id} 음원 파일 없음 → 삐 소리로 대체)")
-        out.play_wav_bytes(tone_wav())
+    if out.play_preset(preset_id):
+        return True
+    log(f"  (presetId={preset_id} 안내 재생 실패 → 오류 표시용 삐 소리)")
+    if not out.play_wav_bytes(tone_wav()):
+        log("  오류 표시용 삐 소리도 재생 실패")
+    # 삐 소리만으로 녹음 사실을 안내할 수 없으므로 성공으로 취급하지 않는다(명세 5.3).
+    return False
 
 
 def end_session(server, event_id, reason):
@@ -93,12 +97,21 @@ def run_session(sensor, release_cm, server, out):
         log("  재확인 게이트: 방문객 이탈 → 안내 생략")
         end_session(server, event_id, "VISITOR_LEFT")
         return
-    play_preset(out, resp["preset"])
+    if not play_preset(out, resp["preset"]):
+        log("  녹음 안내 실패 → 마이크를 열지 않고 장치 오류 종료")
+        end_session(server, event_id, "DEVICE_CANCELLED")
+        return
 
     # 안내가 끝난 뒤에만 마이크를 연다.
     log("  마이크 개방, 발화 대기")
-    wav = record_utterance()
-    log("  마이크 닫힘")
+    try:
+        wav = record_utterance()
+    except OSError as exc:
+        log(f"  마이크 오류 → 장치 오류 종료: {exc}")
+        end_session(server, event_id, "DEVICE_CANCELLED")
+        return
+    finally:
+        log("  마이크 닫힘")
     if wav is None:
         log("  발화 없음")
         end_session(server, event_id, "TIMEOUT")
@@ -107,6 +120,9 @@ def run_session(sensor, release_cm, server, out):
     try:
         resp = server.send_audio(event_id, wav)
     except ApiError as exc:
+        if exc.status == 409:
+            log(f"  음성 접수 상태 충돌 → 현재 응대 종료(재전송·완료 안내 없음): {exc}")
+            return
         log(f"  음성 전송 실패: {exc}")
         play_preset(out, FALLBACK_PRESET)
         return
